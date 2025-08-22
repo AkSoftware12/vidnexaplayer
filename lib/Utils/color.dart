@@ -16,6 +16,4 @@ class ColorSelect {
   static const background=Colors.white;
   static const headingColor=Colors.grey;
 
-
-
 }

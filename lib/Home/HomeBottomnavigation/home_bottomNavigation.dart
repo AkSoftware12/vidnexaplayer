@@ -10,6 +10,7 @@ import 'package:instamusic/HexColorCode/HexColor.dart';
 import 'package:instamusic/Utils/color.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
@@ -42,7 +43,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int currentPage = 0;
   String currentVersion = '';
-  String userName = "User";
+  String? userName;
   String userImage = "";
 
   // GlobalKey bottomNavigationKey = GlobalKey();
@@ -52,82 +53,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     bool isDarkMode = !(prefs.getBool('isDarkMode') ?? false);
     prefs.setBool('isDarkMode', isDarkMode);
     (context as Element).markNeedsBuild();
-  }
-
-  void _openBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (BuildContext context) {
-        return Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: Icon(Icons.restore),
-              title: Text('Restore Purchase'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.remove_circle_outline),
-              title: Text('Remove Ad'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.network_wifi),
-              title: Text('Network Stream'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.build),
-              title: Text('Change Toolbar'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.color_lens),
-              title: Text('Theme'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.language),
-              title: Text('Language'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.share),
-              title: Text('Share Application'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.settings),
-              title: Text('Settings'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-            ListTile(
-              leading: Icon(Icons.feedback),
-              title: Text('Feedback'),
-              onTap: () {
-                Navigator.pop(context);
-              },
-            ),
-          ],
-        );
-      },
-    );
   }
 
   @override
@@ -208,13 +133,16 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
               ],
             ),
             // Grid icon
+            SizedBox(
+              height: 40.sp,
+                child: Image.asset('assets/logo_blue_text.png')),
 
             Row(
               children: [
                 Stack(
                   children: [
                     GestureDetector(
-                      onTap: (){
+                      onTap: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(
@@ -249,14 +177,13 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
 
                 // Profile picture with green dot
                 GestureDetector(
-                  onTap: (){
+                  onTap: () {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                          builder: (context) =>
-                          const HomeBottomNavigation(
-                            bottomIndex: 3,
-                          )),
+                          builder: (context) => const HomeBottomNavigation(
+                                bottomIndex: 3,
+                              )),
                     );
                   },
                   child: Stack(
@@ -311,9 +238,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
           width: MediaQuery.sizeOf(context).width * .65,
           // backgroundColor: ColorSelect.maineColor,
           child: SettingsScreen(
-        user: userName,
-        userImage: userImage,
-      )),
+            user: userName!,
+            userImage: userImage,
+          )),
       // drawer: Drawer(
       //   shape: const RoundedRectangleBorder(
       //     borderRadius: BorderRadius.zero,
@@ -995,504 +922,1857 @@ class CustomBottomBarState extends State<CustomBottomBar> {
   }
 }
 
+// class SettingsScreen extends StatelessWidget {
+//   final String user;
+//   final String userImage;
+//   final String currentVersion =
+//       "1.0.0"; // Example version, replace with actual version
+//   final TextSizes textSizes = TextSizes();
+//
+//   SettingsScreen(
+//       {super.key,
+//       required this.user,
+//       required this.userImage}); // Assuming TextSizes is defined elsewhere
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     return ListView(
+//       padding: EdgeInsets.zero,
+//       children: <Widget>[
+//         Column(
+//           children: [
+//             SizedBox(
+//               height: 40.sp,
+//             ),
+//             Row(
+//               mainAxisAlignment: MainAxisAlignment.end,
+//               children: [
+//                 Padding(
+//                   padding: EdgeInsets.only(right: 25.sp),
+//                   child: GestureDetector(
+//                     onTap: () {
+//                       Navigator.of(context).pop();
+//                     },
+//                     child: Icon(
+//                       FontAwesomeIcons.xmark,
+//                       color: Colors.black54,
+//                       size: 22.sp,
+//                     ),
+//                   ),
+//                 ),
+//               ],
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//             Container(
+//               color: Colors.white,
+//               child: Padding(
+//                 padding: EdgeInsets.all(13.sp),
+//                 child: Container(
+//                   width: double.infinity,
+//                   decoration: BoxDecoration(
+//                     borderRadius: BorderRadius.circular(12),
+//                     gradient: LinearGradient(
+//                       colors: [
+//                         HexColor('#3b82f6'),
+//                         Colors.purple,
+//                       ],
+//                       begin: Alignment.topLeft,
+//                       end: Alignment.bottomRight,
+//                     ),
+//                   ),
+//                   padding: EdgeInsets.all(10.sp),
+//                   child: Row(
+//                     children: [
+//                       ClipOval(
+//                         child: Container(
+//                           width: 50.sp,
+//                           height: 50.sp,
+//                           decoration: BoxDecoration(
+//                             shape: BoxShape.circle,
+//                           ),
+//                           child: userImage != null
+//                               ? Image.asset('assets/avtar.jpg')
+//                               : Image.asset('assets/avtar.jpg'),
+//                         ),
+//                       ),
+//                       SizedBox(
+//                         width: 10.sp,
+//                       ),
+//                       Expanded(
+//                         child: Column(
+//                           mainAxisAlignment: MainAxisAlignment.start,
+//                           crossAxisAlignment: CrossAxisAlignment.start,
+//                           children: [
+//                             Text(
+//                               user,
+//                               style: GoogleFonts.radioCanada(
+//                                 textStyle: TextStyle(
+//                                   color: Colors.white,
+//                                   fontSize: TextSizes.textlarge,
+//                                   fontWeight: FontWeight.bold,
+//                                 ),
+//                               ),
+//                             ),
+//                             Text(
+//                               'Premium Member',
+//                               style: GoogleFonts.radioCanada(
+//                                 textStyle: TextStyle(
+//                                   color: Colors.white,
+//                                   fontSize: TextSizes.textsmall,
+//                                   fontWeight: FontWeight.bold,
+//                                 ),
+//                               ),
+//                             ),
+//                           ],
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               ),
+//             ),
+//             Divider(
+//               thickness: 2.sp,
+//               color: Colors.grey,
+//             ),
+//
+//             // Drawer List
+//
+//             ListTile(
+//               leading: Container(
+//                   decoration: BoxDecoration(
+//                     borderRadius: BorderRadius.circular(12),
+//                     gradient: LinearGradient(
+//                       colors: [
+//                         HexColor('#800000'),
+//                         HexColor('#800000'),
+//                       ],
+//                       begin: Alignment.topLeft,
+//                       end: Alignment.bottomRight,
+//                     ),
+//                   ),
+//                   padding: EdgeInsets.all(10.sp),
+//                   child: Icon(
+//                     Icons.apps,
+//                     color: Colors.white,
+//                   )),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'Dashboard',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'Track Performance',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {
+//                 Navigator.of(context).pop();
+//               },
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//
+//             ListTile(
+//               leading: Container(
+//                 height: 35.sp,
+//                 width: 35.sp,
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#9A6324'),
+//                       HexColor('#9A6324'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(10.sp),
+//                 child: Image.asset(
+//                   'assets/videos_img.png',
+//                 ),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'All Videos',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'View counts and analytics',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {
+//                 Navigator.push(
+//                     context,
+//                     MaterialPageRoute(
+//                       builder: (context) => AllVideosScreen(),
+//                     ));              },
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//
+//
+//             ListTile(
+//               leading: Container(
+//                 height: 35.sp,
+//                 width: 35.sp,
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#808000'),
+//                       HexColor('#808000'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(10.sp),
+//                 child: Image.asset(
+//                   'assets/image-gallery.png',
+//                 ),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'All Photos',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'Captured Bliss',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {
+//                 Navigator.push(
+//                     context,
+//                     MaterialPageRoute(
+//                       builder: (context) => SimpleExamplePage(),
+//                     ));
+//                 },
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//
+//             ListTile(
+//               leading: Container(
+//                 height: 35.sp,
+//                 width: 35.sp,
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#911eb4'),
+//                       HexColor('#911eb4'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(10.sp),
+//                 child: Image.asset(
+//                   'assets/music_img.png',
+//                 ),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'All Musics',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'Melodic Echoes',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {
+//                 Navigator.push(
+//                   context,
+//                   MaterialPageRoute(
+//                       builder: (context) => const HomeBottomNavigation(
+//                         bottomIndex: 1,
+//                       )),
+//                 );
+//                 },
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//
+//
+//
+//             ListTile(
+//               leading: Container(
+//                 height: 35.sp,
+//                 width: 35.sp,
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#4363d8'),
+//                       HexColor('#4363d8'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(10.sp),
+//                 child: Image.asset(
+//                   'assets/link.img.png',
+//                 ),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'VidStream',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'Instant Video, One Click Away',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {
+//                 Navigator.push(
+//                     context,
+//                     MaterialPageRoute(
+//                       builder: (context) => VideoPlayerStream(),
+//                     ));
+//                 },
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//
+//             ListTile(
+//               leading: Container(
+//                 height: 35.sp,
+//                 width: 35.sp,
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#469990'),
+//                       HexColor('#469990'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(10.sp),
+//                 child: Image.asset(
+//                   'assets/folder_img.png',
+//                 ),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'File Manager',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'All Files, Anywhere, Anytime',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {
+//                 Navigator.push(
+//                   context,
+//                   MaterialPageRoute(
+//                     builder: (context) => DeviceSpaceScreen(),
+//                   ),
+//                 );              },
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//
+//
+//             ListTile(
+//               leading: Container(
+//                 height: 35.sp,
+//                 width: 35.sp,
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#dcbeff'),
+//                       HexColor('#dcbeff'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(0.sp),
+//
+//                 child: Icon(Icons.notifications_none,
+//                     color: Colors.white),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'Notifications',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'Stay Updated, Never Miss Out ',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {
+//                 Navigator.push(
+//                   context,
+//                   MaterialPageRoute(
+//                     builder: (context) => NotificationScreen(),
+//                   ),
+//                 );
+//                 },
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//
+//             ListTile(
+//               leading: Container(
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#2563eb'),
+//                       HexColor('#2563eb'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(10.sp),
+//                 child: SvgPicture.asset(
+//                   'assets/cleaner.svg',
+//                   color: Colors.white,
+//                 ),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'Cleaner',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'Clean junk files',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {},
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//             ListTile(
+//               leading: Container(
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#059669'),
+//                       HexColor('#059669'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(10.sp),
+//                 child: SvgPicture.asset(
+//                   'assets/game.svg',
+//                   color: Colors.white,
+//                 ),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'Game',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'Play mini games',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {},
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//             ListTile(
+//               leading: Container(
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#db2777'),
+//                       HexColor('#db2777'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(10.sp),
+//                 child: SvgPicture.asset(
+//                   'assets/languge.svg',
+//                   color: Colors.white,
+//                 ),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'Language',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'Change app language',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {},
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//             ListTile(
+//               leading: Container(
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#ca8a04'),
+//                       HexColor('#ca8a04'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(10.sp),
+//                 child: SvgPicture.asset(
+//                   'assets/theme.svg',
+//                   color: Colors.white,
+//                 ),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'Theme',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'Customize appearance',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {},
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//             ListTile(
+//               leading: Container(
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#d97706'),
+//                       HexColor('#d97706'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(10.sp),
+//                 child: SvgPicture.asset(
+//                   'assets/star.svg',
+//                   color: Colors.white,
+//                 ),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'Premium',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'Unlock all features',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               trailing: Container(
+//                 padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+//                 decoration: BoxDecoration(
+//                   color: Colors.orange,
+//                   borderRadius: BorderRadius.circular(10),
+//                 ),
+//                 child: Text(
+//                   'PRO',
+//                   style: TextStyle(color: Colors.white),
+//                 ),
+//               ),
+//               onTap: () {},
+//             ),
+//             SizedBox(
+//               height: 10.sp,
+//             ),
+//             ListTile(
+//               leading: Container(
+//                 decoration: BoxDecoration(
+//                   borderRadius: BorderRadius.circular(12),
+//                   gradient: LinearGradient(
+//                     colors: [
+//                       HexColor('#334155'),
+//                       HexColor('#334155'),
+//                     ],
+//                     begin: Alignment.topLeft,
+//                     end: Alignment.bottomRight,
+//                   ),
+//                 ),
+//                 padding: EdgeInsets.all(10.sp),
+//                 child: SvgPicture.asset(
+//                   'assets/privacy.svg',
+//                   color: Colors.white,
+//                 ),
+//               ),
+//               title: Column(
+//                 mainAxisAlignment: MainAxisAlignment.start,
+//                 crossAxisAlignment: CrossAxisAlignment.start,
+//                 children: [
+//                   Text(
+//                     'Privacy',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.black,
+//                         fontSize: TextSizes.textmedium14,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                   Text(
+//                     'Privacy & security',
+//                     style: GoogleFonts.openSans(
+//                       textStyle: TextStyle(
+//                         color: Colors.grey,
+//                         fontSize: 9.sp,
+//                         fontWeight: FontWeight.bold,
+//                       ),
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//               onTap: () {},
+//             ),
+//             SizedBox(height: 50.sp),
+//             Container(
+//               color: Colors.white,
+//               child: Padding(
+//                 padding: EdgeInsets.all(13.sp),
+//                 child: Container(
+//                   width: double.infinity,
+//                   decoration: BoxDecoration(
+//                     borderRadius: BorderRadius.circular(12),
+//                     gradient: LinearGradient(
+//                       colors: [
+//                         HexColor('#3b82f6'),
+//                         Colors.purple,
+//                       ],
+//                       begin: Alignment.topLeft,
+//                       end: Alignment.bottomRight,
+//                     ),
+//                   ),
+//                   padding: EdgeInsets.all(10.sp),
+//                   child: Row(
+//                     children: [
+//                       Container(
+//                         decoration: BoxDecoration(
+//                           borderRadius: BorderRadius.circular(12),
+//                           gradient: LinearGradient(
+//                             colors: [
+//                               HexColor('#3b82f6'), // Purple
+//                               HexColor('#3b82f6'), // Purple
+//                             ],
+//                             begin: Alignment.topLeft,
+//                             end: Alignment.bottomRight,
+//                           ),
+//                         ),
+//                         padding: const EdgeInsets.all(8),
+//                         child: const Icon(Icons.folder, color: Colors.white),
+//                       ),
+//                       SizedBox(
+//                         width: 10.sp,
+//                       ),
+//                       Expanded(
+//                         child: Column(
+//                           mainAxisAlignment: MainAxisAlignment.start,
+//                           crossAxisAlignment: CrossAxisAlignment.start,
+//                           children: [
+//                             Text(
+//                               'Nex Player',
+//                               style: GoogleFonts.radioCanada(
+//                                 textStyle: TextStyle(
+//                                   color: Colors.white,
+//                                   fontSize: TextSizes.textmedium,
+//                                   fontWeight: FontWeight.bold,
+//                                 ),
+//                               ),
+//                             ),
+//                             Text(
+//                               'Version : $currentVersion',
+//                               style: GoogleFonts.radioCanada(
+//                                 textStyle: TextStyle(
+//                                   color: Colors.white,
+//                                   fontSize: 10.sp,
+//                                   fontWeight: FontWeight.w600,
+//                                 ),
+//                               ),
+//                             ),
+//                           ],
+//                         ),
+//                       ),
+//                     ],
+//                   ),
+//                 ),
+//               ),
+//             ),
+//           ],
+//         ),
+//       ],
+//     );
+//   }
+// }
+
+
 class SettingsScreen extends StatelessWidget {
   final String user;
   final String userImage;
-  final String currentVersion =
-      "1.0.0"; // Example version, replace with actual version
+  final String currentVersion = "1.0.0"; // Example version, replace with actual version
   final TextSizes textSizes = TextSizes();
 
-  SettingsScreen(
-      {super.key,
-      required this.user,
-      required this.userImage}); // Assuming TextSizes is defined elsewhere
+  SettingsScreen({
+    super.key,
+    required this.user,
+    required this.userImage,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: EdgeInsets.zero,
-      children: <Widget>[
-        Column(
-          children: [
-            SizedBox(
-              height: 40.sp,
-            ),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                Padding(
-                  padding: EdgeInsets.only(right: 25.sp),
-                  child: GestureDetector(
-                    onTap: () {
-                      Navigator.of(context).pop();
-                    },
-                    child: Icon(
-                      FontAwesomeIcons.xmark,
-                      color: Colors.black54,
-                      size: 22.sp,
-                    ),
+    return Scaffold(
+      body: Column(
+        children: [
+          SizedBox(height: 30.sp),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              SizedBox(
+                  height: 50.sp,
+                  child: Image.asset('assets/logo_blue_text.png')),
+              Padding(
+                padding: EdgeInsets.only(right: 10.sp),
+                child: GestureDetector(
+                  onTap: () {
+                    Navigator.of(context).pop();
+                  },
+                  child: Icon(
+                    FontAwesomeIcons.xmark,
+                    color: Colors.black54,
+                    size: 22.sp,
                   ),
                 ),
+              ),
+            ],
+          ),
+          SizedBox(height: 0.sp),
+          Container(
+            color: Colors.white,
+            child: Padding(
+              padding: EdgeInsets.all(10.sp),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    colors: [
+                      HexColor('#3b82f6'),
+                      Colors.purple,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                ),
+                padding: EdgeInsets.all(10.sp),
+                child: Row(
+                  children: [
+                    ClipOval(
+                      child: Container(
+                        width: 50.sp,
+                        height: 50.sp,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                        ),
+                        child: userImage.isNotEmpty
+                            ? Image.asset('assets/avtar.jpg')
+                            : Image.asset('assets/avtar.jpg'),
+                      ),
+                    ),
+                    SizedBox(width: 10.sp),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            user,
+                            style: GoogleFonts.radioCanada(
+                              textStyle: TextStyle(
+                                color: Colors.white,
+                                fontSize: TextSizes.textlarge,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            'Premium Member',
+                            style: GoogleFonts.radioCanada(
+                              textStyle: TextStyle(
+                                color: Colors.white,
+                                fontSize: TextSizes.textsmall,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Divider(
+            thickness: 2.sp,
+            color: Colors.grey,
+          ),
+          Expanded(
+            child: ListView(
+              padding: EdgeInsets.zero,
+              children: <Widget>[
+
+                // Drawer List
+                ListTile(
+                  leading: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          HexColor('#800000'),
+                          HexColor('#800000'),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    padding: EdgeInsets.all(10.sp),
+                    child: Icon(
+                      Icons.apps,
+                      color: Colors.white,
+                    ),
+                  ),
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Dashboard',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.black,
+                            fontSize: TextSizes.textmedium14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Track Performance',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    Navigator.of(context).pop();
+                  },
+                ),
+                SizedBox(height: 10.sp),
+                ListTile(
+                  leading: Container(
+                    height: 35.sp,
+                    width: 35.sp,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          HexColor('#9A6324'),
+                          HexColor('#9A6324'),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    padding: EdgeInsets.all(10.sp),
+                    child: Image.asset('assets/videos_img.png'),
+                  ),
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'All Videos',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.black,
+                            fontSize: TextSizes.textmedium14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'View counts and analytics',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => AllVideosScreen(),
+                      ),
+                    );
+                  },
+                ),
+                SizedBox(height: 10.sp),
+                ListTile(
+                  leading: Container(
+                    height: 35.sp,
+                    width: 35.sp,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          HexColor('#808000'),
+                          HexColor('#808000'),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    padding: EdgeInsets.all(10.sp),
+                    child: Image.asset('assets/image-gallery.png'),
+                  ),
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'All Photos',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.black,
+                            fontSize: TextSizes.textmedium14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Captured Bliss',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => SimpleExamplePage(),
+                      ),
+                    );
+                  },
+                ),
+                SizedBox(height: 10.sp),
+                ListTile(
+                  leading: Container(
+                    height: 35.sp,
+                    width: 35.sp,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          HexColor('#911eb4'),
+                          HexColor('#911eb4'),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    padding: EdgeInsets.all(10.sp),
+                    child: Image.asset('assets/music_img.png'),
+                  ),
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'All Musics',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.black,
+                            fontSize: TextSizes.textmedium14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Melodic Echoes',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const HomeBottomNavigation(
+                          bottomIndex: 1,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                SizedBox(height: 10.sp),
+                ListTile(
+                  leading: Container(
+                    height: 35.sp,
+                    width: 35.sp,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          HexColor('#4363d8'),
+                          HexColor('#4363d8'),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    padding: EdgeInsets.all(10.sp),
+                    child: Image.asset('assets/link.img.png'),
+                  ),
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'VidStream',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.black,
+                            fontSize: TextSizes.textmedium14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Instant Video, One Click Away',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => VideoPlayerStream(),
+                      ),
+                    );
+                  },
+                ),
+                SizedBox(height: 10.sp),
+                ListTile(
+                  leading: Container(
+                    height: 35.sp,
+                    width: 35.sp,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          HexColor('#469990'),
+                          HexColor('#469990'),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    padding: EdgeInsets.all(10.sp),
+                    child: Image.asset('assets/folder_img.png'),
+                  ),
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'File Manager',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.black,
+                            fontSize: TextSizes.textmedium14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'All Files, Anywhere, Anytime',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DeviceSpaceScreen(),
+                      ),
+                    );
+                  },
+                ),
+                SizedBox(height: 10.sp),
+                ListTile(
+                  leading: Container(
+                    height: 35.sp,
+                    width: 35.sp,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          HexColor('#dcbeff'),
+                          HexColor('#dcbeff'),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    padding: EdgeInsets.all(0.sp),
+                    child: Icon(Icons.notifications_none, color: Colors.white),
+                  ),
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Notifications',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.black,
+                            fontSize: TextSizes.textmedium14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Stay Updated, Never Miss Out',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => NotificationScreen(),
+                      ),
+                    );
+                  },
+                ),
+
+
+
+                // SizedBox(height: 10.sp),
+                // ListTile(
+                //   leading: Container(
+                //     decoration: BoxDecoration(
+                //       borderRadius: BorderRadius.circular(12),
+                //       gradient: LinearGradient(
+                //         colors: [
+                //           HexColor('#2563eb'),
+                //           HexColor('#2563eb'),
+                //         ],
+                //         begin: Alignment.topLeft,
+                //         end: Alignment.bottomRight,
+                //       ),
+                //     ),
+                //     padding: EdgeInsets.all(10.sp),
+                //     child: SvgPicture.asset(
+                //       'assets/cleaner.svg',
+                //       color: Colors.white,
+                //     ),
+                //   ),
+                //   title: Column(
+                //     mainAxisAlignment: MainAxisAlignment.start,
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Text(
+                //         'Cleaner',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.black,
+                //             fontSize: TextSizes.textmedium14,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //       Text(
+                //         'Clean junk files',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.grey,
+                //             fontSize: 9.sp,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                //   onTap: () {},
+                // ),
+                // SizedBox(height: 10.sp),
+                // ListTile(
+                //   leading: Container(
+                //     decoration: BoxDecoration(
+                //       borderRadius: BorderRadius.circular(12),
+                //       gradient: LinearGradient(
+                //         colors: [
+                //           HexColor('#059669'),
+                //           HexColor('#059669'),
+                //         ],
+                //         begin: Alignment.topLeft,
+                //         end: Alignment.bottomRight,
+                //       ),
+                //     ),
+                //     padding: EdgeInsets.all(10.sp),
+                //     child: SvgPicture.asset(
+                //       'assets/game.svg',
+                //       color: Colors.white,
+                //     ),
+                //   ),
+                //   title: Column(
+                //     mainAxisAlignment: MainAxisAlignment.start,
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Text(
+                //         'Game',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.black,
+                //             fontSize: TextSizes.textmedium14,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //       Text(
+                //         'Play mini games',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.grey,
+                //             fontSize: 9.sp,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                //   onTap: () {},
+                // ),
+                // SizedBox(height: 10.sp),
+                // ListTile(
+                //   leading: Container(
+                //     decoration: BoxDecoration(
+                //       borderRadius: BorderRadius.circular(12),
+                //       gradient: LinearGradient(
+                //         colors: [
+                //           HexColor('#db2777'),
+                //           HexColor('#db2777'),
+                //         ],
+                //         begin: Alignment.topLeft,
+                //         end: Alignment.bottomRight,
+                //       ),
+                //     ),
+                //     padding: EdgeInsets.all(10.sp),
+                //     child: SvgPicture.asset(
+                //       'assets/languge.svg',
+                //       color: Colors.white,
+                //     ),
+                //   ),
+                //   title: Column(
+                //     mainAxisAlignment: MainAxisAlignment.start,
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Text(
+                //         'Language',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.black,
+                //             fontSize: TextSizes.textmedium14,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //       Text(
+                //         'Change app language',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.grey,
+                //             fontSize: 9.sp,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                //   onTap: () {},
+                // ),
+                // SizedBox(height: 10.sp),
+                // ListTile(
+                //   leading: Container(
+                //     decoration: BoxDecoration(
+                //       borderRadius: BorderRadius.circular(12),
+                //       gradient: LinearGradient(
+                //         colors: [
+                //           HexColor('#ca8a04'),
+                //           HexColor('#ca8a04'),
+                //         ],
+                //         begin: Alignment.topLeft,
+                //         end: Alignment.bottomRight,
+                //       ),
+                //     ),
+                //     padding: EdgeInsets.all(10.sp),
+                //     child: SvgPicture.asset(
+                //       'assets/theme.svg',
+                //       color: Colors.white,
+                //     ),
+                //   ),
+                //   title: Column(
+                //     mainAxisAlignment: MainAxisAlignment.start,
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Text(
+                //         'Theme',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.black,
+                //             fontSize: TextSizes.textmedium14,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //       Text(
+                //         'Customize appearance',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.grey,
+                //             fontSize: 9.sp,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                //   onTap: () {},
+                // ),
+                // SizedBox(height: 10.sp),
+                // ListTile(
+                //   leading: Container(
+                //     decoration: BoxDecoration(
+                //       borderRadius: BorderRadius.circular(12),
+                //       gradient: LinearGradient(
+                //         colors: [
+                //           HexColor('#d97706'),
+                //           HexColor('#d97706'),
+                //         ],
+                //         begin: Alignment.topLeft,
+                //         end: Alignment.bottomRight,
+                //       ),
+                //     ),
+                //     padding: EdgeInsets.all(10.sp),
+                //     child: SvgPicture.asset(
+                //       'assets/star.svg',
+                //       color: Colors.white,
+                //     ),
+                //   ),
+                //   title: Column(
+                //     mainAxisAlignment: MainAxisAlignment.start,
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Text(
+                //         'Premium',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.black,
+                //             fontSize: TextSizes.textmedium14,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //       Text(
+                //         'Unlock all features',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.grey,
+                //             fontSize: 9.sp,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                //   trailing: Container(
+                //     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                //     decoration: BoxDecoration(
+                //       color: Colors.orange,
+                //       borderRadius: BorderRadius.circular(10),
+                //     ),
+                //     child: Text(
+                //       'PRO',
+                //       style: TextStyle(color: Colors.white),
+                //     ),
+                //   ),
+                //   onTap: () {},
+                // ),
+                //
+
+
+
+                SizedBox(height: 10.sp),
+                ListTile(
+                  leading: Container(
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      gradient: LinearGradient(
+                        colors: [
+                          HexColor('#334155'),
+                          HexColor('#334155'),
+                        ],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                      ),
+                    ),
+                    padding: EdgeInsets.all(10.sp),
+                    child: SvgPicture.asset(
+                      'assets/privacy.svg',
+                      color: Colors.white,
+                    ),
+                  ),
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Privacy',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.black,
+                            fontSize: TextSizes.textmedium14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Privacy & security',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {},
+                ),
+
+                SizedBox(height: 10.sp),
+                ListTile(
+                  leading: Container(
+                    height: 35.sp,
+                    width: 35.sp,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(12),
+                      color: Colors.blue.shade50,
+                    ),
+                    padding: EdgeInsets.all(10.sp),
+                    child: Icon(Icons.share,
+                        color: Colors.blue, size: 17.sp),
+                  ),
+                  title: Column(
+                    mainAxisAlignment: MainAxisAlignment.start,
+                    crossAxisAlignment:
+                    CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Share App',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.black,
+                            fontSize: TextSizes.textmedium14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      Text(
+                        'Invite your friends',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: 9.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  onTap: () {
+                    Share.share(
+                      'Check out this amazing app: https://play.google.com/store/apps/details?id=com.example.app',
+                      subject: 'Download this App',
+                    );
+                  },
+                ),
+                // Extra space at the bottom for better scrolling
               ],
             ),
-            SizedBox(
-              height: 10.sp,
-            ),
-            Container(
-              color: Colors.white,
-              child: Padding(
-                padding: EdgeInsets.all(13.sp),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: LinearGradient(
-                      colors: [
-                        HexColor('#3b82f6'),
-                        Colors.purple,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
+          ),
+
+          Container(
+            color: Colors.white,
+            child: Padding(
+              padding: EdgeInsets.all(3.sp),
+              child: Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  gradient: LinearGradient(
+                    colors: [
+                      // HexColor('#3b82f6'),
+                      ColorSelect.maineColor,
+                      ColorSelect.maineColor,
+                    ],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
                   ),
-                  padding: EdgeInsets.all(10.sp),
-                  child: Row(
-                    children: [
-                      ClipOval(
-                        child: Container(
-                          width: 50.sp,
-                          height: 50.sp,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                          ),
-                          child: userImage != null
-                              ? Image.asset('assets/avtar.jpg')
-                              : Image.asset('assets/avtar.jpg'),
-                        ),
-                      ),
-                      SizedBox(
-                        width: 10.sp,
-                      ),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              user,
-                              style: GoogleFonts.radioCanada(
-                                textStyle: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: TextSizes.textlarge,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              'Premium Member',
-                              style: GoogleFonts.radioCanada(
-                                textStyle: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: TextSizes.textsmall,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
+                ),
+                padding: EdgeInsets.all(3.sp),
+                child: Row(
+                  children: [
+                    SizedBox(width: 10.sp),
+
+                    Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8.sp),
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.grey.shade200,
+                            Colors.grey.shade200,
+                            // HexColor('#3b82f6'), // Purple
+                            // HexColor('#3b82f6'), // Purple
                           ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
                       ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            Divider(
-              thickness: 2.sp,
-              color: Colors.grey,
-            ),
-            ListTile(
-              leading: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: [
-                      HexColor('#2563eb'),
-                      HexColor('#2563eb'),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                padding: EdgeInsets.all(10.sp),
-                child: SvgPicture.asset(
-                  'assets/cleaner.svg',
-                  color: Colors.white,
-                ),
-              ),
-              title: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Cleaner',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.black,
-                        fontSize: TextSizes.textmedium14,
-                        fontWeight: FontWeight.bold,
-                      ),
+                      padding:  EdgeInsets.all(3.sp),
+                      child: SizedBox(
+                        height: 20.sp,
+                          width: 20.sp,
+                          child: Image.asset('assets/appblue.png', ))
                     ),
-                  ),
-                  Text(
-                    'Clean junk files',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 9.sp,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              onTap: () {},
-            ),
-            SizedBox(
-              height: 10.sp,
-            ),
-            ListTile(
-              leading: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: [
-                      HexColor('#059669'),
-                      HexColor('#059669'),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                padding: EdgeInsets.all(10.sp),
-                child: SvgPicture.asset(
-                  'assets/game.svg',
-                  color: Colors.white,
-                ),
-              ),
-              title: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Game',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.black,
-                        fontSize: TextSizes.textmedium14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    'Play mini games',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 9.sp,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              onTap: () {},
-            ),
-            SizedBox(
-              height: 10.sp,
-            ),
-            ListTile(
-              leading: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: [
-                      HexColor('#db2777'),
-                      HexColor('#db2777'),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                padding: EdgeInsets.all(10.sp),
-                child: SvgPicture.asset(
-                  'assets/languge.svg',
-                  color: Colors.white,
-                ),
-              ),
-              title: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Language',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.black,
-                        fontSize: TextSizes.textmedium14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    'Change app language',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 9.sp,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              onTap: () {},
-            ),
-            SizedBox(
-              height: 10.sp,
-            ),
-            ListTile(
-              leading: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: [
-                      HexColor('#ca8a04'),
-                      HexColor('#ca8a04'),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                padding: EdgeInsets.all(10.sp),
-                child: SvgPicture.asset(
-                  'assets/theme.svg',
-                  color: Colors.white,
-                ),
-              ),
-              title: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Theme',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.black,
-                        fontSize: TextSizes.textmedium14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    'Customize appearance',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 9.sp,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              onTap: () {},
-            ),
-            SizedBox(
-              height: 10.sp,
-            ),
-            ListTile(
-              leading: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: [
-                      HexColor('#d97706'),
-                      HexColor('#d97706'),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                padding: EdgeInsets.all(10.sp),
-                child: SvgPicture.asset(
-                  'assets/star.svg',
-                  color: Colors.white,
-                ),
-              ),
-              title: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Premium',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.black,
-                        fontSize: TextSizes.textmedium14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    'Unlock all features',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 9.sp,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              trailing: Container(
-                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                decoration: BoxDecoration(
-                  color: Colors.orange,
-                  borderRadius: BorderRadius.circular(10),
-                ),
-                child: Text(
-                  'PRO',
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-              onTap: () {},
-            ),
-            SizedBox(
-              height: 10.sp,
-            ),
-            ListTile(
-              leading: Container(
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: [
-                      HexColor('#334155'),
-                      HexColor('#334155'),
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                ),
-                padding: EdgeInsets.all(10.sp),
-                child: SvgPicture.asset(
-                  'assets/privacy.svg',
-                  color: Colors.white,
-                ),
-              ),
-              title: Column(
-                mainAxisAlignment: MainAxisAlignment.start,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Privacy',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.black,
-                        fontSize: TextSizes.textmedium14,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  Text(
-                    'Privacy & security',
-                    style: GoogleFonts.openSans(
-                      textStyle: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 9.sp,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              onTap: () {},
-            ),
-            SizedBox(height: 50.sp),
-            Container(
-              color: Colors.white,
-              child: Padding(
-                padding: EdgeInsets.all(13.sp),
-                child: Container(
-                  width: double.infinity,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(12),
-                    gradient: LinearGradient(
-                      colors: [
-                        HexColor('#3b82f6'),
-                        Colors.purple,
-                      ],
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                    ),
-                  ),
-                  padding: EdgeInsets.all(10.sp),
-                  child: Row(
-                    children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          gradient: LinearGradient(
-                            colors: [
-                              HexColor('#3b82f6'), // Purple
-                              HexColor('#3b82f6'), // Purple
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
+                    SizedBox(width: 10.sp),
+                    Expanded(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          SizedBox(
+                              height: 25.sp,
+                              child: Image.asset('assets/logo_blue_text.png',color: Colors.white,)),
+
+                          Text(
+                            '  Version : $currentVersion',
+                            style: GoogleFonts.radioCanada(
+                              textStyle: TextStyle(
+                                color: Colors.white,
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
                           ),
-                        ),
-                        padding: const EdgeInsets.all(8),
-                        child: const Icon(Icons.folder, color: Colors.white),
+                        ],
                       ),
-                      SizedBox(
-                        width: 10.sp,
-                      ),
-                      Expanded(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.start,
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Nex Player',
-                              style: GoogleFonts.radioCanada(
-                                textStyle: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: TextSizes.textmedium,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ),
-                            Text(
-                              'Version : $currentVersion',
-                              style: GoogleFonts.radioCanada(
-                                textStyle: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 10.sp,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ),
-          ],
-        ),
-      ],
+          ),
+          SizedBox(height: 0.sp),
+        ],
+      ),
     );
   }
 }

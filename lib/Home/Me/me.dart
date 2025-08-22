@@ -7,17 +7,18 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:instamusic/Settings/setting.dart';
 import 'package:instamusic/Utils/color.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'dart:io';
+import '../../ComingSoon/coming_soon.dart' show ComingSoonPage, ComingSoonScreen;
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
 import '../../DeviceSpace/device_space.dart';
 import '../../HexColorCode/HexColor.dart';
 import '../../Model/property_type.dart';
+import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/AppBar/colorList.dart';
 import '../../Photo/photo.dart';
@@ -1240,201 +1241,313 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 SizedBox(
                                   height: 5.sp,
                                 ),
-                                ListTile(
-                                  trailing: Icon(
-                                    Icons.arrow_forward_ios,
-                                    color: Colors.grey,
-                                    size: 17.sp,
-                                  ),
-                                  leading: Container(
-                                    height: 35.sp,
-                                    width: 35.sp,
-                                    decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        color: Colors.purple.shade100
-                                        // gradient: LinearGradient(
-                                        //   colors: [
-                                        //     HexColor('#ca8a04'),
-                                        //     HexColor('#ca8a04'),
-                                        //   ],
-                                        //   begin: Alignment.topLeft,
-                                        //   end: Alignment.bottomRight,
-                                        // ),
-                                        ),
-                                    padding: EdgeInsets.all(8.sp),
-                                    child: SvgPicture.asset(
-                                      'assets/theme.svg',
-                                      color: Colors.purple,
-                                    ),
-                                  ),
-                                  title: Column(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Themes',
-                                        style: GoogleFonts.openSans(
-                                          textStyle: TextStyle(
-                                            color: Colors.black,
-                                            fontSize: TextSizes.textmedium14,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      Text(
-                                        'Customize appearance',
-                                        style: GoogleFonts.openSans(
-                                          textStyle: TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 9.sp,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  onTap: () {},
-                                ),
-                                Divider(
-                                  thickness: 1.sp,
-                                  color: Colors.grey.shade100,
-                                ),
-                                ListTile(
-                                  trailing: Icon(
-                                    Icons.arrow_forward_ios,
-                                    color: Colors.grey,
-                                    size: 17.sp,
-                                  ),
-                                  leading: Container(
-                                    height: 35.sp,
-                                    width: 35.sp,
-                                    decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(12),
-                                        color: Colors.blue.shade50),
-                                    padding: EdgeInsets.all(8.sp),
-                                    child: SvgPicture.asset(
-                                      'assets/languge.svg',
-                                      color: Colors.blue,
-                                    ),
-                                  ),
-                                  title: Column(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Language',
-                                        style: GoogleFonts.openSans(
-                                          textStyle: TextStyle(
-                                            color: Colors.black,
-                                            fontSize: TextSizes.textmedium14,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      Text(
-                                        'Change app language',
-                                        style: GoogleFonts.openSans(
-                                          textStyle: TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 9.sp,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  onTap: () {},
-                                ),
-                                Divider(
-                                  thickness: 1.sp,
-                                  color: Colors.grey.shade100,
-                                ),
-                                ListTile(
-                                  trailing: Icon(
-                                    Icons.arrow_forward_ios,
-                                    color: Colors.grey,
-                                    size: 17.sp,
-                                  ),
-                                  leading: Container(
-                                      height: 35.sp,
-                                      width: 35.sp,
-                                      decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          color: Colors.green.shade50),
-                                      padding: EdgeInsets.all(10.sp),
-                                      child: Icon(
-                                        FontAwesome.memory_solid,
-                                        color: Colors.green,
-                                        size: 17.sp,
-                                      )
+                                // ListTile(
+                                //   trailing: Icon(
+                                //     Icons.arrow_forward_ios,
+                                //     color: Colors.grey,
+                                //     size: 17.sp,
+                                //   ),
+                                //   leading: Container(
+                                //     height: 35.sp,
+                                //     width: 35.sp,
+                                //     decoration: BoxDecoration(
+                                //         borderRadius: BorderRadius.circular(12),
+                                //         color: Colors.purple.shade100
+                                //         // gradient: LinearGradient(
+                                //         //   colors: [
+                                //         //     HexColor('#ca8a04'),
+                                //         //     HexColor('#ca8a04'),
+                                //         //   ],
+                                //         //   begin: Alignment.topLeft,
+                                //         //   end: Alignment.bottomRight,
+                                //         // ),
+                                //         ),
+                                //     padding: EdgeInsets.all(8.sp),
+                                //     child: SvgPicture.asset(
+                                //       'assets/theme.svg',
+                                //       color: Colors.purple,
+                                //     ),
+                                //   ),
+                                //   title: Column(
+                                //     mainAxisAlignment: MainAxisAlignment.start,
+                                //     crossAxisAlignment:
+                                //         CrossAxisAlignment.start,
+                                //     children: [
+                                //       Text(
+                                //         'Themes',
+                                //         style: GoogleFonts.openSans(
+                                //           textStyle: TextStyle(
+                                //             color: Colors.black,
+                                //             fontSize: TextSizes.textmedium14,
+                                //             fontWeight: FontWeight.bold,
+                                //           ),
+                                //         ),
+                                //       ),
+                                //       Text(
+                                //         'Customize appearance',
+                                //         style: GoogleFonts.openSans(
+                                //           textStyle: TextStyle(
+                                //             color: Colors.grey,
+                                //             fontSize: 9.sp,
+                                //             fontWeight: FontWeight.bold,
+                                //           ),
+                                //         ),
+                                //       ),
+                                //     ],
+                                //   ),
+                                //   onTap: () {},
+                                // ),
+                                // Divider(
+                                //   thickness: 1.sp,
+                                //   color: Colors.grey.shade100,
+                                // ),
+                                // ListTile(
+                                //   trailing: Icon(
+                                //     Icons.arrow_forward_ios,
+                                //     color: Colors.grey,
+                                //     size: 17.sp,
+                                //   ),
+                                //   leading: Container(
+                                //     height: 35.sp,
+                                //     width: 35.sp,
+                                //     decoration: BoxDecoration(
+                                //         borderRadius: BorderRadius.circular(12),
+                                //         color: Colors.blue.shade50),
+                                //     padding: EdgeInsets.all(8.sp),
+                                //     child: SvgPicture.asset(
+                                //       'assets/languge.svg',
+                                //       color: Colors.blue,
+                                //     ),
+                                //   ),
+                                //   title: Column(
+                                //     mainAxisAlignment: MainAxisAlignment.start,
+                                //     crossAxisAlignment:
+                                //         CrossAxisAlignment.start,
+                                //     children: [
+                                //       Text(
+                                //         'Language',
+                                //         style: GoogleFonts.openSans(
+                                //           textStyle: TextStyle(
+                                //             color: Colors.black,
+                                //             fontSize: TextSizes.textmedium14,
+                                //             fontWeight: FontWeight.bold,
+                                //           ),
+                                //         ),
+                                //       ),
+                                //       Text(
+                                //         'Change app language',
+                                //         style: GoogleFonts.openSans(
+                                //           textStyle: TextStyle(
+                                //             color: Colors.grey,
+                                //             fontSize: 9.sp,
+                                //             fontWeight: FontWeight.bold,
+                                //           ),
+                                //         ),
+                                //       ),
+                                //     ],
+                                //   ),
+                                //   onTap: () {},
+                                // ),
+                                // Divider(
+                                //   thickness: 1.sp,
+                                //   color: Colors.grey.shade100,
+                                // ),
+                                // ListTile(
+                                //   trailing: Icon(
+                                //     Icons.arrow_forward_ios,
+                                //     color: Colors.grey,
+                                //     size: 17.sp,
+                                //   ),
+                                //   leading: Container(
+                                //       height: 35.sp,
+                                //       width: 35.sp,
+                                //       decoration: BoxDecoration(
+                                //           borderRadius:
+                                //               BorderRadius.circular(12),
+                                //           color: Colors.green.shade50),
+                                //       padding: EdgeInsets.all(10.sp),
+                                //       child: Icon(
+                                //         FontAwesome.memory_solid,
+                                //         color: Colors.green,
+                                //         size: 17.sp,
+                                //       )
+                                //
+                                //       // child: Image.asset(
+                                //       //   'assets/storage.png',
+                                //       //   color: Colors.green,
+                                //       // ),
+                                //       ),
+                                //   title: Column(
+                                //     mainAxisAlignment: MainAxisAlignment.start,
+                                //     crossAxisAlignment:
+                                //         CrossAxisAlignment.start,
+                                //     children: [
+                                //       Text(
+                                //         'Storage Management',
+                                //         style: GoogleFonts.openSans(
+                                //           textStyle: TextStyle(
+                                //             color: Colors.black,
+                                //             fontSize: TextSizes.textmedium14,
+                                //             fontWeight: FontWeight.bold,
+                                //           ),
+                                //         ),
+                                //       ),
+                                //       Text(
+                                //         '89 GB of 128 GB used',
+                                //         style: GoogleFonts.openSans(
+                                //           textStyle: TextStyle(
+                                //             color: Colors.grey,
+                                //             fontSize: 9.sp,
+                                //             fontWeight: FontWeight.bold,
+                                //           ),
+                                //         ),
+                                //       ),
+                                //     ],
+                                //   ),
+                                //   onTap: () {},
+                                // ),
+                                // Divider(
+                                //   thickness: 1.sp,
+                                //   color: Colors.grey.shade100,
+                                // ),
+                                // ListTile(
+                                //   trailing: Icon(
+                                //     Icons.arrow_forward_ios,
+                                //     color: Colors.grey,
+                                //     size: 17.sp,
+                                //   ),
+                                //   leading: Container(
+                                //       height: 35.sp,
+                                //       width: 35.sp,
+                                //       decoration: BoxDecoration(
+                                //           borderRadius:
+                                //               BorderRadius.circular(12),
+                                //           color: Colors.orange.shade50),
+                                //       padding: EdgeInsets.all(10.sp),
+                                //       child: Icon(
+                                //         FontAwesome.question_solid,
+                                //         color: Colors.orange,
+                                //         size: 17.sp,
+                                //       )),
+                                //   title: Column(
+                                //     mainAxisAlignment: MainAxisAlignment.start,
+                                //     crossAxisAlignment:
+                                //         CrossAxisAlignment.start,
+                                //     children: [
+                                //       Text(
+                                //         'Help & Support ',
+                                //         style: GoogleFonts.openSans(
+                                //           textStyle: TextStyle(
+                                //             color: Colors.black,
+                                //             fontSize: TextSizes.textmedium14,
+                                //             fontWeight: FontWeight.bold,
+                                //           ),
+                                //         ),
+                                //       ),
+                                //       Text(
+                                //         'Get assistance',
+                                //         style: GoogleFonts.openSans(
+                                //           textStyle: TextStyle(
+                                //             color: Colors.grey,
+                                //             fontSize: 9.sp,
+                                //             fontWeight: FontWeight.bold,
+                                //           ),
+                                //         ),
+                                //       ),
+                                //     ],
+                                //   ),
+                                //   onTap: () {},
+                                // ),
+                                // Divider(
+                                //   thickness: 1.sp,
+                                //   color: Colors.grey.shade100,
+                                // ),
+                                // ListTile(
+                                //   trailing: Icon(
+                                //     Icons.arrow_forward_ios,
+                                //     color: Colors.grey,
+                                //     size: 17.sp,
+                                //   ),
+                                //   leading: Container(
+                                //       height: 35.sp,
+                                //       width: 35.sp,
+                                //       decoration: BoxDecoration(
+                                //           borderRadius:
+                                //               BorderRadius.circular(12),
+                                //           color: Colors.pink.shade50),
+                                //       padding: EdgeInsets.all(10.sp),
+                                //       child: Icon(
+                                //         Icons.settings,
+                                //         color: Colors.pink,
+                                //         size: 17.sp,
+                                //       )),
+                                //   title: Column(
+                                //     mainAxisAlignment: MainAxisAlignment.start,
+                                //     crossAxisAlignment:
+                                //         CrossAxisAlignment.start,
+                                //     children: [
+                                //       Text(
+                                //         'Settings',
+                                //         style: GoogleFonts.openSans(
+                                //           textStyle: TextStyle(
+                                //             color: Colors.black,
+                                //             fontSize: TextSizes.textmedium14,
+                                //             fontWeight: FontWeight.bold,
+                                //           ),
+                                //         ),
+                                //       ),
+                                //       Text(
+                                //         'Customize your experience',
+                                //         style: GoogleFonts.openSans(
+                                //           textStyle: TextStyle(
+                                //             color: Colors.grey,
+                                //             fontSize: 9.sp,
+                                //             fontWeight: FontWeight.bold,
+                                //           ),
+                                //         ),
+                                //       ),
+                                //     ],
+                                //   ),
+                                //   onTap: () {
+                                //     Navigator.push(
+                                //         context,
+                                //         MaterialPageRoute(
+                                //           builder: (context) => SettingsPage(),
+                                //         ));
+                                //   },
+                                // ),
+                                // Divider(
+                                //   thickness: 1.sp,
+                                //   color: Colors.grey.shade100,
+                                // ),
 
-                                      // child: Image.asset(
-                                      //   'assets/storage.png',
-                                      //   color: Colors.green,
-                                      // ),
-                                      ),
-                                  title: Column(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Storage Management',
-                                        style: GoogleFonts.openSans(
-                                          textStyle: TextStyle(
-                                            color: Colors.black,
-                                            fontSize: TextSizes.textmedium14,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      Text(
-                                        '89 GB of 128 GB used',
-                                        style: GoogleFonts.openSans(
-                                          textStyle: TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 9.sp,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  onTap: () {},
-                                ),
-                                Divider(
-                                  thickness: 1.sp,
-                                  color: Colors.grey.shade100,
-                                ),
+
                                 ListTile(
-                                  trailing: Icon(
-                                    Icons.arrow_forward_ios,
-                                    color: Colors.grey,
-                                    size: 17.sp,
-                                  ),
+                                  trailing: Icon(Icons.arrow_forward_ios,
+                                      color: Colors.grey, size: 17.sp),
                                   leading: Container(
-                                      height: 35.sp,
-                                      width: 35.sp,
-                                      decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          color: Colors.orange.shade50),
-                                      padding: EdgeInsets.all(10.sp),
-                                      child: Icon(
-                                        FontAwesome.question_solid,
-                                        color: Colors.orange,
-                                        size: 17.sp,
-                                      )),
+                                    height: 35.sp,
+                                    width: 35.sp,
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          HexColor('#dcbeff'),
+                                          HexColor('#dcbeff'),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                    ),
+                                    padding: EdgeInsets.all(0.sp),
+                                    child: Icon(Icons.notifications_none, color: Colors.white),
+                                  ),
                                   title: Column(
                                     mainAxisAlignment: MainAxisAlignment.start,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
                                       Text(
-                                        'Help & Support ',
+                                        'Notifications',
                                         style: GoogleFonts.openSans(
                                           textStyle: TextStyle(
                                             color: Colors.black,
@@ -1444,59 +1557,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                         ),
                                       ),
                                       Text(
-                                        'Get assistance',
-                                        style: GoogleFonts.openSans(
-                                          textStyle: TextStyle(
-                                            color: Colors.grey,
-                                            fontSize: 9.sp,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  onTap: () {},
-                                ),
-                                Divider(
-                                  thickness: 1.sp,
-                                  color: Colors.grey.shade100,
-                                ),
-                                ListTile(
-                                  trailing: Icon(
-                                    Icons.arrow_forward_ios,
-                                    color: Colors.grey,
-                                    size: 17.sp,
-                                  ),
-                                  leading: Container(
-                                      height: 35.sp,
-                                      width: 35.sp,
-                                      decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(12),
-                                          color: Colors.pink.shade50),
-                                      padding: EdgeInsets.all(10.sp),
-                                      child: Icon(
-                                        Icons.settings,
-                                        color: Colors.pink,
-                                        size: 17.sp,
-                                      )),
-                                  title: Column(
-                                    mainAxisAlignment: MainAxisAlignment.start,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        'Settings',
-                                        style: GoogleFonts.openSans(
-                                          textStyle: TextStyle(
-                                            color: Colors.black,
-                                            fontSize: TextSizes.textmedium14,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      Text(
-                                        'Customize your experience',
+                                        'Stay Updated, Never Miss Out ',
                                         style: GoogleFonts.openSans(
                                           textStyle: TextStyle(
                                             color: Colors.grey,
@@ -1509,16 +1570,79 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   ),
                                   onTap: () {
                                     Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => SettingsPage(),
-                                        ));
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => NotificationScreen(),
+                                      ),
+                                    );
                                   },
+                                ),
+
+
+
+
+
+
+
+                                Divider(
+                                  thickness: 1.sp,
+                                  color: Colors.grey.shade100,
+                                ),
+                                ListTile(
+                                  trailing: Icon(Icons.arrow_forward_ios,
+                                      color: Colors.grey, size: 17.sp),
+                                  leading: Container(
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(12),
+                                      gradient: LinearGradient(
+                                        colors: [
+                                          HexColor('#334155'),
+                                          HexColor('#334155'),
+                                        ],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                    ),
+                                    padding: EdgeInsets.all(10.sp),
+                                    child: SvgPicture.asset(
+                                      'assets/privacy.svg',
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  title: Column(
+                                    mainAxisAlignment: MainAxisAlignment.start,
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        'Privacy',
+                                        style: GoogleFonts.openSans(
+                                          textStyle: TextStyle(
+                                            color: Colors.black,
+                                            fontSize: TextSizes.textmedium14,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                      Text(
+                                        'Privacy & security',
+                                        style: GoogleFonts.openSans(
+                                          textStyle: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 9.sp,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                  onTap: () {},
                                 ),
                                 Divider(
                                   thickness: 1.sp,
                                   color: Colors.grey.shade100,
                                 ),
+
+
                                 ListTile(
                                   trailing: Icon(Icons.arrow_forward_ios,
                                       color: Colors.grey, size: 17.sp),
@@ -1760,7 +1884,7 @@ class _ProfileQuickActionListState extends State<ProfileQuickActionList> {
   List<PropertyTypeModel> items = [
     PropertyTypeModel(
       imageUrl: 'assets/files.png',
-      text: ' Folders',
+      text: ' Folders ',
       color: HexColor('#122620'),
       color2: HexColor('#122620'),
       mb: '3.2 GB',
@@ -1801,33 +1925,11 @@ class _ProfileQuickActionListState extends State<ProfileQuickActionList> {
           itemBuilder: (context, index) {
             return GestureDetector(
               onTap: () {
-                if (index == 0) {
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AllVideosScreen(),
-                      ));
-                } else if (index == 1) {
-                  Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => SimpleExamplePage(),
-                      ));
-                } else if (index == 2) {
-                  Navigator.push(
+                Navigator.push(
                     context,
                     MaterialPageRoute(
-                        builder: (context) => const HomeBottomNavigation(
-                              bottomIndex: 1,
-                            )),
-                  );
-                } else if (index == 3) {
-                  // Navigator.push(
-                  //     context,
-                  //     MaterialPageRoute(
-                  //       builder: (context) => SimpleExamplePage(),
-                  //     ));
-                }
+                      builder: (context) => ComingSoonScreen(title: items[index].text.toString(),),
+                    ));
               },
               child: Container(
                   width: MediaQuery.of(context).size.width *
