@@ -1,0 +1,80 @@
+
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+xmlns:tools="http://schemas.android.com/tools"
+package="com.instamusic.instamusic"
+tools:ignore="Instantiatable"
+    android:versionCode="TODO">
+
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.VIEW" />
+            <data android:scheme="https" />
+        </intent>
+    </queries>
+    <!-- !DANGER! Delete, update songs/playlists -->
+    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE"
+        tools:ignore="ScopedStorage" />
+    <!-- Android 13+ notification -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"/>
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"/>
+    <!-- Android 13 or greater  -->
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_VIDEO"/>
+    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO"/>
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- ALSO ADD THIS PERMISSION IF TARGETING SDK 34 -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
+<application
+    android:usesCleartextTraffic="true"
+    android:label="Nex Player"
+    android:name="${applicationName}"
+    android:icon="@mipmap/ic_launcher"
+    android:requestLegacyExternalStorage="true"
+    android:enableOnBackInvokedCallback="true"
+    tools:targetApi="m">
+
+    <activity
+        android:name="com.ryanheise.audioservice.AudioServiceActivity"
+        android:launchMode="singleTop"
+        android:theme="@style/LaunchTheme"
+        android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+        android:hardwareAccelerated="true"
+        android:enableOnBackInvokedCallback="true"
+        android:windowSoftInputMode="adjustResize"
+        android:exported="true"
+        tools:ignore="MissingClass">
+        <intent-filter>
+            <action android:name="android.intent.action.MAIN"/>
+            <category android:name="android.intent.category.LAUNCHER"/>
+        </intent-filter>
+    </activity>
+
+    <service
+        android:name="com.ryanheise.audioservice.AudioService"
+        android:foregroundServiceType="mediaPlayback"
+        android:exported="true"
+        android:permission="TODO"
+        tools:ignore="MissingClass">
+        <intent-filter>
+            <action android:name="android.media.browse.MediaBrowserService" />
+        </intent-filter>
+    </service>
+
+    <receiver
+        android:name="com.ryanheise.audioservice.MediaButtonReceiver"
+        android:exported="true"
+        tools:ignore="MissingClass">
+        <intent-filter>
+            <action android:name="android.intent.action.MEDIA_BUTTON" />
+        </intent-filter>
+    </receiver>
+
+    <meta-data
+        android:name="flutterEmbedding"
+        android:value="2" />
+</application>
+</manifest>
