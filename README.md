@@ -1,2 +1,2 @@
-# nexplayer
+# vidnexaplayer
 video player
