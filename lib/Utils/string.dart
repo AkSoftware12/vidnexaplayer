@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 class AppConstants {
-  static const appName="Nex Player";
+  static const appName="Vidnexa Player";
   static const home="Home";
   static const chat="Chat";
   static const settings="Settings";

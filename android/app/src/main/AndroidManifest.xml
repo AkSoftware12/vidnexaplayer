@@ -1,7 +1,7 @@
 
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
 xmlns:tools="http://schemas.android.com/tools"
-package="com.instamusic.instamusic"
+package="com.vidnexa.videoplayer">
 tools:ignore="Instantiatable"
     android:versionCode="TODO">
 
@@ -30,7 +30,7 @@ tools:ignore="Instantiatable"
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
 <application
     android:usesCleartextTraffic="true"
-    android:label="Nex Player"
+    android:label="Vidnexa Player"
     android:name="${applicationName}"
     android:icon="@mipmap/ic_launcher"
     android:requestLegacyExternalStorage="true"

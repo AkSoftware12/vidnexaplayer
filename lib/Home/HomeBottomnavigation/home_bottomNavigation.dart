@@ -235,7 +235,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
           shape: const RoundedRectangleBorder(
             borderRadius: BorderRadius.zero,
           ),
-          width: MediaQuery.sizeOf(context).width * .65,
+          width: MediaQuery.sizeOf(context).width * .7,
           // backgroundColor: ColorSelect.maineColor,
           child: SettingsScreen(
             user: userName!,

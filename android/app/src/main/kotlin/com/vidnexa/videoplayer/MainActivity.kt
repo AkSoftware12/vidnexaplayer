@@ -1,4 +1,4 @@
-package com.instamusic.instamusic
+package com.vidnexa.videoplayer
 
 import io.flutter.embedding.android.FlutterActivity
 

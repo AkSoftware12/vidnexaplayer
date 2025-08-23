@@ -23,7 +23,7 @@ if (flutterVersionName == null) {
 }
 
 android {
-    namespace "com.instamusic.instamusic"
+    namespace "com.vidnexa.videoplayer"
     compileSdk 36
     ndkVersion = "27.0.12077973"
 
@@ -42,7 +42,7 @@ android {
     }
 
     defaultConfig {
-        applicationId "com.instamusic.instamusic"
+        applicationId "com.vidnexa.videoplayer"
         minSdkVersion 23
         targetSdkVersion 36
         versionCode flutterVersionCode.toInteger()
