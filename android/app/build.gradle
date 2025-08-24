@@ -22,11 +22,44 @@ if (flutterVersionName == null) {
     flutterVersionName = '1.0'
 }
 
+// 🔐 Load keystore properties for release signing
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file("key.properties")
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace "com.vidnexa.videoplayer"
     compileSdk 36
     ndkVersion = "27.0.12077973"
 
+    defaultConfig {
+        applicationId "com.vidnexa.videoplayer"
+        minSdkVersion 23
+        targetSdkVersion 36
+        versionCode flutterVersionCode.toInteger()
+        versionName flutterVersionName
+        multiDexEnabled true
+    }
+
+    signingConfigs {
+        release {
+            storeFile file(keystoreProperties['storeFile'])
+            storePassword keystoreProperties['storePassword']
+            keyAlias keystoreProperties['keyAlias']
+            keyPassword keystoreProperties['keyPassword']
+        }
+    }
+
+    buildTypes {
+        release {
+            signingConfig signingConfigs.release
+            minifyEnabled false
+            shrinkResources false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+        }
+    }
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -40,20 +73,6 @@ android {
     sourceSets {
         main.java.srcDirs += 'src/main/kotlin'
     }
-
-    defaultConfig {
-        applicationId "com.vidnexa.videoplayer"
-        minSdkVersion 23
-        targetSdkVersion 36
-        versionCode flutterVersionCode.toInteger()
-        versionName flutterVersionName
-    }
-
-    buildTypes {
-        release {
-            signingConfig signingConfigs.debug
-        }
-    }
 }
 
 flutter {
@@ -63,11 +82,5 @@ flutter {
 dependencies {
     implementation("androidx.multidex:multidex:2.0.1")
     androidTestImplementation 'androidx.test:runner:1.5.2'
-    // Optional: Add core testing library if needed
     androidTestImplementation 'androidx.test:core:1.5.0'
-}
-android {
-    defaultConfig {
-        multiDexEnabled true
-    }
 }

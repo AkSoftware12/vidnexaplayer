@@ -12,6 +12,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
 import '../../DeviceSpace/device_space.dart';
@@ -133,9 +134,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
               ],
             ),
             // Grid icon
-            SizedBox(
-              height: 40.sp,
-                child: Image.asset('assets/logo_blue_text.png')),
+            // SizedBox(
+            //   height: 40.sp,
+            //     child: Image.asset('assets/logo_blue_text.png')),
 
             Row(
               children: [
@@ -2644,7 +2645,12 @@ class SettingsScreen extends StatelessWidget {
                       ),
                     ],
                   ),
-                  onTap: () {},
+                  onTap: () async {
+                    final Uri _url = Uri.parse('https://www.freeprivacypolicy.com/live/3a47e749-0364-44f5-8cc3-559f2cd90336');
+                    if (!await launchUrl(_url, mode: LaunchMode.externalApplication)) {
+                    throw 'Could not launch $_url';
+                    }
+                  },
                 ),
 
                 SizedBox(height: 10.sp),

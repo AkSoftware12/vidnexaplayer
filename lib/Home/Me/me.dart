@@ -11,6 +11,7 @@ import 'package:instamusic/Utils/color.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
 import '../../ComingSoon/coming_soon.dart' show ComingSoonPage, ComingSoonScreen;
 import '../../DarkMode/dark_mode.dart';
@@ -1086,119 +1087,119 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     ProfileQuickActionList(),
                     SizedBox(height: 8),
 
-                    Padding(
-                      padding: EdgeInsets.only(top: 0.sp),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(15),
-                          gradient: LinearGradient(
-                            colors: [
-                              HexColor('#6663f2'), // Purple
-                              Colors.purple // Purple
-                            ],
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                          ),
-                        ),
-                        child: SizedBox(
-                          width: double.infinity,
-                          child: Padding(
-                            padding: EdgeInsets.all(15.sp),
-                            child: Row(
-                              children: [
-                                Container(
-                                    width: 70.sp,
-                                    height: 70.sp,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white24,
-                                      borderRadius: BorderRadius.circular(15),
-                                    ),
-                                    child: Icon(
-                                      AntDesign.play_circle_fill,
-                                      size: 50.sp,
-                                      color: Colors.white,
-                                    )),
-                                SizedBox(
-                                  width: 20.sp,
-                                ),
-                                Column(
-                                  mainAxisAlignment: MainAxisAlignment.start,
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text.rich(
-                                      TextSpan(
-                                        text: AppConstants.appName,
-                                        style: GoogleFonts.openSans(
-                                          textStyle: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 20.sp,
-                                            // Adjust font size as needed
-                                            fontWeight: FontWeight
-                                                .bold, // Adjust font weight as needed
-                                          ),
-                                        ),
-                                      ),
-                                      textAlign: TextAlign
-                                          .start, // Ensure text starts at the beginning
-                                    ),
-                                    Text.rich(
-                                      TextSpan(
-                                        text:
-                                            "Now Aaviailable on iOS & Android",
-                                        style: GoogleFonts.openSans(
-                                          textStyle: TextStyle(
-                                            color: Colors.white70,
-                                            fontSize: 12.sp,
-                                            // Adjust font size as needed
-                                            fontWeight: FontWeight
-                                                .w600, // Adjust font weight as needed
-                                          ),
-                                        ),
-                                      ),
-                                      textAlign: TextAlign
-                                          .start, // Ensure text starts at the beginning
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.only(
-                                          left: 00.sp,
-                                          right: 00.sp,
-                                          top: 10.sp),
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          borderRadius:
-                                              BorderRadius.circular(10),
-                                          color: Colors.white24,
-                                        ),
-                                        padding: EdgeInsets.all(3.sp),
-                                        child: Padding(
-                                          padding: EdgeInsets.all(5.sp),
-                                          child: Text.rich(
-                                            TextSpan(
-                                              text: "Install Now",
-                                              style: GoogleFonts.openSans(
-                                                textStyle: TextStyle(
-                                                  color: Colors.white,
-                                                  fontSize: 13.sp,
-                                                  // Adjust font size as needed
-                                                  fontWeight: FontWeight
-                                                      .bold, // Adjust font weight as needed
-                                                ),
-                                              ),
-                                            ),
-                                            textAlign: TextAlign
-                                                .start, // Ensure text starts at the beginning
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
+                    // Padding(
+                    //   padding: EdgeInsets.only(top: 0.sp),
+                    //   child: Container(
+                    //     decoration: BoxDecoration(
+                    //       borderRadius: BorderRadius.circular(15),
+                    //       gradient: LinearGradient(
+                    //         colors: [
+                    //           HexColor('#6663f2'), // Purple
+                    //           Colors.purple // Purple
+                    //         ],
+                    //         begin: Alignment.topLeft,
+                    //         end: Alignment.bottomRight,
+                    //       ),
+                    //     ),
+                    //     child: SizedBox(
+                    //       width: double.infinity,
+                    //       child: Padding(
+                    //         padding: EdgeInsets.all(15.sp),
+                    //         child: Row(
+                    //           children: [
+                    //             Container(
+                    //                 width: 70.sp,
+                    //                 height: 70.sp,
+                    //                 decoration: BoxDecoration(
+                    //                   color: Colors.white24,
+                    //                   borderRadius: BorderRadius.circular(15),
+                    //                 ),
+                    //                 child: Icon(
+                    //                   AntDesign.play_circle_fill,
+                    //                   size: 50.sp,
+                    //                   color: Colors.white,
+                    //                 )),
+                    //             SizedBox(
+                    //               width: 20.sp,
+                    //             ),
+                    //             Column(
+                    //               mainAxisAlignment: MainAxisAlignment.start,
+                    //               crossAxisAlignment: CrossAxisAlignment.start,
+                    //               children: [
+                    //                 Text.rich(
+                    //                   TextSpan(
+                    //                     text: AppConstants.appName,
+                    //                     style: GoogleFonts.openSans(
+                    //                       textStyle: TextStyle(
+                    //                         color: Colors.white,
+                    //                         fontSize: 20.sp,
+                    //                         // Adjust font size as needed
+                    //                         fontWeight: FontWeight
+                    //                             .bold, // Adjust font weight as needed
+                    //                       ),
+                    //                     ),
+                    //                   ),
+                    //                   textAlign: TextAlign
+                    //                       .start, // Ensure text starts at the beginning
+                    //                 ),
+                    //                 Text.rich(
+                    //                   TextSpan(
+                    //                     text:
+                    //                         "Now Aaviailable on iOS & Android",
+                    //                     style: GoogleFonts.openSans(
+                    //                       textStyle: TextStyle(
+                    //                         color: Colors.white70,
+                    //                         fontSize: 12.sp,
+                    //                         // Adjust font size as needed
+                    //                         fontWeight: FontWeight
+                    //                             .w600, // Adjust font weight as needed
+                    //                       ),
+                    //                     ),
+                    //                   ),
+                    //                   textAlign: TextAlign
+                    //                       .start, // Ensure text starts at the beginning
+                    //                 ),
+                    //                 Padding(
+                    //                   padding: EdgeInsets.only(
+                    //                       left: 00.sp,
+                    //                       right: 00.sp,
+                    //                       top: 10.sp),
+                    //                   child: Container(
+                    //                     decoration: BoxDecoration(
+                    //                       borderRadius:
+                    //                           BorderRadius.circular(10),
+                    //                       color: Colors.white24,
+                    //                     ),
+                    //                     padding: EdgeInsets.all(3.sp),
+                    //                     child: Padding(
+                    //                       padding: EdgeInsets.all(5.sp),
+                    //                       child: Text.rich(
+                    //                         TextSpan(
+                    //                           text: "Install Now",
+                    //                           style: GoogleFonts.openSans(
+                    //                             textStyle: TextStyle(
+                    //                               color: Colors.white,
+                    //                               fontSize: 13.sp,
+                    //                               // Adjust font size as needed
+                    //                               fontWeight: FontWeight
+                    //                                   .bold, // Adjust font weight as needed
+                    //                             ),
+                    //                           ),
+                    //                         ),
+                    //                         textAlign: TextAlign
+                    //                             .start, // Ensure text starts at the beginning
+                    //                       ),
+                    //                     ),
+                    //                   ),
+                    //                 ),
+                    //               ],
+                    //             ),
+                    //           ],
+                    //         ),
+                    //       ),
+                    //     ),
+                    //   ),
+                    // ),
 
                     SizedBox(height: 16),
                     // Quick Actions
@@ -1635,7 +1636,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                       ),
                                     ],
                                   ),
-                                  onTap: () {},
+                                  onTap: () async {
+                                    final Uri _url = Uri.parse('https://www.freeprivacypolicy.com/live/3a47e749-0364-44f5-8cc3-559f2cd90336');
+                                    if (!await launchUrl(_url, mode: LaunchMode.externalApplication)) {
+                                      throw 'Could not launch $_url';
+                                    }
+                                  },
                                 ),
                                 Divider(
                                   thickness: 1.sp,

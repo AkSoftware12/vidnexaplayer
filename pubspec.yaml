@@ -2,10 +2,10 @@ name: instamusic
 description: "A new Flutter project."
 publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 
-version: 1.0.0+1
+version: 1.0.2+2
 
 environment:
-  sdk: '>=3.3.0 <4.0.0'
+  sdk: '>=3.7.0 <4.0.0'
 
 dependencies:
   flutter:
@@ -33,7 +33,7 @@ dependencies:
   sliding_clipped_nav_bar: ^3.1.1
   photo_manager: ^3.7.1
   imagewidget: ^1.2.4
-  disk_space_plus: ^0.2.6
+  disk_space_plus: ^0.2.5
   file_manager: ^1.0.2
   text_scroll: ^0.2.0
   flutter_colorpicker: ^1.1.0
