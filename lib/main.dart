@@ -4,6 +4,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'AppDemo/Test1/test1.dart';
 import 'NotifyListeners/LanguageProvider/language_provider.dart';
 import 'DarkMode/dark_mode.dart';
 import 'Home/HomeBottomnavigation/home_bottomNavigation.dart';
@@ -100,6 +101,10 @@ class _AuthenticationWrapperState extends State<AuthenticationWrapper> {
         context,
         MaterialPageRoute(builder: (context) =>  const HomeBottomNavigation()),
       );
+      // Navigator.pushReplacement(
+      //   context,
+      //   MaterialPageRoute(builder: (context) =>  const Test1Screen()),
+      // );
     } else {
       // If user is not logged in, navigate to login page
       Navigator.pushReplacement(
