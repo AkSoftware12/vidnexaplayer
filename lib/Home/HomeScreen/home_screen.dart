@@ -46,7 +46,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   bool isLoading = true;
   String? errorMessage;
   List<String> recentlyPlayed = [];
-  bool hasPermission = false; // Track permission status
+  bool hasPermission = true; // Track permission status
 
 
 
@@ -63,7 +63,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
-    _checkPermissions(); // Check permissions on init
+    _requestAssets();
+    // _checkPermissions(); // Check permissions on init
     _loadRecentlyPlayed();
   }
 
@@ -77,7 +78,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
           : Permission.storage.status);
     } else {
       // For iOS, use Permission.photos or Permission.storage as needed
-      status = await Permission.storage.status;
+      status = await Permission.photos.status; // Use photos for iOS media access
     }
 
     setState(() {
@@ -86,9 +87,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
     if (hasPermission) {
       _loadVideos(); // Load videos if permission is granted
+      _requestAssets(); // Load assets for PhotoManager
     }
   }
-
   // Request permissions
   Future<void> _requestPermissions() async {
     PermissionStatus status;
@@ -165,61 +166,70 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
 
+// Request permissions and handle assets
   Future<void> _requestAssets() async {
     setState(() {
       _isLoading = true;
     });
-    // Request permissions.
+
+    // Request permissions using PhotoManager
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
-    if (!mounted) {
-      return;
-    }
-    // Further requests can be only proceed with authorized or limited.
+    if (!mounted) return;
+
     if (!ps.hasAccess) {
-      setState(() => _isLoading = false);
-      await PhotoManager.openSetting(); // Har baar setting pe le jao
+      setState(() {
+        hasPermission = false;
+        _isLoading = false;
+      });
+      await PhotoManager.openSetting(); // Open settings if permission denied
       return;
     }
-    // Customize your own filter options.
+
+    // Permission granted, update state
+    setState(() {
+      hasPermission = true;
+    });
+
+    // Load assets
     final PMFilter filter = FilterOptionGroup(
       imageOption: const FilterOption(
         sizeConstraint: SizeConstraint(ignoreSize: true),
       ),
     );
-    // Obtain assets using the path entity.
+
     final List<AssetPathEntity> paths = await PhotoManager.getAssetPathList(
       onlyAll: true,
       filterOption: filter,
     );
-    if (!mounted) {
-      return;
-    }
-    // Return if not paths found.
-    if (paths.isEmpty) {
+
+    if (!mounted || paths.isEmpty) {
       setState(() {
         _isLoading = false;
       });
-      // showToast('No paths found.');
       return;
     }
+
     setState(() {
       _path = paths.first;
     });
+
     _totalEntitiesCount = await _path!.assetCountAsync;
     final List<AssetEntity> entities = await _path!.getAssetListPaged(
       page: 0,
       size: _sizePerPage,
     );
-    if (!mounted) {
-      return;
-    }
+
+    if (!mounted) return;
+
     setState(() {
       _entities = entities;
       _isLoading = false;
       _hasMoreToLoad = _entities!.length < _totalEntitiesCount;
     });
-  }
 
+    // Load videos after assets are loaded
+    await _loadVideos();
+  }
 
   void _showBottomSheet(BuildContext context) {
     showModalBottomSheet(
@@ -361,6 +371,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkPermissions();
+    });
+
   }
 
   @override
