@@ -10,6 +10,7 @@ import 'package:instamusic/Utils/color.dart';
 import 'package:instamusic/VideoPLayer/AllVideo/all_videos.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
+import 'package:permission_handler/permission_handler.dart'; // For permission handling
 import '../../HexColorCode/HexColor.dart';
 import '../../Model/property_type.dart';
 import '../../NetWork Stream/stream_video.dart';
@@ -20,7 +21,6 @@ import '../../Utils/textSize.dart';
 import '../../VideoPLayer/VideoList/video_list.dart';
 import 'package:path/path.dart' as path;
 import '../HomeBottomnavigation/home_bottomNavigation.dart';
-import 'package:permission_handler/permission_handler.dart'; // Add permission_handler
 
 class SearchData {
   final String imageUrl;
@@ -47,219 +47,63 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   bool isLoading = true;
   String? errorMessage;
   List<String> recentlyPlayed = [];
-  bool hasPermission = false; // Track permission status
-
-
-
-  bool _isLoadingMore = false;
-  bool _hasMoreToLoad = true;
-  bool _isLoading = true;
-  bool _loading = false;
-
-  AssetPathEntity? _path;
-  List<AssetEntity>? _entities;
-  int _totalEntitiesCount = 0;
-  final int _sizePerPage = 50;
+  bool hasPermissions = false; // Track permission status
 
   @override
   void initState() {
     super.initState();
-    // _requestAssets();
-    // _checkPermissions(); // Check permissions on init
+    _checkPermissions(); // Check permissions on initialization
     _loadRecentlyPlayed();
   }
 
-  // Check for storage or video permissions
-// Update the _checkPermissions method
+  // Check permissions for photos and videos
   Future<void> _checkPermissions() async {
-    PermissionStatus status;
-
-    try {
-      if (Platform.isAndroid) {
-        // For Android API >= 33, use Permission.videos; otherwise, use Permission.storage
-        if (await _isAndroid13OrHigher()) {
-          status = await Permission.videos.status;
-        } else {
-          status = await Permission.storage.status;
-        }
-      } else {
-        // For iOS, use Permission.photos for media access
-        status = await Permission.photos.status;
-      }
-
-      // Update hasPermission based on the status
-      setState(() {
-        hasPermission = status.isGranted ;
-      });
-
-      if (hasPermission) {
-        // If permission is already granted, load videos and assets
-        await _loadVideos();
-        await _requestAssets();
-      } else {
-        // If permission is not granted, request it
-        await _requestPermissions();
-      }
-    } catch (e) {
-      setState(() {
-        hasPermission = false;
-        isLoading = false;
-        errorMessage = 'Error checking permissions: $e';
-      });
-    }
-  }
-
-// Helper method to check Android version
-  Future<bool> _isAndroid13OrHigher() async {
-    if (!Platform.isAndroid) return false;
-
-    final androidInfo = await DeviceInfoPlugin().androidInfo;
-    final sdkVersion = androidInfo.version.sdkInt;
-    return sdkVersion != null && sdkVersion >= 33;
-  }
-
-// Update the _requestPermissions method
-  Future<void> _requestPermissions() async {
-    PermissionStatus status;
+    bool photosPermission;
+    bool videosPermission;
 
     if (Platform.isAndroid) {
-      if (await _isAndroid13OrHigher()) {
-        status = await Permission.videos.request();
-      } else {
-        status = await Permission.storage.request();
-      }
+      photosPermission = await Permission.photos.isGranted;
+      videosPermission = await Permission.videos.isGranted;
+    } else if (Platform.isIOS) {
+      photosPermission = await Permission.photos.isGranted;
+      videosPermission = await Permission.videos.isGranted;
     } else {
-      status = await Permission.photos.request();
+      photosPermission = false;
+      videosPermission = false;
     }
 
     setState(() {
-      hasPermission = status.isGranted;
+      hasPermissions = photosPermission && videosPermission;
     });
 
-    if (hasPermission) {
-      await _loadVideos(); // Load videos after permission is granted
-      await _requestAssets(); // Also load assets
-    } else {
-      _showPermissionDeniedDialog();
+    if (hasPermissions) {
+      _loadVideos(); // Load videos if permissions are granted
     }
   }
 
-  void _showPermissionDeniedDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(
-            'Permission Required',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.bold,
-              fontSize: TextSizes.textmedium,
-            ),
-          ),
-          content: Text(
-            'This app requires access to your music files to display offline songs. Please grant the necessary permissions.',
-            style: GoogleFonts.poppins(fontSize: TextSizes.textsmall),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                openAppSettings();
-              },
-              child: Text(
-                'Open Settings',
-                style: GoogleFonts.poppins(
-                  color: ColorSelect.maineColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Stay on permission screen or navigate back
-                if (Navigator.canPop(context)) {
-                  Navigator.pop(context);
-                }
-              },
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.poppins(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
-  }
 
 
-// Request permissions and handle assets
-  Future<void> _requestAssets() async {
+
+
+  // Request permissions for photos and videos
+  Future<void> _requestPermissions() async {
+    Map<Permission, PermissionStatus> statuses = await [
+      Permission.photos,
+      Permission.videos,
+    ].request();
+
+    bool photosGranted = statuses[Permission.photos]!.isGranted;
+    bool videosGranted = statuses[Permission.videos]!.isGranted;
+
     setState(() {
-      _isLoading = true;
+      hasPermissions = photosGranted && videosGranted;
     });
 
-    // Request permissions using PhotoManager
-    final PermissionState ps = await PhotoManager.requestPermissionExtend();
-    if (!mounted) return;
-
-    if (!ps.hasAccess) {
-      setState(() {
-        hasPermission = false;
-        _isLoading = false;
-      });
-      await PhotoManager.openSetting(); // Open settings if permission denied
-      return;
+    if (hasPermissions) {
+      _loadVideos(); // Load videos after permissions are granted
+    } else {
+      openAppSettings();
     }
-
-    // Permission granted, update state
-    setState(() {
-      hasPermission = true;
-    });
-
-    // Load assets
-    final PMFilter filter = FilterOptionGroup(
-      imageOption: const FilterOption(
-        sizeConstraint: SizeConstraint(ignoreSize: true),
-      ),
-    );
-
-    final List<AssetPathEntity> paths = await PhotoManager.getAssetPathList(
-      onlyAll: true,
-      filterOption: filter,
-    );
-
-    if (!mounted || paths.isEmpty) {
-      setState(() {
-        _isLoading = false;
-      });
-      return;
-    }
-
-    setState(() {
-      _path = paths.first;
-    });
-
-    _totalEntitiesCount = await _path!.assetCountAsync;
-    final List<AssetEntity> entities = await _path!.getAssetListPaged(
-      page: 0,
-      size: _sizePerPage,
-    );
-
-    if (!mounted) return;
-
-    setState(() {
-      _entities = entities;
-      _isLoading = false;
-      _hasMoreToLoad = _entities!.length < _totalEntitiesCount;
-    });
-
-    // Load videos after assets are loaded
-    await _loadVideos();
   }
 
   void _showBottomSheet(BuildContext context) {
@@ -402,10 +246,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkPermissions();
-    });
-
+    WidgetsBinding.instance.addPostFrameCallback((_) {});
   }
 
   @override
@@ -423,127 +264,362 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: !hasPermission
-          ? Center(
-        child: Card(
-          elevation: 4,
-          margin: EdgeInsets.all(16.sp),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.sp),
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(16.sp),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.lock,
-                  size: 48.sp,
-                  color: Colors.red,
-                ),
-                SizedBox(height: 16.sp),
-                Text(
-                  'Permission Required',
-                  style: GoogleFonts.poppins(
-                    textStyle: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 8.sp),
-                Text(
-                  'Please allow access to videos to view content.',
-                  style: GoogleFonts.poppins(
-                    textStyle: TextStyle(
-                      fontSize: 14.sp,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 16.sp),
-                ElevatedButton(
-                  onPressed: _requestPermissions, // Call the correct method
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ColorSelect.maineColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.sp),
-                    ),
-                    padding: EdgeInsets.symmetric(horizontal: 24.sp, vertical: 12.sp),
-                  ),
-                  child: Text(
-                    'Allow Permission',
-                    style: GoogleFonts.poppins(
-                      textStyle: TextStyle(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      )
-          : SingleChildScrollView(
+      body: SingleChildScrollView(
         child: Column(
           children: [
             SizedBox(height: 10.sp),
             BannerSlider(),
             HorizontalGridList(),
-            if (recentlyPlayed.isNotEmpty) ...[
+            if (!hasPermissions) ...[
+              // Show permission card if permissions are not granted
+
               Padding(
-                padding: EdgeInsets.all(8.sp),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(
-                      'Recently Videos',
-                      style: GoogleFonts.openSans(
-                        textStyle: TextStyle(
-                          color: Colors.black,
-                          fontSize: 16.sp,
-                          fontWeight: FontWeight.bold,
+                padding: EdgeInsets.all(16.sp),
+                child: Card(
+                  elevation: 4,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Padding(
+                    padding: EdgeInsets.all(16.sp),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.lock_outline,
+                          color: Colors.red,
+                          size: 48.sp,
                         ),
-                      ),
-                    ),
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => RecentlyPlayedScreen(
-                              horizontalView: false,
-                              recentVideos: recentlyPlayed,
+                        SizedBox(height: 16.sp),
+                        Text(
+                          'Permissions Required',
+                          style: GoogleFonts.poppins(
+                            textStyle: TextStyle(
+                              fontSize: 18.sp,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.black,
                             ),
                           ),
-                        ).then((value) {
-                          _loadRecentlyPlayed();
-                        });
-                      },
-                      child: Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(8.0),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.center,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.list,
-                                size: 12.sp,
-                                color: ColorSelect.maineColor,
+                        ),
+                        SizedBox(height: 8.sp),
+                        Text(
+                          'Please grant access to photos and videos to view your media content.',
+                          style: GoogleFonts.poppins(
+                            textStyle: TextStyle(
+                              fontSize: 14.sp,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        SizedBox(height: 16.sp),
+                        ElevatedButton(
+                          onPressed: _requestPermissions,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: ColorSelect.maineColor,
+                            foregroundColor: Colors.white,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          child: Text(
+                            'Allow Permissions',
+                            style: GoogleFonts.poppins(
+                              textStyle: TextStyle(
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.w600,
                               ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ] else ...[
+              // Show video content if permissions are granted
+              if (recentlyPlayed.isNotEmpty) ...[
+                Padding(
+                  padding: EdgeInsets.all(8.sp),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Recently Videos',
+                        style: GoogleFonts.openSans(
+                          textStyle: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => RecentlyPlayedScreen(
+                                horizontalView: false,
+                                recentVideos: recentlyPlayed,
+                              ),
+                            ),
+                          ).then((value) {
+                            _loadRecentlyPlayed();
+                          });
+                        },
+                        child: Card(
+                          child: Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.list,
+                                  size: 12.sp,
+                                  color: ColorSelect.maineColor,
+                                ),
+                                Text(
+                                  ' See All',
+                                  style: GoogleFonts.openSans(
+                                    textStyle: TextStyle(
+                                      color: ColorSelect.maineColor,
+                                      fontSize: 10.sp,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(
+                  height: 120.sp,
+                  child: RecentlyPlayedScreen(
+                    horizontalView: true,
+                    recentVideos: recentlyPlayed,
+                  ),
+                ),
+              ],
+              Padding(
+                padding: EdgeInsets.all(0.sp),
+                child: Padding(
+                  padding: EdgeInsets.only(top: 8.sp),
+                  child: Container(
+                    child: Padding(
+                      padding: EdgeInsets.only(left: 10.sp, right: 10.sp),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Folders',
+                            style: GoogleFonts.poppins(
+                              textStyle: TextStyle(
+                                color: Colors.black,
+                                fontSize: 14.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.refresh, color: Colors.black),
+                            onPressed: _loadVideos,
+                            tooltip: 'Refresh Videos',
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              isLoading && videosByFolder.isEmpty
+                  ? Padding(
+                padding: EdgeInsets.only(top: 100),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CupertinoActivityIndicator(
+                      radius: 25,
+                      color: ColorSelect.maineColor,
+                      animating: true,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'Scanning for videos...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+                  : errorMessage != null
+                  ? Padding(
+                padding: EdgeInsets.only(top: 100),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      errorMessage!,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.red,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadVideos,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              )
+                  : videosByFolder.isEmpty
+                  ? const Padding(
+                padding: EdgeInsets.only(top: 100),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.video_library_outlined,
+                      color: Colors.grey,
+                      size: 64,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'No videos found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+                  : Column(
+                children: [
+                  ...List.generate(
+                    videosByFolder.keys.length,
+                        (index) {
+                      String folderName = videosByFolder.keys.elementAt(index);
+                      List<File> videos = videosByFolder[folderName]!;
+                      final List<String> iconAssets = [
+                        'assets/open-folder.png',
+                        'assets/bluetooth.png',
+                        'assets/open-folder.png',
+                        'assets/camera2.png',
+                        'assets/open-folder.png',
+                        'assets/open-folder.png',
+                        'assets/downloadlist.png',
+                        'assets/open-folder.png',
+                        'assets/open-folder.png',
+                        'assets/open-folder.png',
+                        'assets/open-folder.png',
+                      ];
+                      final List<Color> backgroundColors = [
+                        Colors.blue,
+                        Colors.green,
+                        Colors.purple,
+                        Colors.orange,
+                        Colors.red,
+                        Colors.teal,
+                        Colors.cyan,
+                        Colors.pink,
+                        Colors.amber,
+                        Colors.lime,
+                      ];
+                      String selectedIcon = iconAssets[index % iconAssets.length];
+                      Color selectedColor = backgroundColors[index % backgroundColors.length];
+                      return GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => VideoFolderScreen(
+                                folderName: folderName,
+                                videos: videos,
+                              ),
+                            ),
+                          ).then((value) {
+                            _loadRecentlyPlayed();
+                          });
+                        },
+                        child: Container(
+                          margin: EdgeInsets.symmetric(vertical: 5.sp, horizontal: 5.sp),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10.sp),
+                          ),
+                          child: CustomFolderTile(
+                            folderName: folderName,
+                            videos: videos,
+                            showBottomSheet: _showBottomSheet,
+                            iconPath: selectedIcon,
+                            color: selectedColor,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DeviceSpaceScreen(),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: EdgeInsets.all(10.sp),
+                      child: Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Container(
+                          child: Row(
+                            children: [
+                              Container(
+                                height: 35.sp,
+                                width: 35.sp,
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.shade300,
+                                  borderRadius: BorderRadius.circular(10.0),
+                                ),
+                                child: Icon(
+                                  Icons.search,
+                                  color: Colors.white,
+                                  size: 20.sp,
+                                ),
+                              ),
+                              SizedBox(width: 15.sp),
                               Text(
-                                ' See All',
-                                style: GoogleFonts.openSans(
+                                'Directory ',
+                                style: GoogleFonts.poppins(
                                   textStyle: TextStyle(
-                                    color: ColorSelect.maineColor,
-                                    fontSize: 10.sp,
-                                    fontWeight: FontWeight.bold,
+                                    color: Theme.of(context).colorScheme.secondary,
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w600,
                                   ),
                                 ),
                               ),
@@ -552,249 +628,16 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         ),
                       ),
                     ),
-                  ],
-                ),
-              ),
-              SizedBox(
-                height: 120.sp,
-                child: RecentlyPlayedScreen(
-                  horizontalView: true,
-                  recentVideos: recentlyPlayed,
-                ),
+                  ),
+                ],
               ),
             ],
-            Padding(
-              padding: EdgeInsets.all(0.sp),
-              child: Padding(
-                padding: EdgeInsets.only(top: 8.sp),
-                child: Container(
-                  child: Padding(
-                    padding: EdgeInsets.only(left: 10.sp, right: 10.sp),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          'Folders',
-                          style: GoogleFonts.poppins(
-                            textStyle: TextStyle(
-                              color: Colors.black,
-                              fontSize: 14.sp,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        IconButton(
-                          icon: const Icon(Icons.refresh, color: Colors.black),
-                          onPressed: _loadVideos,
-                          tooltip: 'Refresh Videos',
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            ),
-            isLoading && videosByFolder.isEmpty
-                ? Padding(
-              padding: EdgeInsets.only(top: 100),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CupertinoActivityIndicator(
-                    radius: 25,
-                    color: ColorSelect.maineColor,
-                    animating: true,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'Scanning for videos...',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: Colors.grey,
-                    ),
-                  ),
-                ],
-              ),
-            )
-                : errorMessage != null
-                ? Padding(
-              padding: EdgeInsets.only(top: 100),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.error_outline,
-                    color: Colors.red,
-                    size: 48,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    errorMessage!,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      color: Colors.red,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _loadVideos,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.deepPurple,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
-            )
-                : videosByFolder.isEmpty
-                ? const Padding(
-              padding: EdgeInsets.only(top: 100),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.video_library_outlined,
-                    color: Colors.grey,
-                    size: 64,
-                  ),
-                  SizedBox(height: 16),
-                  Text(
-                    'No videos found',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ],
-              ),
-            )
-                : Column(
-              children: [
-                ...List.generate(
-                  videosByFolder.keys.length,
-                      (index) {
-                    String folderName = videosByFolder.keys.elementAt(index);
-                    List<File> videos = videosByFolder[folderName]!;
-                    final List<String> iconAssets = [
-                      'assets/open-folder.png',
-                      'assets/bluetooth.png',
-                      'assets/open-folder.png',
-                      'assets/camera2.png',
-                      'assets/open-folder.png',
-                      'assets/open-folder.png',
-                      'assets/downloadlist.png',
-                      'assets/open-folder.png',
-                      'assets/open-folder.png',
-                      'assets/open-folder.png',
-                      'assets/open-folder.png',
-                    ];
-                    final List<Color> backgroundColors = [
-                      Colors.blue,
-                      Colors.green,
-                      Colors.purple,
-                      Colors.orange,
-                      Colors.red,
-                      Colors.teal,
-                      Colors.cyan,
-                      Colors.pink,
-                      Colors.amber,
-                      Colors.lime,
-                    ];
-                    String selectedIcon = iconAssets[index % iconAssets.length];
-                    Color selectedColor = backgroundColors[index % backgroundColors.length];
-                    return GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => VideoFolderScreen(
-                              folderName: folderName,
-                              videos: videos,
-                            ),
-                          ),
-                        ).then((value) {
-                          _loadRecentlyPlayed();
-                        });
-                      },
-                      child: Container(
-                        margin: EdgeInsets.symmetric(vertical: 5.sp, horizontal: 5.sp),
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(10.sp),
-                        ),
-                        child: CustomFolderTile(
-                          folderName: folderName,
-                          videos: videos,
-                          showBottomSheet: _showBottomSheet,
-                          iconPath: selectedIcon,
-                          color: selectedColor,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DeviceSpaceScreen(),
-                      ),
-                    );
-                  },
-                  child: Padding(
-                    padding: EdgeInsets.all(10.sp),
-                    child: Padding(
-                      padding: EdgeInsets.only(top: 8),
-                      child: Container(
-                        child: Row(
-                          children: [
-                            Container(
-                              height: 35.sp,
-                              width: 35.sp,
-                              decoration: BoxDecoration(
-                                color: Colors.purple.shade300,
-                                borderRadius: BorderRadius.circular(10.0),
-                              ),
-                              child: Icon(
-                                Icons.search,
-                                color: Colors.white,
-                                size: 20.sp,
-                              ),
-                            ),
-                            SizedBox(width: 15.sp),
-                            Text(
-                              'Directory',
-                              style: GoogleFonts.poppins(
-                                textStyle: TextStyle(
-                                  color: Theme.of(context).colorScheme.secondary,
-                                  fontSize: 14.sp,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
           ],
         ),
       ),
     );
   }
 }
-
-// The rest of your classes (CustomFolderTile, HorizontalGridList, BannerSlider) remain unchanged
 
 class CustomFolderTile extends StatelessWidget {
   final String folderName;
@@ -900,13 +743,7 @@ class HorizontalGridList extends StatefulWidget {
 
 class _HorizontalGridListState extends State<HorizontalGridList> {
   List<PropertyTypeModel> items = [
-    // PropertyTypeModel(
-    //   imageUrl: 'assets/customImages/prince.png',
-    //   text: 'Games ',
-    //   color: Colors.cyan,
-    // ),
     PropertyTypeModel(
-      // imageUrl: 'assets/customImages/play.png',
       imageUrl: 'assets/videos.png',
       text: 'All Videos',
       color: HexColor('#f97316'),
@@ -928,22 +765,8 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
       color2: HexColor('#9333ea'),
       mb: '2.2 GB',
     ),
-    // PropertyTypeModel(
-    //   imageUrl: 'assets/apps.png',
-    //   text: ' Apps',
-    //   color: HexColor('#2563eb'),
-    //   color2: HexColor('#3b82f6'),
-    //   mb: '1.5 GB',
-    // ),
-    // PropertyTypeModel(
-    //   imageUrl: 'assets/customImages/lock.png',
-    //   text: ' Privacy',
-    //   color: HexColor('#2563eb'),
-    //   color2: HexColor('#3b82f6'),
-    //   mb: '7.2 GB',
-    // ),
     PropertyTypeModel(
-      imageUrl: 'assets/customImages/global_network.png',
+      imageUrl: 'assets/link.img.png',
       text: ' Network',
       color: HexColor('#2563eb'),
       color2: HexColor('#3b82f6'),
@@ -1009,9 +832,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                         end: Alignment.bottomRight,
                       ),
                       borderRadius: BorderRadius.circular(10.sp),
-                      // image: DecorationImage(
-                      //   image: AssetImage('assets/livevideo.jpg')
-                      // )
+
                     ),
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.start,

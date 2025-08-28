@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:upgrader/upgrader.dart';
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
 import '../../DeviceSpace/device_space.dart';
@@ -63,6 +64,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     _getUsername();
     currentPage = widget.bottomIndex;
     checkForVersion(context);
+    // TESTING: Clear saved settings to force show upgrade dialog every time
+    Upgrader.clearSavedSettings(); // Remove this line for production
   }
 
   Future<void> checkForVersion(BuildContext context) async {
@@ -218,10 +221,17 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
         ),
       ),
 
-      body: Container(
-        decoration: BoxDecoration(color: Colors.white),
-        child: Center(
-          child: _getPage(currentPage),
+      body: UpgradeAlert(
+        upgrader: Upgrader(
+          debugLogging: true,
+          debugDisplayAlways: true,
+          debugDisplayOnce: true,
+        ),
+        child: Container(
+          decoration: BoxDecoration(color: Colors.white),
+          child: Center(
+            child: _getPage(currentPage),
+          ),
         ),
       ),
       bottomNavigationBar: CustomBottomBar(

@@ -123,9 +123,9 @@ class _DashBoardScreenState extends State<OfflineMusicTabScreen> with SingleTick
               onPressed: () {
                 Navigator.of(context).pop();
                 // Stay on permission screen or navigate back
-                if (Navigator.canPop(context)) {
-                  Navigator.pop(context);
-                }
+                // if (Navigator.canPop(context)) {
+                //   Navigator.pop(context);
+                // }
               },
               child: Text(
                 'Cancel',

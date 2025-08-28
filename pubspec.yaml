@@ -128,10 +128,10 @@ name: instamusic
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.4+4
+version: 1.0.3+3
 
 environment:
-  sdk: '>=3.7.0 <4.0.0'
+  sdk: ^3.8.1
 
 dependencies:
   flutter:
@@ -143,6 +143,7 @@ dependencies:
   audio_service: ^0.18.18
   audio_session: ^0.2.2
   on_audio_query_forked: ^2.9.1
+
 
   # ✅ Optional Desktop Audio (if targeting Windows/Linux)
   just_audio_mpv: ^0.1.7
@@ -178,7 +179,7 @@ dependencies:
   url_launcher: ^6.3.2
   path_provider: ^2.1.5
   provider: ^6.1.5
-  intl: ^0.19.0
+  intl: ^0.20.2
   flutter_tts: ^4.2.3
   firebase_messaging: ^15.2.9
   device_info_plus: ^11.5.0
@@ -195,19 +196,10 @@ dependencies:
   text_scroll: ^0.2.0
   badges: ^3.1.2
   floating: ^6.0.0
-
   file_manager: ^1.0.2
+  upgrader: ^11.5.0
 
-  # ❓ Optional / Remove If Not Needed
-  # bottom_navy_bar: ^6.1.0             # ❌ Duplicate navbar
-  # sliding_clipped_nav_bar: ^3.1.1     # ❌ Duplicate navbar
-  # imagewidget: ^1.2.4                 # ❌ Likely redundant
-  # disk_space_plus: ^0.2.5             # ❓ Only keep if checking storage
-  # file_manager: ^1.0.2                # ❓ Not always necessary
-  # lottie: ^3.3.1                      # ❓ Heavy - keep only if used
-  # audioplayers: ^6.5.0                # ❌ Replaced by just_audio
-  # easy_audio: ^1.0.0                  # ❌ Unused wrapper
-  # rxdart: ^0.28.0                     # ❓ Keep only if streams logic used
+
 
 dev_dependencies:
   flutter_test:
@@ -237,12 +229,7 @@ flutter:
   generate: true
   uses-material-design: true
   assets:
-    - assets/images/
     - assets/
-    - assets/images/background/
-    - assets/images/svg/
-    - assets/images/icons/
-    - assets/customImages/
     - assets/fonts/
   fonts:
     - family: PoppinsRegular
