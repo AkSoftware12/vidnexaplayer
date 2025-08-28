@@ -239,7 +239,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
           width: MediaQuery.sizeOf(context).width * .7,
           // backgroundColor: ColorSelect.maineColor,
           child: SettingsScreen(
-            user: userName!,
+            user: userName??'',
             userImage: userImage,
           )),
       // drawer: Drawer(

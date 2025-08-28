@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:carousel_slider/carousel_slider.dart' show CarouselOptions, CarouselSlider;
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -46,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   bool isLoading = true;
   String? errorMessage;
   List<String> recentlyPlayed = [];
-  bool hasPermission = true; // Track permission status
+  bool hasPermission = false; // Track permission status
 
 
 
@@ -63,42 +64,72 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
-    _requestAssets();
+    // _requestAssets();
     // _checkPermissions(); // Check permissions on init
     _loadRecentlyPlayed();
   }
 
   // Check for storage or video permissions
+// Update the _checkPermissions method
   Future<void> _checkPermissions() async {
     PermissionStatus status;
-    if (Platform.isAndroid) {
-      // For Android API >= 33, use Permission.videos; otherwise, use Permission.storage
-      status = await (Platform.version.contains('13') || Platform.version.contains('14')
-          ? Permission.videos.status
-          : Permission.storage.status);
-    } else {
-      // For iOS, use Permission.photos or Permission.storage as needed
-      status = await Permission.photos.status; // Use photos for iOS media access
-    }
 
-    setState(() {
-      hasPermission = status.isGranted;
-    });
+    try {
+      if (Platform.isAndroid) {
+        // For Android API >= 33, use Permission.videos; otherwise, use Permission.storage
+        if (await _isAndroid13OrHigher()) {
+          status = await Permission.videos.status;
+        } else {
+          status = await Permission.storage.status;
+        }
+      } else {
+        // For iOS, use Permission.photos for media access
+        status = await Permission.photos.status;
+      }
 
-    if (hasPermission) {
-      _loadVideos(); // Load videos if permission is granted
-      _requestAssets(); // Load assets for PhotoManager
+      // Update hasPermission based on the status
+      setState(() {
+        hasPermission = status.isGranted ;
+      });
+
+      if (hasPermission) {
+        // If permission is already granted, load videos and assets
+        await _loadVideos();
+        await _requestAssets();
+      } else {
+        // If permission is not granted, request it
+        await _requestPermissions();
+      }
+    } catch (e) {
+      setState(() {
+        hasPermission = false;
+        isLoading = false;
+        errorMessage = 'Error checking permissions: $e';
+      });
     }
   }
-  // Request permissions
+
+// Helper method to check Android version
+  Future<bool> _isAndroid13OrHigher() async {
+    if (!Platform.isAndroid) return false;
+
+    final androidInfo = await DeviceInfoPlugin().androidInfo;
+    final sdkVersion = androidInfo.version.sdkInt;
+    return sdkVersion != null && sdkVersion >= 33;
+  }
+
+// Update the _requestPermissions method
   Future<void> _requestPermissions() async {
     PermissionStatus status;
+
     if (Platform.isAndroid) {
-      status = await (Platform.version.contains('13') || Platform.version.contains('14')
-          ? Permission.videos.request()
-          : Permission.storage.request());
+      if (await _isAndroid13OrHigher()) {
+        status = await Permission.videos.request();
+      } else {
+        status = await Permission.storage.request();
+      }
     } else {
-      status = await Permission.storage.request();
+      status = await Permission.photos.request();
     }
 
     setState(() {
@@ -106,10 +137,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     });
 
     if (hasPermission) {
-      _loadVideos(); // Load videos after permission is granted
+      await _loadVideos(); // Load videos after permission is granted
+      await _requestAssets(); // Also load assets
     } else {
-      // _showPermissionDeniedDialog();
-
+      _showPermissionDeniedDialog();
     }
   }
 
@@ -434,9 +465,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 ),
                 SizedBox(height: 16.sp),
                 ElevatedButton(
-                  onPressed:  (){
-                    _requestAssets();
-                  },
+                  onPressed: _requestPermissions, // Call the correct method
                   style: ElevatedButton.styleFrom(
                     backgroundColor: ColorSelect.maineColor,
                     foregroundColor: Colors.white,
