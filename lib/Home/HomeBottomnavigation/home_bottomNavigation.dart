@@ -2,10 +2,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as badges;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:flutter_svg/svg.dart';
+// import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:icons_plus/icons_plus.dart';
-import 'package:imagewidget/imagewidget.dart';
+// import 'package:imagewidget/imagewidget.dart';
 import 'package:instamusic/HexColorCode/HexColor.dart';
 import 'package:instamusic/Utils/color.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -1881,7 +1882,9 @@ class SettingsScreen extends StatelessWidget {
                     Navigator.of(context).pop();
                   },
                   child: Icon(
-                    FontAwesomeIcons.xmark,
+                    Icons.close,
+
+                    // FontAwesomeIcons.xmark,
                     color: Colors.black54,
                     size: 22.sp,
                   ),
