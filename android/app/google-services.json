@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1054442908505",
+    "project_id": "vidnexa-video-player-a69f8",
+    "storage_bucket": "vidnexa-video-player-a69f8.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1054442908505:android:b664773d6e1220246a3a48",
+        "android_client_info": {
+          "package_name": "com.vidnexa.videoplayer"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBXH-9NE0Q0VeQVRYkF0xMYeu12IMQ4EW0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

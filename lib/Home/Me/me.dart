@@ -1691,7 +1691,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   ),
                                   onTap: () {
                                     Share.share(
-                                      'Check out this amazing app: https://play.google.com/store/apps/details?id=com.example.app',
+                                      'Check out this Vidnexa Video Player App: https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer&pcampaignid=web_share',
                                       subject: 'Download this App',
                                     );
                                   },
