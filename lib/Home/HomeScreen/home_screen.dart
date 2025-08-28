@@ -46,24 +46,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   bool isLoading = true;
   String? errorMessage;
   List<String> recentlyPlayed = [];
-  bool hasPermission = false; // Track permission status
 
 
 
-  bool _isLoadingMore = false;
-  bool _hasMoreToLoad = true;
-  bool _isLoading = true;
-  bool _loading = false;
-
-  AssetPathEntity? _path;
-  List<AssetEntity>? _entities;
-  int _totalEntitiesCount = 0;
-  final int _sizePerPage = 50;
 
   @override
   void initState() {
     super.initState();
-    _checkPermissions(); // Check permissions on init
+    _loadVideos(); // Check permissions on init
     _loadRecentlyPlayed();
   }
 
@@ -79,14 +69,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       // For iOS, use Permission.photos or Permission.storage as needed
       status = await Permission.storage.status;
     }
-
-    setState(() {
-      hasPermission = status.isGranted;
-    });
-
-    if (hasPermission) {
-      _loadVideos(); // Load videos if permission is granted
-    }
+    //
+    // setState(() {
+    //   hasPermission = status.isGranted;
+    // });
+    //
+    // if (hasPermission) {
+    //   _loadVideos(); // Load videos if permission is granted
+    // }
   }
 
   // Request permissions
@@ -100,16 +90,16 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       status = await Permission.storage.request();
     }
 
-    setState(() {
-      hasPermission = status.isGranted;
-    });
-
-    if (hasPermission) {
-      _loadVideos(); // Load videos after permission is granted
-    } else {
-      // _showPermissionDeniedDialog();
-
-    }
+    // setState(() {
+    //   hasPermission = status.isGranted;
+    // });
+    //
+    // if (hasPermission) {
+    //   _loadVideos(); // Load videos after permission is granted
+    // } else {
+    //   // _showPermissionDeniedDialog();
+    //
+    // }
   }
 
   void _showPermissionDeniedDialog() {
@@ -165,60 +155,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   }
 
 
-  Future<void> _requestAssets() async {
-    setState(() {
-      _isLoading = true;
-    });
-    // Request permissions.
-    final PermissionState ps = await PhotoManager.requestPermissionExtend();
-    if (!mounted) {
-      return;
-    }
-    // Further requests can be only proceed with authorized or limited.
-    if (!ps.hasAccess) {
-      setState(() => _isLoading = false);
-      await PhotoManager.openSetting(); // Har baar setting pe le jao
-      return;
-    }
-    // Customize your own filter options.
-    final PMFilter filter = FilterOptionGroup(
-      imageOption: const FilterOption(
-        sizeConstraint: SizeConstraint(ignoreSize: true),
-      ),
-    );
-    // Obtain assets using the path entity.
-    final List<AssetPathEntity> paths = await PhotoManager.getAssetPathList(
-      onlyAll: true,
-      filterOption: filter,
-    );
-    if (!mounted) {
-      return;
-    }
-    // Return if not paths found.
-    if (paths.isEmpty) {
-      setState(() {
-        _isLoading = false;
-      });
-      // showToast('No paths found.');
-      return;
-    }
-    setState(() {
-      _path = paths.first;
-    });
-    _totalEntitiesCount = await _path!.assetCountAsync;
-    final List<AssetEntity> entities = await _path!.getAssetListPaged(
-      page: 0,
-      size: _sizePerPage,
-    );
-    if (!mounted) {
-      return;
-    }
-    setState(() {
-      _entities = entities;
-      _isLoading = false;
-      _hasMoreToLoad = _entities!.length < _totalEntitiesCount;
-    });
-  }
 
 
   void _showBottomSheet(BuildContext context) {
@@ -378,75 +314,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.white,
-      body: !hasPermission
-          ? Center(
-        child: Card(
-          elevation: 4,
-          margin: EdgeInsets.all(16.sp),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12.sp),
-          ),
-          child: Padding(
-            padding: EdgeInsets.all(16.sp),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(
-                  Icons.lock,
-                  size: 48.sp,
-                  color: Colors.red,
-                ),
-                SizedBox(height: 16.sp),
-                Text(
-                  'Permission Required',
-                  style: GoogleFonts.poppins(
-                    textStyle: TextStyle(
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
-                ),
-                SizedBox(height: 8.sp),
-                Text(
-                  'Please allow access to videos to view content.',
-                  style: GoogleFonts.poppins(
-                    textStyle: TextStyle(
-                      fontSize: 14.sp,
-                      color: Colors.grey.shade600,
-                    ),
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-                SizedBox(height: 16.sp),
-                ElevatedButton(
-                  onPressed:  (){
-                    _requestAssets();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: ColorSelect.maineColor,
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12.sp),
-                    ),
-                    padding: EdgeInsets.symmetric(horizontal: 24.sp, vertical: 12.sp),
-                  ),
-                  child: Text(
-                    'Allow Permission',
-                    style: GoogleFonts.poppins(
-                      textStyle: TextStyle(
-                        fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      )
-          : SingleChildScrollView(
+      body:  SingleChildScrollView(
         child: Column(
           children: [
             SizedBox(height: 10.sp),
@@ -520,6 +388,73 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                 ),
               ),
             ],
+            // Center(
+            //   child: Card(
+            //     elevation: 4,
+            //     margin: EdgeInsets.all(16.sp),
+            //     shape: RoundedRectangleBorder(
+            //       borderRadius: BorderRadius.circular(12.sp),
+            //     ),
+            //     child: Padding(
+            //       padding: EdgeInsets.all(16.sp),
+            //       child: Column(
+            //         mainAxisSize: MainAxisSize.min,
+            //         children: [
+            //           Icon(
+            //             Icons.lock,
+            //             size: 48.sp,
+            //             color: Colors.red,
+            //           ),
+            //           SizedBox(height: 16.sp),
+            //           Text(
+            //             'Permission Required',
+            //             style: GoogleFonts.poppins(
+            //               textStyle: TextStyle(
+            //                 fontSize: 18.sp,
+            //                 fontWeight: FontWeight.bold,
+            //                 color: Colors.black,
+            //               ),
+            //             ),
+            //           ),
+            //           SizedBox(height: 8.sp),
+            //           Text(
+            //             'Please allow access to videos to view content.',
+            //             style: GoogleFonts.poppins(
+            //               textStyle: TextStyle(
+            //                 fontSize: 14.sp,
+            //                 color: Colors.grey.shade600,
+            //               ),
+            //             ),
+            //             textAlign: TextAlign.center,
+            //           ),
+            //           SizedBox(height: 16.sp),
+            //           ElevatedButton(
+            //             onPressed:  (){
+            //               _requestPermissions();
+            //             },
+            //             style: ElevatedButton.styleFrom(
+            //               backgroundColor: ColorSelect.maineColor,
+            //               foregroundColor: Colors.white,
+            //               shape: RoundedRectangleBorder(
+            //                 borderRadius: BorderRadius.circular(12.sp),
+            //               ),
+            //               padding: EdgeInsets.symmetric(horizontal: 24.sp, vertical: 12.sp),
+            //             ),
+            //             child: Text(
+            //               'Allow Permission',
+            //               style: GoogleFonts.poppins(
+            //                 textStyle: TextStyle(
+            //                   fontSize: 14.sp,
+            //                   fontWeight: FontWeight.w600,
+            //                 ),
+            //               ),
+            //             ),
+            //           ),
+            //         ],
+            //       ),
+            //     ),
+            //   ),
+            // ),
             Padding(
               padding: EdgeInsets.all(0.sp),
               child: Padding(
