@@ -23,7 +23,6 @@ import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/AppBar/colorList.dart';
 import '../../Photo/photo.dart';
-import '../../Utils/string.dart';
 import '../../Utils/textSize.dart';
 import '../../VideoPLayer/AllVideo/all_videos.dart';
 import '../../app_store/app_store.dart';
@@ -1701,6 +1700,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   thickness: 1.sp,
                                   color: Colors.grey.shade100,
                                 ),
+
                                 ListTile(
                                   trailing: Icon(Icons.arrow_forward_ios,
                                       color: Colors.grey, size: 17.sp),
