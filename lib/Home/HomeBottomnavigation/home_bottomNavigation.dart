@@ -279,7 +279,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                         right: 0,
                         child: badges.Badge(
                           label: const Text(
-                            '6',
+                            '10',
                             style: TextStyle(color: Colors.white, fontSize: 10),
                           ),
                         ),
