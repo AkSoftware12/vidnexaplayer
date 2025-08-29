@@ -13,6 +13,7 @@ class SongsView extends StatefulWidget {
 
   final Color color;
   final Color colortext;
+
   const SongsView({super.key, required this.color, required this.colortext});
 
   @override

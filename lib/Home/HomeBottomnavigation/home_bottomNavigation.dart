@@ -64,13 +64,120 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     _getUsername();
     currentPage = widget.bottomIndex;
     checkForVersion(context);
-    // TESTING: Clear saved settings to force show upgrade dialog every time
-    Upgrader.clearSavedSettings(); // Remove this line for production
   }
 
   Future<void> checkForVersion(BuildContext context) async {
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
     currentVersion = packageInfo.version;
+  }
+
+  // Handle back button press
+  Future<bool> _onWillPop() async {
+    return (await showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        backgroundColor: Colors.white,
+        contentPadding: EdgeInsets.zero,
+        content: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                HexColor('#3b82f6'),
+                ColorSelect.maineColor,
+              ],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: EdgeInsets.all(20.sp),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                'Exit App',
+                style: GoogleFonts.openSans(
+                  textStyle: TextStyle(
+                    color: Colors.white,
+                    fontSize: TextSizes.textlarge,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+              SizedBox(height: 10.sp),
+              Text(
+                'Are you sure you want to exit the app?',
+                style: GoogleFonts.openSans(
+                  textStyle: TextStyle(
+                    color: Colors.white70,
+                    fontSize: TextSizes.textmedium,
+                  ),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 20.sp),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.purple,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20.sp,
+                        vertical: 10.sp,
+                      ),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(false),
+                    child: Text(
+                      'Cancel',
+                      style: GoogleFonts.openSans(
+                        textStyle: TextStyle(
+                          color: Colors.purple,
+                          fontSize: TextSizes.textmedium,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                  ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.redAccent,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 20.sp,
+                        vertical: 10.sp,
+                      ),
+                    ),
+                    onPressed: () => Navigator.of(context).pop(true),
+                    child: Text(
+                      'Exit',
+                      style: GoogleFonts.openSans(
+                        textStyle: TextStyle(
+                          color: Colors.white,
+                          fontSize: TextSizes.textmedium,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    )) ??
+        false;
   }
 
   @override
@@ -80,179 +187,175 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       Provider.of<AppBarColorProvider>(context, listen: false).loadColor();
     });
 
-    return Scaffold(
-      key: _scaffoldKey,
-      // Assign the key to the Scaffold
-      backgroundColor: Colors.white,
-      appBar: AppBar(
+    return WillPopScope(
+      onWillPop: _onWillPop,
+      child: Scaffold(
+        key: _scaffoldKey,
+        // Assign the key to the Scaffold
         backgroundColor: Colors.white,
-        elevation: 0,
-        automaticallyImplyLeading: false,
-        title: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Row(
-              children: [
-                GestureDetector(
-                  onTap: () {
-                    _scaffoldKey.currentState?.openDrawer(); // Open the drawer
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(8),
-                    child: Icon(Icons.apps, color: Colors.black),
-                  ),
-                ),
-
-                const SizedBox(width: 8),
-
-                // Folder icon button with purple background
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => DeviceSpaceScreen(),
+        appBar: AppBar(
+          backgroundColor: Colors.white,
+          elevation: 0,
+          automaticallyImplyLeading: false,
+          title: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
+                children: [
+                  GestureDetector(
+                    onTap: () {
+                      _scaffoldKey.currentState?.openDrawer(); // Open the drawer
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade200,
+                        borderRadius: BorderRadius.circular(12),
                       ),
-                    );
-                  },
-                  child: Container(
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: LinearGradient(
-                        colors: [
-                          HexColor('#3b82f6'), // Purple
-                          Colors.purple,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(Icons.apps, color: Colors.black),
                     ),
-                    padding: const EdgeInsets.all(8),
-                    child: const Icon(Icons.folder, color: Colors.white),
                   ),
-                ),
-              ],
-            ),
-            // Grid icon
-            // SizedBox(
-            //   height: 40.sp,
-            //     child: Image.asset('assets/logo_blue_text.png')),
 
-            Row(
-              children: [
-                Stack(
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (context) => NotificationScreen(),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(12),
+                  const SizedBox(width: 8),
+
+                  // Folder icon button with purple background
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DeviceSpaceScreen(),
                         ),
-                        padding: const EdgeInsets.all(8),
-                        child: const Icon(Icons.notifications_none,
-                            color: Colors.black),
-                      ),
-                    ),
-                    Positioned(
-                      top: 0, // 👈 ye line badli
-                      right: 0,
-                      child: badges.Badge(
-                        label: const Text(
-                          '6',
-                          style: TextStyle(color: Colors.white, fontSize: 10),
+                      );
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        gradient: LinearGradient(
+                          colors: [
+                            HexColor('#3b82f6'), // Purple
+                            Colors.purple,
+                          ],
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
                         ),
                       ),
-                    )
-                  ],
-                ),
+                      padding: const EdgeInsets.all(8),
+                      child: const Icon(Icons.folder, color: Colors.white),
+                    ),
+                  ),
+                ],
+              ),
+              // Grid icon
+              // SizedBox(
+              //   height: 40.sp,
+              //     child: Image.asset('assets/logo_blue_text.png')),
 
-                const SizedBox(width: 16),
-
-                // Profile picture with green dot
-                GestureDetector(
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                          builder: (context) => const HomeBottomNavigation(
-                                bottomIndex: 3,
-                              )),
-                    );
-                  },
-                  child: Stack(
+              Row(
+                children: [
+                  Stack(
                     children: [
-                      const CircleAvatar(
-                        radius: 20,
-                        // If backgroundImage is not set or fails to load, the child (Icon) will be displayed
-                        backgroundImage: NetworkImage(
-                            'https://img.freepik.com/free-photo/young-bearded-man-with-striped-shirt_273609-5677.jpg'), // Uncomment and replace with your image path
+                      GestureDetector(
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => NotificationScreen(),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.all(8),
+                          child: const Icon(Icons.notifications_none,
+                              color: Colors.black),
+                        ),
                       ),
                       Positioned(
-                        bottom: 0,
+                        top: 0, // 👈 ye line badli
                         right: 0,
-                        child: Container(
-                          width: 12,
-                          height: 12,
-                          decoration: BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white, width: 2),
+                        child: badges.Badge(
+                          label: const Text(
+                            '6',
+                            style: TextStyle(color: Colors.white, fontSize: 10),
                           ),
                         ),
                       )
                     ],
                   ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
 
-      body: UpgradeAlert(
-        upgrader: Upgrader(
-          debugLogging: true,
-          debugDisplayAlways: true,
-          debugDisplayOnce: true,
+                  const SizedBox(width: 16),
+
+                  // Profile picture with green dot
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (context) => const HomeBottomNavigation(
+                                  bottomIndex: 3,
+                                )),
+                      );
+                    },
+                    child: Stack(
+                      children: [
+                        const CircleAvatar(
+                          radius: 20,
+                          // If backgroundImage is not set or fails to load, the child (Icon) will be displayed
+                          backgroundImage: NetworkImage(
+                              'https://img.freepik.com/free-photo/young-bearded-man-with-striped-shirt_273609-5677.jpg'), // Uncomment and replace with your image path
+                        ),
+                        Positioned(
+                          bottom: 0,
+                          right: 0,
+                          child: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: Colors.green,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white, width: 2),
+                            ),
+                          ),
+                        )
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
-        child: Container(
+
+        body:Container(
           decoration: BoxDecoration(color: Colors.white),
           child: Center(
             child: _getPage(currentPage),
           ),
         ),
+        bottomNavigationBar: CustomBottomBar(
+          initialSelection: widget.bottomIndex,
+          key: bottomNavigationKey,
+          onTabChangedListener: (position) {
+            setState(() {
+              currentPage = position;
+            });
+          },
+        ),
+        drawer: Drawer(
+            shape: const RoundedRectangleBorder(
+              borderRadius: BorderRadius.zero,
+            ),
+            width: MediaQuery.sizeOf(context).width * .7,
+            // backgroundColor: ColorSelect.maineColor,
+            child: SettingsScreen(
+              user: userName??'User Name',
+              userImage: userImage, currentVersion: currentVersion,
+            )),
       ),
-      bottomNavigationBar: CustomBottomBar(
-        initialSelection: widget.bottomIndex,
-        key: bottomNavigationKey,
-        onTabChangedListener: (position) {
-          setState(() {
-            currentPage = position;
-          });
-        },
-      ),
-      drawer: Drawer(
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.zero,
-          ),
-          width: MediaQuery.sizeOf(context).width * .7,
-          // backgroundColor: ColorSelect.maineColor,
-          child: SettingsScreen(
-            user: userName??'',
-            userImage: userImage,
-          )),
     );
   }
 
@@ -263,7 +366,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       case 1:
         return OfflineMusicTabScreen();
       case 2:
-        return AllVideosScreen();
+        return AllVideosScreen(icon: '',);
       case 3:
         return UserProfilePage();
       default:
@@ -420,13 +523,14 @@ class CustomBottomBarState extends State<CustomBottomBar> {
 class SettingsScreen extends StatelessWidget {
   final String user;
   final String userImage;
-  final String currentVersion = "1.0.0"; // Example version, replace with actual version
+  final String currentVersion;
   final TextSizes textSizes = TextSizes();
 
   SettingsScreen({
     super.key,
     required this.user,
     required this.userImage,
+    required this.currentVersion,
   });
 
   @override
@@ -497,7 +601,17 @@ class SettingsScreen extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.start,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          user.isEmpty?
                           Text(
+                            'User',
+                            style: GoogleFonts.radioCanada(
+                              textStyle: TextStyle(
+                                color: Colors.white,
+                                fontSize: TextSizes.textlarge,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ):  Text(
                             user,
                             style: GoogleFonts.radioCanada(
                               textStyle: TextStyle(
@@ -633,7 +747,7 @@ class SettingsScreen extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AllVideosScreen(),
+                        builder: (context) => AllVideosScreen(icon: 'AppBar',),
                       ),
                     );
                   },
@@ -1345,7 +1459,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(height: 0.sp),
+          SizedBox(height: 30.sp),
         ],
       ),
     );

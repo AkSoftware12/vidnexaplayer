@@ -10,7 +10,8 @@ import '../../Utils/color.dart';
 import '../video_player.dart';
 
 class AllVideosScreen extends StatefulWidget {
-  const AllVideosScreen({super.key});
+  final String icon;
+  const AllVideosScreen({super.key, required this.icon});
 
   @override
   _HomeScreenState createState() => _HomeScreenState();
@@ -84,6 +85,7 @@ class _HomeScreenState extends State<AllVideosScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        automaticallyImplyLeading: widget.icon=='' ? false:true,
         title: const Text(
           'All Videos',
           style: TextStyle(

@@ -10,7 +10,7 @@ import 'package:instamusic/Utils/color.dart';
 import 'package:instamusic/VideoPLayer/AllVideo/all_videos.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
-import 'package:permission_handler/permission_handler.dart'; // For permission handling
+import 'package:permission_handler/permission_handler.dart';
 import '../../HexColorCode/HexColor.dart';
 import '../../Model/property_type.dart';
 import '../../NetWork Stream/stream_video.dart';
@@ -41,7 +41,7 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with RouteAware {
+class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBindingObserver {
   final RouteObserver<PageRoute> routeObserver = RouteObserver<PageRoute>();
   Map<String, List<File>> videosByFolder = {};
   bool isLoading = true;
@@ -52,8 +52,19 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // Add lifecycle observer
     _checkPermissions(); // Check permissions on initialization
     _loadRecentlyPlayed();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // App resumed from background
+      _checkPermissions(); // Re-check permissions and refresh UI
+      _loadRecentlyPlayed();
+    }
   }
 
   // Check permissions for photos and videos
@@ -72,12 +83,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
       videosPermission = false;
     }
 
-    setState(() {
-      hasPermissions = photosPermission && videosPermission;
-    });
+    if (mounted) {
+      setState(() {
+        hasPermissions = photosPermission && videosPermission;
+      });
 
-    if (hasPermissions) {
-      _loadVideos(); // Load videos if permissions are granted
+      if (hasPermissions) {
+        await _loadVideos(); // Load videos if permissions are granted
+      }
     }
   }
 
@@ -91,24 +104,29 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     bool photosGranted = statuses[Permission.photos]!.isGranted;
     bool videosGranted = statuses[Permission.videos]!.isGranted;
 
-    setState(() {
-      hasPermissions = photosGranted && videosGranted;
-    });
+    if (mounted) {
+      setState(() {
+        hasPermissions = photosGranted && videosGranted;
+      });
 
-    if (hasPermissions) {
-      _loadVideos(); // Load videos after permissions are granted
-    } else {
-      openAppSettings();
+      if (hasPermissions) {
+        await _loadVideos(); // Load videos after permissions are granted
+      } else {
+        await openAppSettings();
+        await _checkPermissions(); // Re-check permissions after returning from settings
+      }
     }
   }
 
   // Load videos from device
   Future<void> _loadVideos() async {
-    setState(() {
-      isLoading = true;
-      errorMessage = null;
-      videosByFolder.clear();
-    });
+    if (mounted) {
+      setState(() {
+        isLoading = true;
+        errorMessage = null;
+        videosByFolder.clear();
+      });
+    }
 
     try {
       final videoExtensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.3gp'];
@@ -127,9 +145,11 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         await Future.wait(directories.map((dir) async {
           if (await dir.exists()) {
             await _scanDirectory(dir, videoExtensions, tempVideosByFolder);
-            setState(() {
-              videosByFolder = Map.from(tempVideosByFolder);
-            });
+            if (mounted) {
+              setState(() {
+                videosByFolder = Map.from(tempVideosByFolder);
+              });
+            }
           }
         }));
       } else if (Platform.isIOS) {
@@ -137,15 +157,19 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         await _scanDirectory(dir, videoExtensions, tempVideosByFolder);
       }
 
-      setState(() {
-        videosByFolder = tempVideosByFolder;
-        isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          videosByFolder = tempVideosByFolder;
+          isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        errorMessage = 'Error loading videos: $e';
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'Error loading videos: $e';
+        });
+      }
     }
   }
 
@@ -175,14 +199,18 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   Future<void> _loadRecentlyPlayed() async {
     try {
       final videos = await RecentlyPlayedManager.getVideos();
-      setState(() {
-        recentlyPlayed = videos;
-      });
+      if (mounted) {
+        setState(() {
+          recentlyPlayed = videos;
+        });
+      }
     } catch (e) {
-      setState(() {
-        isLoading = false;
-        errorMessage = 'Error loading videos: $e';
-      });
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+          errorMessage = 'Error loading recently played videos: $e';
+        });
+      }
     }
   }
 
@@ -199,12 +227,13 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   void didPopNext() {
     // Called when HomeScreen is revealed after popping another screen
     _checkPermissions(); // Re-check permissions and load videos if granted
-    _loadRecentlyPlayed();
+    _loadRecentlyPlayed(); // Refresh recently played videos
   }
 
   @override
   void dispose() {
     routeObserver.unsubscribe(this);
+    WidgetsBinding.instance.removeObserver(this); // Remove lifecycle observer
     super.dispose();
   }
 
@@ -274,7 +303,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             HorizontalGridList(),
             if (!hasPermissions) ...[
               // Show permission card if permissions are not granted
-
               Padding(
                 padding: EdgeInsets.all(16.sp),
                 child: Card(
@@ -368,6 +396,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                               ),
                             ),
                           ).then((value) {
+                            _checkPermissions(); // Check permissions and refresh after returning
                             _loadRecentlyPlayed();
                           });
                         },
@@ -566,6 +595,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                               ),
                             ),
                           ).then((value) {
+                            _checkPermissions(); // Check permissions and refresh after returning
                             _loadRecentlyPlayed();
                           });
                         },
@@ -592,7 +622,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                         MaterialPageRoute(
                           builder: (context) => DeviceSpaceScreen(),
                         ),
-                      );
+                      ).then((value) {
+                        _checkPermissions(); // Check permissions and refresh after returning
+                        _loadRecentlyPlayed();
+                      });
                     },
                     child: Padding(
                       padding: EdgeInsets.all(10.sp),
@@ -640,7 +673,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 }
-
 class CustomFolderTile extends StatelessWidget {
   final String folderName;
   final List<dynamic> videos;
@@ -793,7 +825,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                   Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => AllVideosScreen(),
+                        builder: (context) => AllVideosScreen(icon: 'AppBar',),
                       ));
                 } else if (index == 1) {
                   Navigator.push(

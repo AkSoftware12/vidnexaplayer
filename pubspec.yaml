@@ -128,7 +128,7 @@ name: instamusic
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.6+6
+version: 1.0.7+7
 
 environment:
   sdk: ^3.7.0
@@ -145,9 +145,9 @@ dependencies:
   on_audio_query_forked: ^2.9.1
 
 
-  # ✅ Optional Desktop Audio (if targeting Windows/Linux)
-  just_audio_mpv: ^0.1.7
-  audio_service_mpris: ^0.2.0
+#  # ✅ Optional Desktop Audio (if targeting Windows/Linux)
+#  just_audio_mpv: ^0.1.7
+#  audio_service_mpris: ^0.2.0
 
   # ✅ UI + Media
   fancy_bottom_navigation_2: ^0.3.5

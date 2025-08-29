@@ -581,9 +581,30 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   SizedBox(
                                     height: 5.sp,
                                   ),
+
+                                  userName.isEmpty?
                                   Text.rich(
                                     TextSpan(
-                                      text: "${userName}",
+                                      text: 'User',
+                                      style: GoogleFonts.radioCanada(
+                                        textStyle: TextStyle(
+                                          color: Theme.of(context)
+                                              .colorScheme
+                                              .secondary,
+                                          fontSize: 17.sp,
+                                          // Adjust font size as needed
+                                          fontWeight: FontWeight
+                                              .bold, // Adjust font weight as needed
+                                        ),
+                                      ),
+                                    ),
+                                    textAlign: TextAlign
+                                        .start, // Ensure text starts at the beginning
+                                  )
+
+                            : Text.rich(
+                                    TextSpan(
+                                      text: userName,
                                       style: GoogleFonts.radioCanada(
                                         textStyle: TextStyle(
                                           color: Theme.of(context)
@@ -599,6 +620,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                     textAlign: TextAlign
                                         .start, // Ensure text starts at the beginning
                                   ),
+
                                   Text.rich(
                                     TextSpan(
                                       text: "demo1234@gmail.com",
@@ -808,7 +830,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => AllVideosScreen(),
+                                  builder: (context) => AllVideosScreen(icon: 'AppBar',),
                                 ),
                               );
                             },

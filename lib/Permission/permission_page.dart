@@ -56,8 +56,10 @@ class _HomeScreenState extends State<PermissionPage> {
     }
   }
   void openAppSettingsDialog() {
-    Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (context) => HomeBottomNavigation(bottomIndex: 0,)));
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const HomeBottomNavigation(bottomIndex: 0,)),
+    );
   }
   @override
   Widget build(BuildContext context) {
@@ -239,8 +241,12 @@ class _HomeScreenState extends State<PermissionPage> {
                 children: [
                   GestureDetector(
                     onTap:(){
-                      Navigator.of(context).pushReplacement(
-                          MaterialPageRoute(builder: (context) => const HomeBottomNavigation(bottomIndex: 0,)));
+
+                      Navigator.pushReplacement(
+                        context,
+                        MaterialPageRoute(builder: (context) => const HomeBottomNavigation(bottomIndex: 0,)),
+                      );
+
 
                     },
                     child: SizedBox(

@@ -1,9 +1,9 @@
 import 'dart:io';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:device_info_plus/device_info_plus.dart';
 import 'package:instamusic/Utils/color.dart';
 import '../../Utils/textSize.dart';
 import 'OfflineSongs/presentation/pages/home/views/albums_view.dart';
@@ -18,127 +18,108 @@ class OfflineMusicTabScreen extends StatefulWidget {
   _DashBoardScreenState createState() => _DashBoardScreenState();
 }
 
-class _DashBoardScreenState extends State<OfflineMusicTabScreen> with SingleTickerProviderStateMixin {
-  PageController _pageController = PageController(initialPage: 0);
+class _DashBoardScreenState extends State<OfflineMusicTabScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+  late PageController _pageController;
   int _selectedIndex = 0;
-  bool isLiked = false;
-  bool download = false;
-  int selectIndex = 0;
-  bool _hasPermission = false;
+  bool _hasPermissions = false;
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController(initialPage: 0);
+    WidgetsBinding.instance.addObserver(this); // Add observer for lifecycle changes
     _checkPermissions();
   }
 
-  Future<void> _checkPermissions() async {
-    try {
-      PermissionStatus status;
-
-      if (Platform.isAndroid) {
-        DeviceInfoPlugin deviceInfo = DeviceInfoPlugin();
-        AndroidDeviceInfo? androidInfo;
-
-        try {
-          androidInfo = await deviceInfo.androidInfo;
-        } catch (e) {
-          print('Error getting Android device info: $e');
-          setState(() {
-            _hasPermission = false;
-            _isLoading = false;
-          });
-          _showPermissionDeniedDialog();
-          return;
-        }
-
-        if (androidInfo.version.sdkInt >= 33) {
-          status = await Permission.audio.status;
-          if (!status.isGranted) {
-            status = await Permission.audio.request();
-          }
-        } else {
-          status = await Permission.storage.status;
-          if (!status.isGranted) {
-            status = await Permission.storage.request();
-          }
-        }
-      } else {
-        status = await Permission.audio.status;
-        if (!status.isGranted) {
-          status = await Permission.audio.request();
-        }
-      }
-
-      setState(() {
-        _hasPermission = status.isGranted;
-        _isLoading = false;
-      });
-
-      if (!status.isGranted || status.isPermanentlyDenied) {
-        _showPermissionDeniedDialog();
-      }
-    } catch (e) {
-      print('Error checking permissions: $e');
-      setState(() {
-        _hasPermission = false;
-        _isLoading = false;
-      });
-      _showPermissionDeniedDialog();
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state == AppLifecycleState.resumed) {
+      // When app resumes, recheck permissions
+      _checkPermissions();
     }
   }
 
-  void _showPermissionDeniedDialog() {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: Text(
-            'Permission Required',
-            style: GoogleFonts.poppins(
-              fontWeight: FontWeight.bold,
-              fontSize: TextSizes.textmedium,
-            ),
-          ),
-          content: Text(
-            'This app requires access to your music files to display offline songs. Please grant the necessary permissions.',
-            style: GoogleFonts.poppins(fontSize: TextSizes.textsmall),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                openAppSettings();
-              },
-              child: Text(
-                'Open Settings',
-                style: GoogleFonts.poppins(
-                  color: ColorSelect.maineColor,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-                // Stay on permission screen or navigate back
-                // if (Navigator.canPop(context)) {
-                //   Navigator.pop(context);
-                // }
-              },
-              child: Text(
-                'Cancel',
-                style: GoogleFonts.poppins(
-                  color: Colors.grey,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-          ],
-        );
-      },
-    );
+  // Check audio permission for Android 14 (API 34)
+  Future<void> _checkPermissions() async {
+    bool audioPermission;
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      audioPermission = await Permission.audio.isGranted;
+    } else {
+      audioPermission = false;
+    }
+
+    if (mounted) {
+      setState(() {
+        _hasPermissions = audioPermission;
+        _isLoading = false;
+      });
+
+      if (_hasPermissions) {
+        await _loadMusic(); // Load music data when permission is granted
+      }
+    }
+  }
+
+  // Request audio permission for Android 14 (API 34)
+  Future<void> _requestPermissions() async {
+    final status = await Permission.audio.request();
+
+    bool audioGranted = status.isGranted;
+
+    if (mounted) {
+      setState(() {
+        _hasPermissions = audioGranted;
+        _isLoading = false;
+      });
+
+      if (_hasPermissions) {
+        await _loadMusic(); // Load music data when permission is granted
+      } else if (status.isPermanentlyDenied) {
+        // Open app settings if permission is permanently denied
+        await openAppSettings();
+      }
+    }
+  }
+
+  // Function to load music data and refresh the screen
+  Future<void> _loadMusic() async {
+    try {
+      if (mounted) {
+        setState(() {
+          _isLoading = true; // Show loading indicator while fetching songs
+        });
+      }
+
+      // Placeholder for loading music data
+      // Example: Use on_audio_query to fetch songs
+      // final OnAudioQuery audioQuery = OnAudioQuery();
+      // List<SongModel> songs = await audioQuery.querySongs();
+      // Update your state or provider with the songs
+      print('Loading music data...');
+      // Example: Update a provider or state management solution
+      // Provider.of<MusicProvider>(context, listen: false).setSongs(songs);
+
+      // Simulate a delay to mimic song loading
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // Hide loading indicator and refresh UI
+          _hasPermissions = true; // Ensure UI shows the music tabs
+        });
+      }
+    } catch (e) {
+      print('Error loading music: $e');
+      if (mounted) {
+        setState(() {
+          _isLoading = false; // Hide loading indicator even on error
+        });
+      }
+    }
   }
 
   void _onItemTapped(int index) {
@@ -146,7 +127,7 @@ class _DashBoardScreenState extends State<OfflineMusicTabScreen> with SingleTick
       _selectedIndex = index;
       _pageController.animateToPage(
         index,
-        duration: Duration(milliseconds: 300),
+        duration: const Duration(milliseconds: 300),
         curve: Curves.ease,
       );
     });
@@ -154,226 +135,179 @@ class _DashBoardScreenState extends State<OfflineMusicTabScreen> with SingleTick
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.background,
-        body: Center(
-          child: CircularProgressIndicator(
-            color: ColorSelect.maineColor,
+    return Scaffold(
+      backgroundColor: Theme.of(context).colorScheme.background,
+      body: _isLoading
+          ? Center(
+        child:  CupertinoActivityIndicator(
+          radius: 25,
+          color: ColorSelect.maineColor,
+          animating: true,
+        ),
+      )
+          : ScrollConfiguration(
+        behavior: const ConstantScrollBehavior(),
+        child: Column(
+          children: [
+            _buildAppBar(),
+            Expanded(
+              child: _hasPermissions
+                  ? PageView(
+                controller: _pageController,
+                onPageChanged: (index) {
+                  setState(() {
+                    _selectedIndex = index;
+                  });
+                },
+                children: [
+                  SongsView(
+                    color: Theme.of(context).colorScheme.background,
+                    colortext: Theme.of(context).colorScheme.secondary,
+                  ),
+                  ArtistsView(
+                    color: Theme.of(context).colorScheme.background,
+                    colortext: Theme.of(context).colorScheme.secondary,
+                  ),
+                  AlbumsView(
+                    color: Theme.of(context).colorScheme.background,
+                    colortext: Theme.of(context).colorScheme.secondary,
+                  ),
+                  GenresView(
+                    color: Theme.of(context).colorScheme.background,
+                    colortext: Theme.of(context).colorScheme.secondary,
+                  ),
+                ],
+              )
+                  : _buildPermissionDeniedCard(),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAppBar() {
+    return AppBar(
+      backgroundColor: Theme.of(context).colorScheme.background,
+      automaticallyImplyLeading: false,
+      title: SizedBox(
+        height: 40.sp,
+        child: ListView(
+          scrollDirection: Axis.horizontal,
+          children: [
+            _buildTab('Songs', 0),
+            _buildTab('Artists', 1),
+            _buildTab('Albums', 2),
+            _buildTab('Genres', 3),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTab(String title, int index) {
+    return GestureDetector(
+      onTap: () => _onItemTapped(index),
+      child: Card(
+        color: _selectedIndex == index ? ColorSelect.maineColor : Colors.white,
+        child: SizedBox(
+          width: 80.sp,
+          child: Padding(
+            padding: EdgeInsets.all(8.sp),
+            child: Center(
+              child: Text(
+                title,
+                style: GoogleFonts.poppins(
+                  textStyle: TextStyle(
+                    color: _selectedIndex == index
+                        ? Colors.white
+                        : ColorSelect.maineColor,
+                    fontSize: TextSizes.textmedium,
+                    fontWeight: FontWeight.bold,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ),
+              ),
+            ),
           ),
         ),
-      );
-    }
+      ),
+    );
+  }
 
-    if (!_hasPermission) {
-      return Scaffold(
-        backgroundColor: Theme.of(context).colorScheme.background,
-        body: Center(
+  Widget _buildPermissionDeniedCard() {
+    return Padding(
+      padding: EdgeInsets.all(16.sp),
+      child: Card(
+        elevation: 4,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Padding(
+          padding: EdgeInsets.all(16.sp),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
+              Icon(
+                Icons.lock_outline,
+                color: Colors.red,
+                size: 48.sp,
+              ),
+              SizedBox(height: 16.sp),
               Text(
                 'Music Access Permission Required',
                 style: GoogleFonts.poppins(
-                  fontSize: TextSizes.textlarge,
-                  fontWeight: FontWeight.bold,
-                  color: Theme.of(context).colorScheme.secondary,
+                  textStyle: TextStyle(
+                    fontSize: 20.sp,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black,
+                  ),
                 ),
+                textAlign: TextAlign.center,
               ),
-              SizedBox(height: 20.sp),
+              SizedBox(height: 8.sp),
+              Text(
+                'This app requires access to your music files to display offline songs. Please grant the necessary permissions.',
+                style: GoogleFonts.poppins(
+                  textStyle: TextStyle(
+                    fontSize: 12.sp,
+                    color: Colors.grey[600],
+                  ),
+                ),
+                textAlign: TextAlign.center,
+              ),
+              SizedBox(height: 16.sp),
               ElevatedButton(
-                onPressed: _checkPermissions,
+                onPressed: () async {
+                  await _requestPermissions();
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: ColorSelect.maineColor,
-                  padding: EdgeInsets.symmetric(horizontal: 20.sp, vertical: 10.sp),
+                  foregroundColor: Colors.white,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 child: Text(
-                  'Request Permission',
+                  'Allow Permissions',
                   style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: TextSizes.textmedium,
-                    fontWeight: FontWeight.bold,
+                    textStyle: TextStyle(
+                      fontSize: 16.sp,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ),
               ),
             ],
           ),
         ),
-      );
-    }
-
-    return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
-      appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.background,
-        automaticallyImplyLeading: false,
-        title: Padding(
-          padding: EdgeInsets.all(0.0),
-          child: SizedBox(
-            height: 40.sp,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              children: <Widget>[
-                GestureDetector(
-                  onTap: () {
-                    _onItemTapped(0);
-                  },
-                  child: Card(
-                    color: _selectedIndex == 0
-                        ? ColorSelect.maineColor
-                        : Colors.white,
-                    child: SizedBox(
-                      width: 80.sp,
-                      child: Padding(
-                        padding: EdgeInsets.all(8.sp),
-                        child: Center(
-                          child: Text(
-                            'Songs',
-                            style: GoogleFonts.poppins(
-                              textStyle: TextStyle(
-                                color: _selectedIndex == 0
-                                    ? Colors.white
-                                    : ColorSelect.maineColor,
-                                fontSize: TextSizes.textmedium,
-                                fontWeight: FontWeight.bold,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    _onItemTapped(1);
-                  },
-                  child: Card(
-                    color: _selectedIndex == 1
-                        ? ColorSelect.maineColor
-                        : Colors.white,
-                    child: SizedBox(
-                      width: 80.sp,
-                      child: Padding(
-                        padding: EdgeInsets.all(8.sp),
-                        child: Center(
-                          child: Text(
-                            'Artists',
-                            style: GoogleFonts.poppins(
-                              textStyle: TextStyle(
-                                color: _selectedIndex == 1
-                                    ? Colors.white
-                                    : ColorSelect.maineColor,
-                                fontSize: TextSizes.textmedium,
-                                fontWeight: FontWeight.bold,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    _onItemTapped(2);
-                  },
-                  child: Card(
-                    color: _selectedIndex == 2
-                        ? ColorSelect.maineColor
-                        : Colors.white,
-                    child: SizedBox(
-                      width: 80.sp,
-                      child: Padding(
-                        padding: EdgeInsets.all(8.sp),
-                        child: Center(
-                          child: Text(
-                            'Albums',
-                            style: GoogleFonts.poppins(
-                              textStyle: TextStyle(
-                                color: _selectedIndex == 2
-                                    ? Colors.white
-                                    : ColorSelect.maineColor,
-                                fontSize: TextSizes.textmedium,
-                                fontWeight: FontWeight.bold,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () {
-                    _onItemTapped(3);
-                  },
-                  child: Card(
-                    color: _selectedIndex == 3
-                        ? ColorSelect.maineColor
-                        : Colors.white,
-                    child: SizedBox(
-                      width: 80.sp,
-                      child: Padding(
-                        padding: EdgeInsets.all(8.sp),
-                        child: Center(
-                          child: Text(
-                            'Genres',
-                            style: GoogleFonts.poppins(
-                              textStyle: TextStyle(
-                                color: _selectedIndex == 3
-                                    ? Colors.white
-                                    : ColorSelect.maineColor,
-                                fontSize: TextSizes.textmedium,
-                                fontWeight: FontWeight.bold,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-      body: PageView(
-        controller: _pageController,
-        onPageChanged: (index) {
-          setState(() {
-            _selectedIndex = index;
-          });
-        },
-        children: [
-          SongsView(
-            color: Theme.of(context).colorScheme.background,
-            colortext: Theme.of(context).colorScheme.secondary,
-          ),
-          ArtistsView(
-            color: Theme.of(context).colorScheme.background,
-            colortext: Theme.of(context).colorScheme.secondary,
-          ),
-          AlbumsView(
-            color: Theme.of(context).colorScheme.background,
-            colortext: Theme.of(context).colorScheme.secondary,
-          ),
-          GenresView(
-            color: Theme.of(context).colorScheme.background,
-            colortext: Theme.of(context).colorScheme.secondary,
-          ),
-        ],
       ),
     );
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // Remove observer
     _pageController.dispose();
     super.dispose();
   }
