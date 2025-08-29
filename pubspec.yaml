@@ -128,7 +128,7 @@ name: instamusic
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.3+3
+version: 1.0.6+6
 
 environment:
   sdk: ^3.7.0

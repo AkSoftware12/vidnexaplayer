@@ -74,16 +74,10 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
     setState(() {
       hasPermissions = photosPermission && videosPermission;
-      isLoading = hasPermissions; // Set isLoading to true only if permissions are granted
     });
 
     if (hasPermissions) {
-      await _loadVideos(); // Load videos if permissions are granted
-    } else {
-      setState(() {
-        isLoading = false; // Stop loading if permissions are not granted
-        videosByFolder.clear(); // Clear videos to ensure no stale data
-      });
+      _loadVideos(); // Load videos if permissions are granted
     }
   }
 
@@ -99,15 +93,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
 
     setState(() {
       hasPermissions = photosGranted && videosGranted;
-      isLoading = hasPermissions; // Start loading if permissions are granted
     });
 
     if (hasPermissions) {
-      await _loadVideos(); // Load videos after permissions are granted
+      _loadVideos(); // Load videos after permissions are granted
     } else {
-      await openAppSettings();
-      // After returning from settings, re-check permissions
-      await _checkPermissions();
+      openAppSettings();
     }
   }
 
@@ -136,11 +127,9 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         await Future.wait(directories.map((dir) async {
           if (await dir.exists()) {
             await _scanDirectory(dir, videoExtensions, tempVideosByFolder);
-            if (mounted) {
-              setState(() {
-                videosByFolder = Map.from(tempVideosByFolder);
-              });
-            }
+            setState(() {
+              videosByFolder = Map.from(tempVideosByFolder);
+            });
           }
         }));
       } else if (Platform.isIOS) {
@@ -148,19 +137,15 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
         await _scanDirectory(dir, videoExtensions, tempVideosByFolder);
       }
 
-      if (mounted) {
-        setState(() {
-          videosByFolder = tempVideosByFolder;
-          isLoading = false;
-        });
-      }
+      setState(() {
+        videosByFolder = tempVideosByFolder;
+        isLoading = false;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-          errorMessage = 'Error loading videos: $e';
-        });
-      }
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Error loading videos: $e';
+      });
     }
   }
 
@@ -190,18 +175,14 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   Future<void> _loadRecentlyPlayed() async {
     try {
       final videos = await RecentlyPlayedManager.getVideos();
-      if (mounted) {
-        setState(() {
-          recentlyPlayed = videos;
-        });
-      }
+      setState(() {
+        recentlyPlayed = videos;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          isLoading = false;
-          errorMessage = 'Error loading recently played videos: $e';
-        });
-      }
+      setState(() {
+        isLoading = false;
+        errorMessage = 'Error loading videos: $e';
+      });
     }
   }
 
@@ -217,7 +198,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
   @override
   void didPopNext() {
     // Called when HomeScreen is revealed after popping another screen
-    _checkPermissions(); // Re-check permissions when returning to the screen
+    _checkPermissions(); // Re-check permissions and load videos if granted
+    _loadRecentlyPlayed();
   }
 
   @override
@@ -292,6 +274,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
             HorizontalGridList(),
             if (!hasPermissions) ...[
               // Show permission card if permissions are not granted
+
               Padding(
                 padding: EdgeInsets.all(16.sp),
                 child: Card(
@@ -457,200 +440,199 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
                   ),
                 ),
               ),
-              if (isLoading && videosByFolder.isEmpty)
-                Padding(
-                  padding: EdgeInsets.only(top: 100),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CupertinoActivityIndicator(
-                        radius: 25,
-                        color: ColorSelect.maineColor,
-                        animating: true,
-                      ),
-                      SizedBox(height: 16),
-                      Text(
-                        'Scanning for videos...',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
-              else if (errorMessage != null)
-                Padding(
-                  padding: EdgeInsets.only(top: 100),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.error_outline,
-                        color: Colors.red,
-                        size: 48,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        errorMessage!,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Colors.red,
-                          fontWeight: FontWeight.w500,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                      ElevatedButton(
-                        onPressed: _loadVideos,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.deepPurple,
-                          foregroundColor: Colors.white,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text('Retry'),
-                      ),
-                    ],
-                  ),
-                )
-              else if (videosByFolder.isEmpty)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 100),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          Icons.video_library_outlined,
-                          color: Colors.grey,
-                          size: 64,
-                        ),
-                        SizedBox(height: 16),
-                        Text(
-                          'No videos found',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
+              isLoading && videosByFolder.isEmpty
+                  ? Padding(
+                padding: EdgeInsets.only(top: 100),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    CupertinoActivityIndicator(
+                      radius: 25,
+                      color: ColorSelect.maineColor,
+                      animating: true,
                     ),
-                  )
-                else
-                  Column(
-                    children: [
-                      ...List.generate(
-                        videosByFolder.keys.length,
-                            (index) {
-                          String folderName = videosByFolder.keys.elementAt(index);
-                          List<File> videos = videosByFolder[folderName]!;
-                          final List<String> iconAssets = [
-                            'assets/open-folder.png',
-                            'assets/bluetooth.png',
-                            'assets/open-folder.png',
-                            'assets/camera2.png',
-                            'assets/open-folder.png',
-                            'assets/open-folder.png',
-                            'assets/downloadlist.png',
-                            'assets/open-folder.png',
-                            'assets/open-folder.png',
-                            'assets/open-folder.png',
-                            'assets/open-folder.png',
-                          ];
-                          final List<Color> backgroundColors = [
-                            Colors.blue,
-                            Colors.green,
-                            Colors.purple,
-                            Colors.orange,
-                            Colors.red,
-                            Colors.teal,
-                            Colors.cyan,
-                            Colors.pink,
-                            Colors.amber,
-                            Colors.lime,
-                          ];
-                          String selectedIcon = iconAssets[index % iconAssets.length];
-                          Color selectedColor = backgroundColors[index % backgroundColors.length];
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (context) => VideoFolderScreen(
-                                    folderName: folderName,
-                                    videos: videos,
-                                  ),
-                                ),
-                              ).then((value) {
-                                _loadRecentlyPlayed();
-                              });
-                            },
-                            child: Container(
-                              margin: EdgeInsets.symmetric(vertical: 5.sp, horizontal: 5.sp),
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(10.sp),
-                              ),
-                              child: CustomFolderTile(
-                                folderName: folderName,
-                                videos: videos,
-                                showBottomSheet: _showBottomSheet,
-                                iconPath: selectedIcon,
-                                color: selectedColor,
-                              ),
-                            ),
-                          );
-                        },
+                    SizedBox(height: 16),
+                    Text(
+                      'Scanning for videos...',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: Colors.grey,
                       ),
-                      GestureDetector(
+                    ),
+                  ],
+                ),
+              )
+                  : errorMessage != null
+                  ? Padding(
+                padding: EdgeInsets.only(top: 100),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.error_outline,
+                      color: Colors.red,
+                      size: 48,
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      errorMessage!,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        color: Colors.red,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 16),
+                    ElevatedButton(
+                      onPressed: _loadVideos,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.deepPurple,
+                        foregroundColor: Colors.white,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text('Retry'),
+                    ),
+                  ],
+                ),
+              )
+                  : videosByFolder.isEmpty
+                  ? const Padding(
+                padding: EdgeInsets.only(top: 100),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(
+                      Icons.video_library_outlined,
+                      color: Colors.grey,
+                      size: 64,
+                    ),
+                    SizedBox(height: 16),
+                    Text(
+                      'No videos found',
+                      style: TextStyle(
+                        fontSize: 18,
+                        color: Colors.grey,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ],
+                ),
+              )
+                  : Column(
+                children: [
+                  ...List.generate(
+                    videosByFolder.keys.length,
+                        (index) {
+                      String folderName = videosByFolder.keys.elementAt(index);
+                      List<File> videos = videosByFolder[folderName]!;
+                      final List<String> iconAssets = [
+                        'assets/open-folder.png',
+                        'assets/bluetooth.png',
+                        'assets/open-folder.png',
+                        'assets/camera2.png',
+                        'assets/open-folder.png',
+                        'assets/open-folder.png',
+                        'assets/downloadlist.png',
+                        'assets/open-folder.png',
+                        'assets/open-folder.png',
+                        'assets/open-folder.png',
+                        'assets/open-folder.png',
+                      ];
+                      final List<Color> backgroundColors = [
+                        Colors.blue,
+                        Colors.green,
+                        Colors.purple,
+                        Colors.orange,
+                        Colors.red,
+                        Colors.teal,
+                        Colors.cyan,
+                        Colors.pink,
+                        Colors.amber,
+                        Colors.lime,
+                      ];
+                      String selectedIcon = iconAssets[index % iconAssets.length];
+                      Color selectedColor = backgroundColors[index % backgroundColors.length];
+                      return GestureDetector(
                         onTap: () {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => DeviceSpaceScreen(),
-                            ),
-                          );
-                        },
-                        child: Padding(
-                          padding: EdgeInsets.all(10.sp),
-                          child: Padding(
-                            padding: EdgeInsets.only(top: 8),
-                            child: Container(
-                              child: Row(
-                                children: [
-                                  Container(
-                                    height: 35.sp,
-                                    width: 35.sp,
-                                    decoration: BoxDecoration(
-                                      color: Colors.purple.shade300,
-                                      borderRadius: BorderRadius.circular(10.0),
-                                    ),
-                                    child: Icon(
-                                      Icons.search,
-                                      color: Colors.white,
-                                      size: 20.sp,
-                                    ),
-                                  ),
-                                  SizedBox(width: 15.sp),
-                                  Text(
-                                    'Directory ',
-                                    style: GoogleFonts.poppins(
-                                      textStyle: TextStyle(
-                                        color: Theme.of(context).colorScheme.secondary,
-                                        fontSize: 14.sp,
-                                        fontWeight: FontWeight.w600,
-                                      ),
-                                    ),
-                                  ),
-                                ],
+                              builder: (context) => VideoFolderScreen(
+                                folderName: folderName,
+                                videos: videos,
                               ),
                             ),
+                          ).then((value) {
+                            _loadRecentlyPlayed();
+                          });
+                        },
+                        child: Container(
+                          margin: EdgeInsets.symmetric(vertical: 5.sp, horizontal: 5.sp),
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(10.sp),
+                          ),
+                          child: CustomFolderTile(
+                            folderName: folderName,
+                            videos: videos,
+                            showBottomSheet: _showBottomSheet,
+                            iconPath: selectedIcon,
+                            color: selectedColor,
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => DeviceSpaceScreen(),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: EdgeInsets.all(10.sp),
+                      child: Padding(
+                        padding: EdgeInsets.only(top: 8),
+                        child: Container(
+                          child: Row(
+                            children: [
+                              Container(
+                                height: 35.sp,
+                                width: 35.sp,
+                                decoration: BoxDecoration(
+                                  color: Colors.purple.shade300,
+                                  borderRadius: BorderRadius.circular(10.0),
+                                ),
+                                child: Icon(
+                                  Icons.search,
+                                  color: Colors.white,
+                                  size: 20.sp,
+                                ),
+                              ),
+                              SizedBox(width: 15.sp),
+                              Text(
+                                'Directory ',
+                                style: GoogleFonts.poppins(
+                                  textStyle: TextStyle(
+                                    color: Theme.of(context).colorScheme.secondary,
+                                    fontSize: 14.sp,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
-                    ],
+                    ),
                   ),
+                ],
+              ),
             ],
           ],
         ),
@@ -658,6 +640,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware {
     );
   }
 }
+
 class CustomFolderTile extends StatelessWidget {
   final String folderName;
   final List<dynamic> videos;
