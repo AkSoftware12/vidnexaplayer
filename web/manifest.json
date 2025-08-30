@@ -1,6 +1,6 @@
 {
-    "name": "instamusic",
-    "short_name": "instamusic",
+    "name": "videoplayer",
+    "short_name": "videoplayer",
     "start_url": ".",
     "display": "standalone",
     "background_color": "#0175C2",

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:instamusic/DarkMode/styles/theme_data_style.dart';
+import 'package:videoplayer/DarkMode/styles/theme_data_style.dart';
 
 
 class ThemeProvider extends ChangeNotifier {

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:instamusic/HexColorCode/HexColor.dart';
+import 'package:videoplayer/HexColorCode/HexColor.dart' show HexColor;
 
 class ColorSelect {
   static final maineColor=HexColor('#4e14d1');

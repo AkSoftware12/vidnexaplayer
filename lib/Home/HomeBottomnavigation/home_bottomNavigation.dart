@@ -6,15 +6,16 @@ import 'package:flutter_svg/svg.dart';
 // import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:icons_plus/icons_plus.dart';
+import 'package:new_version_plus/new_version_plus.dart';
 // import 'package:imagewidget/imagewidget.dart';
-import 'package:instamusic/HexColorCode/HexColor.dart';
-import 'package:instamusic/Utils/color.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:upgrader/upgrader.dart';
+import 'package:videoplayer/HexColorCode/HexColor.dart';
+import 'package:videoplayer/Utils/color.dart';
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
 import '../../DeviceSpace/device_space.dart';
@@ -26,6 +27,7 @@ import '../../Photo/photo.dart';
 import '../../Utils/textSize.dart';
 import '../../VideoPLayer/AllVideo/all_videos.dart';
 import '../../app_store/app_store.dart';
+import '../../main.dart';
 import '../HomeScreen/home_screen.dart';
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
@@ -58,13 +60,81 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     (context as Element).markNeedsBuild();
   }
 
+
+  String release = "";
   @override
   void initState() {
     super.initState();
+
     _getUsername();
     currentPage = widget.bottomIndex;
-    checkForVersion(context);
+
+    // Instantiate NewVersion manager object (Using GCP Console app as example)
+    final newVersion = NewVersionPlus(
+      iOSId: 'com.vidnexa.videoplayer', androidId: 'com.vidnexa.videoplayer', androidPlayStoreCountry: "es_ES", androidHtmlReleaseNotes: true, //support country code
+    );
+
+    // You can let the plugin handle fetching the status and showing a dialog,
+    // or you can fetch the status and display your own dialog, or no dialog.
+    final ver = VersionStatus(
+      appStoreLink: '',
+      localVersion: '',
+      storeVersion: '',
+      releaseNotes: '',
+      originalStoreVersion: '',
+    );
+    print(ver);
+    const simpleBehavior = true;
+
+    // if (simpleBehavior) {
+    // basicStatusCheck(newVersion);
+    // }
+    // else {
+    advancedStatusCheck(newVersion);
+    // }
   }
+
+
+  basicStatusCheck(NewVersionPlus newVersion) async {
+    final version = await newVersion.getVersionStatus();
+    if (version != null) {
+      release = version.releaseNotes ?? "";
+      setState(() {});
+    }
+    newVersion.showAlertIfNecessary(
+      context: context,
+      launchModeVersion: LaunchModeVersion.external,
+    );
+  }
+
+  Future<void> advancedStatusCheck(NewVersionPlus newVersion) async {
+    final status = await newVersion.getVersionStatus();
+    if (status != null) {
+      debugPrint(status.releaseNotes);
+      debugPrint(status.appStoreLink);
+      debugPrint(status.localVersion);
+      debugPrint(status.storeVersion);
+      debugPrint(status.canUpdate.toString());
+
+      if (status.canUpdate) {
+        // Show the custom dialog instead of the default showUpdateDialog
+        showDialog(
+          context: navigatorKey.currentContext!,
+          barrierDismissible: false, // Matches allowDismissal: false
+          builder: (BuildContext context) {
+            return CustomUpgradeDialog(currentVersion: status.localVersion, newVersion: status.storeVersion, releaseNotes: [status.releaseNotes.toString()],);
+          },
+        );
+      }
+    }
+  }
+  // @override
+  // void initState() {
+  //   super.initState();
+  //   _getUsername();
+  //   currentPage = widget.bottomIndex;
+  //   checkForVersion(context);
+  // }
 
   Future<void> checkForVersion(BuildContext context) async {
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
@@ -1025,263 +1095,6 @@ class SettingsScreen extends StatelessWidget {
                   },
                 ),
 
-
-
-                // SizedBox(height: 10.sp),
-                // ListTile(
-                //   leading: Container(
-                //     decoration: BoxDecoration(
-                //       borderRadius: BorderRadius.circular(12),
-                //       gradient: LinearGradient(
-                //         colors: [
-                //           HexColor('#2563eb'),
-                //           HexColor('#2563eb'),
-                //         ],
-                //         begin: Alignment.topLeft,
-                //         end: Alignment.bottomRight,
-                //       ),
-                //     ),
-                //     padding: EdgeInsets.all(10.sp),
-                //     child: SvgPicture.asset(
-                //       'assets/cleaner.svg',
-                //       color: Colors.white,
-                //     ),
-                //   ),
-                //   title: Column(
-                //     mainAxisAlignment: MainAxisAlignment.start,
-                //     crossAxisAlignment: CrossAxisAlignment.start,
-                //     children: [
-                //       Text(
-                //         'Cleaner',
-                //         style: GoogleFonts.openSans(
-                //           textStyle: TextStyle(
-                //             color: Colors.black,
-                //             fontSize: TextSizes.textmedium14,
-                //             fontWeight: FontWeight.bold,
-                //           ),
-                //         ),
-                //       ),
-                //       Text(
-                //         'Clean junk files',
-                //         style: GoogleFonts.openSans(
-                //           textStyle: TextStyle(
-                //             color: Colors.grey,
-                //             fontSize: 9.sp,
-                //             fontWeight: FontWeight.bold,
-                //           ),
-                //         ),
-                //       ),
-                //     ],
-                //   ),
-                //   onTap: () {},
-                // ),
-                // SizedBox(height: 10.sp),
-                // ListTile(
-                //   leading: Container(
-                //     decoration: BoxDecoration(
-                //       borderRadius: BorderRadius.circular(12),
-                //       gradient: LinearGradient(
-                //         colors: [
-                //           HexColor('#059669'),
-                //           HexColor('#059669'),
-                //         ],
-                //         begin: Alignment.topLeft,
-                //         end: Alignment.bottomRight,
-                //       ),
-                //     ),
-                //     padding: EdgeInsets.all(10.sp),
-                //     child: SvgPicture.asset(
-                //       'assets/game.svg',
-                //       color: Colors.white,
-                //     ),
-                //   ),
-                //   title: Column(
-                //     mainAxisAlignment: MainAxisAlignment.start,
-                //     crossAxisAlignment: CrossAxisAlignment.start,
-                //     children: [
-                //       Text(
-                //         'Game',
-                //         style: GoogleFonts.openSans(
-                //           textStyle: TextStyle(
-                //             color: Colors.black,
-                //             fontSize: TextSizes.textmedium14,
-                //             fontWeight: FontWeight.bold,
-                //           ),
-                //         ),
-                //       ),
-                //       Text(
-                //         'Play mini games',
-                //         style: GoogleFonts.openSans(
-                //           textStyle: TextStyle(
-                //             color: Colors.grey,
-                //             fontSize: 9.sp,
-                //             fontWeight: FontWeight.bold,
-                //           ),
-                //         ),
-                //       ),
-                //     ],
-                //   ),
-                //   onTap: () {},
-                // ),
-                // SizedBox(height: 10.sp),
-                // ListTile(
-                //   leading: Container(
-                //     decoration: BoxDecoration(
-                //       borderRadius: BorderRadius.circular(12),
-                //       gradient: LinearGradient(
-                //         colors: [
-                //           HexColor('#db2777'),
-                //           HexColor('#db2777'),
-                //         ],
-                //         begin: Alignment.topLeft,
-                //         end: Alignment.bottomRight,
-                //       ),
-                //     ),
-                //     padding: EdgeInsets.all(10.sp),
-                //     child: SvgPicture.asset(
-                //       'assets/languge.svg',
-                //       color: Colors.white,
-                //     ),
-                //   ),
-                //   title: Column(
-                //     mainAxisAlignment: MainAxisAlignment.start,
-                //     crossAxisAlignment: CrossAxisAlignment.start,
-                //     children: [
-                //       Text(
-                //         'Language',
-                //         style: GoogleFonts.openSans(
-                //           textStyle: TextStyle(
-                //             color: Colors.black,
-                //             fontSize: TextSizes.textmedium14,
-                //             fontWeight: FontWeight.bold,
-                //           ),
-                //         ),
-                //       ),
-                //       Text(
-                //         'Change app language',
-                //         style: GoogleFonts.openSans(
-                //           textStyle: TextStyle(
-                //             color: Colors.grey,
-                //             fontSize: 9.sp,
-                //             fontWeight: FontWeight.bold,
-                //           ),
-                //         ),
-                //       ),
-                //     ],
-                //   ),
-                //   onTap: () {},
-                // ),
-                // SizedBox(height: 10.sp),
-                // ListTile(
-                //   leading: Container(
-                //     decoration: BoxDecoration(
-                //       borderRadius: BorderRadius.circular(12),
-                //       gradient: LinearGradient(
-                //         colors: [
-                //           HexColor('#ca8a04'),
-                //           HexColor('#ca8a04'),
-                //         ],
-                //         begin: Alignment.topLeft,
-                //         end: Alignment.bottomRight,
-                //       ),
-                //     ),
-                //     padding: EdgeInsets.all(10.sp),
-                //     child: SvgPicture.asset(
-                //       'assets/theme.svg',
-                //       color: Colors.white,
-                //     ),
-                //   ),
-                //   title: Column(
-                //     mainAxisAlignment: MainAxisAlignment.start,
-                //     crossAxisAlignment: CrossAxisAlignment.start,
-                //     children: [
-                //       Text(
-                //         'Theme',
-                //         style: GoogleFonts.openSans(
-                //           textStyle: TextStyle(
-                //             color: Colors.black,
-                //             fontSize: TextSizes.textmedium14,
-                //             fontWeight: FontWeight.bold,
-                //           ),
-                //         ),
-                //       ),
-                //       Text(
-                //         'Customize appearance',
-                //         style: GoogleFonts.openSans(
-                //           textStyle: TextStyle(
-                //             color: Colors.grey,
-                //             fontSize: 9.sp,
-                //             fontWeight: FontWeight.bold,
-                //           ),
-                //         ),
-                //       ),
-                //     ],
-                //   ),
-                //   onTap: () {},
-                // ),
-                // SizedBox(height: 10.sp),
-                // ListTile(
-                //   leading: Container(
-                //     decoration: BoxDecoration(
-                //       borderRadius: BorderRadius.circular(12),
-                //       gradient: LinearGradient(
-                //         colors: [
-                //           HexColor('#d97706'),
-                //           HexColor('#d97706'),
-                //         ],
-                //         begin: Alignment.topLeft,
-                //         end: Alignment.bottomRight,
-                //       ),
-                //     ),
-                //     padding: EdgeInsets.all(10.sp),
-                //     child: SvgPicture.asset(
-                //       'assets/star.svg',
-                //       color: Colors.white,
-                //     ),
-                //   ),
-                //   title: Column(
-                //     mainAxisAlignment: MainAxisAlignment.start,
-                //     crossAxisAlignment: CrossAxisAlignment.start,
-                //     children: [
-                //       Text(
-                //         'Premium',
-                //         style: GoogleFonts.openSans(
-                //           textStyle: TextStyle(
-                //             color: Colors.black,
-                //             fontSize: TextSizes.textmedium14,
-                //             fontWeight: FontWeight.bold,
-                //           ),
-                //         ),
-                //       ),
-                //       Text(
-                //         'Unlock all features',
-                //         style: GoogleFonts.openSans(
-                //           textStyle: TextStyle(
-                //             color: Colors.grey,
-                //             fontSize: 9.sp,
-                //             fontWeight: FontWeight.bold,
-                //           ),
-                //         ),
-                //       ),
-                //     ],
-                //   ),
-                //   trailing: Container(
-                //     padding: EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                //     decoration: BoxDecoration(
-                //       color: Colors.orange,
-                //       borderRadius: BorderRadius.circular(10),
-                //     ),
-                //     child: Text(
-                //       'PRO',
-                //       style: TextStyle(color: Colors.white),
-                //     ),
-                //   ),
-                //   onTap: () {},
-                // ),
-                //
-
-
-
                 SizedBox(height: 10.sp),
                 ListTile(
                   leading: Container(
@@ -1465,3 +1278,4 @@ class SettingsScreen extends StatelessWidget {
     );
   }
 }
+

@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:instamusic/HexColorCode/HexColor.dart';
-import 'package:instamusic/OnboardScreen/size_config.dart';
-import 'package:instamusic/Utils/color.dart';
+import 'package:videoplayer/HexColorCode/HexColor.dart';
+import 'package:videoplayer/OnboardScreen/size_config.dart';
+import 'package:videoplayer/Utils/color.dart';
 
 import '../Permission/permission_page.dart';
 import 'onboarding_contents.dart';
@@ -61,6 +61,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     SizeConfig().init(context);
     double width = SizeConfig.screenW!;
     double height = SizeConfig.screenH!;
+
 
     return Scaffold(
 

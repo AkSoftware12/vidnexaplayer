@@ -1,17 +1,15 @@
 import 'dart:io';
-
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_portal/flutter_portal.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:instamusic/HexColorCode/HexColor.dart';
-import 'package:instamusic/Utils/color.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:upgrader/upgrader.dart';
 import 'package:url_launcher/url_launcher.dart';
-
+import 'package:videoplayer/HexColorCode/HexColor.dart';
+import 'package:videoplayer/Utils/color.dart';
 import 'NotifyListeners/LanguageProvider/language_provider.dart';
 import 'DarkMode/dark_mode.dart';
 import 'Home/HomeBottomnavigation/home_bottomNavigation.dart';
@@ -19,23 +17,25 @@ import 'NotifyListeners/AppBar/app_bar_color.dart';
 import 'OnboardScreen/onboarding_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
+import 'package:new_version_plus/new_version_plus.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   Platform.isAndroid
       ? await Firebase.initializeApp(
-        options:
-            kIsWeb || Platform.isAndroid
-                ? const FirebaseOptions(
-                  apiKey: 'AIzaSyBXH-9NE0Q0VeQVRYkF0xMYeu12IMQ4EW0',
-                  appId: '1:1054442908505:android:b664773d6e1220246a3a48',
-                  messagingSenderId: '1054442908505',
-                  projectId: 'vidnexa-video-player-a69f8',
-                  storageBucket:
-                      "vidnexa-video-player-a69f8.firebasestorage.app",
-                )
-                : null,
-      )
+    options:
+    kIsWeb || Platform.isAndroid
+        ? const FirebaseOptions(
+      apiKey: 'AIzaSyBXH-9NE0Q0VeQVRYkF0xMYeu12IMQ4EW0',
+      appId: '1:1054442908505:android:b664773d6e1220246a3a48',
+      messagingSenderId: '1054442908505',
+      projectId: 'vidnexa-video-player-a69f8',
+      storageBucket:
+      "vidnexa-video-player-a69f8.firebasestorage.app",
+    )
+        : null,
+  )
       : await Firebase.initializeApp();
 
   // FOR TESTING ONLY - Clear settings every time app starts
@@ -62,9 +62,11 @@ class MyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final upgrader = Upgrader(
-      debugDisplayAlways: false, // Always show for testing
-    );
+    // final upgrader = Upgrader(
+    //   debugDisplayAlways: false,
+    //   countryCode: 'IN',
+    // );
+
 
     return Portal(
       child: Provider.value(
@@ -88,25 +90,57 @@ class MyApp extends StatelessWidget {
                     Locale('hi', ' '), // Hindi
                   ],
                   home: Scaffold(
-                    body: AuthenticationWrapper(),
-                    floatingActionButton: Builder(
-                      builder: (context) {
-                        Future.microtask(() async {
-                          final shouldDisplay = await upgrader.shouldDisplayUpgrade();
-                          if (shouldDisplay && context.mounted) {
-                            showDialog(
-                              context: context,
-                              barrierDismissible: false, // tap outside se close nahi hoga
-                              builder: (_) => WillPopScope(
-                                onWillPop: () async => false, // back button disable
-                                child: CustomUpgradeDialog(upgrader: upgrader),
-                              ),
-                            );
-                          }
-                        });
-                        return const SizedBox.shrink();
-                      },
-                    ),
+                    body:  AuthenticationWrapper(),
+                    // floatingActionButton: Builder(
+                    //   builder: (context) {
+                    //     Future.microtask(() async {
+                    //       // ✅ Upgrader init
+                    //       final upgrader = Upgrader(
+                    //         debugDisplayAlways: false,
+                    //         countryCode: 'IN',
+                    //       );
+                    //
+                    //       String? storeVersion = upgrader.currentAppStoreVersion;
+                    //       String? installedVersion = upgrader.currentInstalledVersion;
+                    //
+                    //       debugPrint('🔥 Installed version (Upgrader): $installedVersion');
+                    //       debugPrint('🔥 Store version (Upgrader): $storeVersion');
+                    //
+                    //       // ✅ Fallback to NewVersionPlus if Upgrader fails
+                    //       if (storeVersion == null || installedVersion == null) {
+                    //         debugPrint('⚠️ Upgrader failed. Trying NewVersionPlus...');
+                    //         final newVersion = NewVersionPlus(androidId: "com.vidnexa.videoplayer");
+                    //         final status = await newVersion.getVersionStatus();
+                    //
+                    //         storeVersion = status?.storeVersion;
+                    //         installedVersion = status?.localVersion;
+                    //
+                    //         debugPrint('🔥 Installed version (NewVersionPlus): $installedVersion');
+                    //         debugPrint('🔥 Store version (NewVersionPlus): $storeVersion');
+                    //       }
+                    //
+                    //       // ✅ Final check
+                    //       if (storeVersion != null && installedVersion != null) {
+                    //         final shouldDisplay = await upgrader.shouldDisplayUpgrade();
+                    //         debugPrint('📢 Should display upgrade? $shouldDisplay');
+                    //
+                    //         if (shouldDisplay && context.mounted) {
+                    //           showDialog(
+                    //             context: context,
+                    //             barrierDismissible: false,
+                    //             builder: (_) => WillPopScope(
+                    //               onWillPop: () async => false,
+                    //               child: CustomUpgradeDialog(upgrader: upgrader),
+                    //             ),
+                    //           );
+                    //         }
+                    //       } else {
+                    //         debugPrint('❌ Both Upgrader & NewVersionPlus failed to fetch version.');
+                    //       }
+                    //     });
+                    //     return const SizedBox.shrink();
+                    //   },
+                    // ),
                   ),
                 );
               },
@@ -117,6 +151,8 @@ class MyApp extends StatelessWidget {
     );
   }
 }
+
+
 
 class AuthenticationWrapper extends StatefulWidget {
   @override
@@ -138,13 +174,11 @@ class _AuthenticationWrapperState extends State<AuthenticationWrapper> {
     if (loggedIn) {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const HomeBottomNavigation()),
-      );
+        MaterialPageRoute(builder: (context) => const HomeBottomNavigation()));
     } else {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => OnboardingScreen()),
-      );
+        MaterialPageRoute(builder: (context) => OnboardingScreen()));
     }
   }
 
@@ -208,13 +242,19 @@ class NotificationService {
 /// 🎨 Custom Upgrade Dialog
 /// 🎨 Custom Upgrade Dialog with improved UI
 
-
 class CustomUpgradeDialog extends StatelessWidget {
   final String androidAppUrl = 'https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer&pcampaignid=web_share';
-  final String iosAppUrl = 'https://apps.apple.com/app/idYOUR_IOS_APP_ID '; // Replace with your iOS app URL
-  final Upgrader upgrader;
-  const CustomUpgradeDialog({Key? key, required this.upgrader}) : super(key: key);
+  final String iosAppUrl = 'https://apps.apple.com/app/idYOUR_IOS_APP_ID'; // Replace with your iOS app URL
+  final String currentVersion; // Old version
+  final String newVersion; // New version
+  final List<String> releaseNotes; // Release notes
 
+  const CustomUpgradeDialog({
+    Key? key,
+    required this.currentVersion,
+    required this.newVersion,
+    required this.releaseNotes,
+  }) : super(key: key);
 
   Future<void> _launchStore() async {
     final Uri androidUri = Uri.parse(androidAppUrl);
@@ -234,21 +274,19 @@ class CustomUpgradeDialog extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Dialog(
-      insetPadding:  EdgeInsets.symmetric(horizontal: 20.sp, vertical: 20.sp),
+      insetPadding: EdgeInsets.symmetric(horizontal: 10.sp, vertical: 20.sp),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.sp)),
       elevation: 12,
-      // backgroundColor: Colors.transparent,
       child: Container(
-        constraints:  BoxConstraints(maxWidth: 420),
-        padding:  EdgeInsets.all(25.sp),
+        constraints: BoxConstraints(maxWidth: 420),
+        padding: EdgeInsets.all(25.sp),
         decoration: BoxDecoration(
           gradient: LinearGradient(
-            colors: [ColorSelect.maineColor, ColorSelect.maineColor,],
+            colors: [HexColor('#4A00E0'), HexColor('#8E2DE2')],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
           borderRadius: BorderRadius.circular(25.sp),
-
         ),
         child: SingleChildScrollView(
           child: Column(
@@ -259,8 +297,8 @@ class CustomUpgradeDialog extends StatelessWidget {
                   shape: BoxShape.circle,
                   gradient: RadialGradient(
                     colors: [
-                      ColorSelect.titletextColor,
-                      ColorSelect.maineColor.withOpacity(0.9),
+                      HexColor('#FFFFFF'),
+                      HexColor('#4A00E0').withOpacity(0.9),
                     ],
                     radius: 0.85,
                     center: Alignment.center,
@@ -273,14 +311,14 @@ class CustomUpgradeDialog extends StatelessWidget {
                     ),
                   ],
                 ),
-                padding: const EdgeInsets.all(20),
+                padding: EdgeInsets.all(20.sp),
                 child: Icon(
                   Icons.rocket_launch_outlined,
-                  size: 72,
+                  size: 72.sp,
                   color: Colors.white,
                 ),
               ),
-               SizedBox(height: 20.sp),
+              SizedBox(height: 10.sp),
               Text(
                 "🚀 New Update Available!",
                 style: GoogleFonts.poppins(
@@ -291,60 +329,119 @@ class CustomUpgradeDialog extends StatelessWidget {
                   shadows: [
                     Shadow(
                       color: Colors.black.withOpacity(0.4),
-                      offset: const Offset(1, 1),
+                      offset: Offset(1, 1),
                       blurRadius: 3,
                     ),
                   ],
                 ),
                 textAlign: TextAlign.center,
               ),
-               SizedBox(height: 15.sp),
-              Text(
-                "A fresh version of this app is ready for you.\nUpdate now to enjoy the latest features and improvements!",
-                style: GoogleFonts.poppins(
-                  color: Colors.white.withOpacity(0.9),
-                  fontSize: 13.sp,
-                  height: 1.5,
-                  fontWeight: FontWeight.w500,
-                ),
-                textAlign: TextAlign.center,
-              ),
-               SizedBox(height: 25.sp),
-              Wrap(
-                spacing: 16,
-                runSpacing: 12,
-                alignment: WrapAlignment.center,
-                children: [
-                  ElevatedButton.icon(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor:HexColor('##00008B'),
-                      foregroundColor:Colors.white,
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 28,
-                        vertical: 14,
-                      ),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20.sp),
-                        side: BorderSide(
-                          color: Colors.white60, // You can change this color as needed
-                          width: 1.sp,
-                        ),
-                      ),
-
-                    ),
-                    icon: const Icon(Icons.rocket_launch, size: 24),
-                    label: Text(
-                      "Update Now",
-                      style: GoogleFonts.poppins(
-                        fontSize: 15.sp,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    onPressed: () async {
-                      await _launchStore();
-                    },
+              SizedBox(height: 10.sp),
+              Center(
+                child: Text(
+                  "A new version of Upgrader is available! Version $newVersion is now available - you have $currentVersion",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w500,
                   ),
-                ],
+                  textAlign: TextAlign.center,
+                ),
+              ),
+              SizedBox(height: 10.sp),
+
+              Center(
+                child: Text(
+                  " Would you like to update it now?",
+                  style: GoogleFonts.poppins(
+                    color: Colors.white,
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+              // SizedBox(height: 15.sp),
+              // Text(
+              //   "A fresh version of this app is ready for you.\nUpdate now to enjoy the latest features and improvements!",
+              //   style: GoogleFonts.poppins(
+              //     color: Colors.white.withOpacity(0.9),
+              //     fontSize: 13.sp,
+              //     height: 1.5,
+              //     fontWeight: FontWeight.w500,
+              //   ),
+              //   textAlign: TextAlign.center,
+              // ),
+              SizedBox(height: 10.sp),
+              Container(
+                width: double.infinity,
+                padding: EdgeInsets.all(15.sp),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(15.sp),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "What's New in Version $newVersion",
+                      style: GoogleFonts.poppins(
+                        color: Colors.white,
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    SizedBox(height: 10.sp),
+                    ...releaseNotes.asMap().entries.map((entry) => Padding(
+                      padding: EdgeInsets.only(bottom: 8.sp),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            "• ",
+                            style: GoogleFonts.poppins(
+                              color: Colors.white,
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          Expanded(
+                            child: Text(
+                              entry.value,
+                              style: GoogleFonts.poppins(
+                                color: Colors.white.withOpacity(0.9),
+                                fontSize: 13.sp,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    )),
+                  ],
+                ),
+              ),
+              SizedBox(height: 25.sp),
+              ElevatedButton.icon(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: HexColor('#00008B'),
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 28.sp, vertical: 14.sp),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20.sp),
+                    side: BorderSide(color: Colors.white60, width: 1.sp),
+                  ),
+                ),
+                icon: Icon(Icons.rocket_launch, size: 24.sp),
+                label: Text(
+                  "Update Now",
+                  style: GoogleFonts.poppins(
+                    fontSize: 15.sp,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                onPressed: () async {
+                  await _launchStore();
+                },
               ),
             ],
           ),
@@ -353,6 +450,7 @@ class CustomUpgradeDialog extends StatelessWidget {
     );
   }
 }
-
 // You need to define a global navigator key to access context outside widgets
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
+

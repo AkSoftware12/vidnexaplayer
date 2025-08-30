@@ -1,6 +1,6 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:instamusic/HexColorCode/HexColor.dart';
+import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class AppBarColorProvider extends ChangeNotifier {

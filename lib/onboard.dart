@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:instamusic/Permission/permission_page.dart';
+import 'package:videoplayer/Permission/permission_page.dart';
 import 'Home/HomeBottomnavigation/home_bottomNavigation.dart';
 import 'OnboardModel/model/allinonboardscreen.dart';
 import 'constant.dart';

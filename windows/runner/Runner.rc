@@ -89,13 +89,13 @@ BEGIN
     BEGIN
         BLOCK "040904e4"
         BEGIN
-            VALUE "CompanyName", "com.instamusic" "\0"
-            VALUE "FileDescription", "instamusic" "\0"
+            VALUE "CompanyName", "com.videoplayer" "\0"
+            VALUE "FileDescription", "videoplayer" "\0"
             VALUE "FileVersion", VERSION_AS_STRING "\0"
-            VALUE "InternalName", "instamusic" "\0"
-            VALUE "LegalCopyright", "Copyright (C) 2024 com.instamusic. All rights reserved." "\0"
-            VALUE "OriginalFilename", "instamusic.exe" "\0"
-            VALUE "ProductName", "instamusic" "\0"
+            VALUE "InternalName", "videoplayer" "\0"
+            VALUE "LegalCopyright", "Copyright (C) 2024 com.videoplayer. All rights reserved." "\0"
+            VALUE "OriginalFilename", "videoplayer.exe" "\0"
+            VALUE "ProductName", "videoplayer" "\0"
             VALUE "ProductVersion", VERSION_AS_STRING "\0"
         END
     END

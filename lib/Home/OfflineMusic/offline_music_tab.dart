@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:instamusic/Utils/color.dart';
+import 'package:videoplayer/Utils/color.dart';
 import '../../Utils/textSize.dart';
 import 'OfflineSongs/presentation/pages/home/views/albums_view.dart';
 import 'OfflineSongs/presentation/pages/home/views/artists_view.dart';

@@ -3,8 +3,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:instamusic/Utils/color.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:videoplayer/Utils/color.dart';
 
 import '../DirectoryFolder/directory_folder.dart';
 class DeviceSpaceScreen extends StatefulWidget {
