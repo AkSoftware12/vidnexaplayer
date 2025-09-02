@@ -15,6 +15,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:upgrader/upgrader.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
+import 'package:videoplayer/Photo/image_album.dart';
 import 'package:videoplayer/Utils/color.dart';
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
@@ -23,7 +24,6 @@ import '../../NetWork Stream/stream_video.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/AppBar/colorList.dart';
-import '../../Photo/photo.dart';
 import '../../Utils/textSize.dart';
 import '../../VideoPLayer/AllVideo/all_videos.dart';
 import '../../app_store/app_store.dart';
@@ -349,7 +349,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                         right: 0,
                         child: badges.Badge(
                           label: const Text(
-                            '10',
+                            '15',
                             style: TextStyle(color: Colors.white, fontSize: 10),
                           ),
                         ),
@@ -871,7 +871,7 @@ class SettingsScreen extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => SimpleExamplePage(),
+                        builder: (context) => AlbumScreen(),
                       ),
                     );
                   },

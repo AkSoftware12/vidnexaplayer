@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:videoplayer/Utils/color.dart';
 
 import '../VideoPLayer/video_player.dart';
 
@@ -74,7 +75,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
             fontWeight: FontWeight.w600,
           ),
         ),
-        backgroundColor: Colors.indigo[800],
+        backgroundColor: ColorSelect.maineColor,
         elevation: 0,
       ),
       body: Container(

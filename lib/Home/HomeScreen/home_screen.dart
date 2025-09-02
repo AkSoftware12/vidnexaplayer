@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:videoplayer/DeviceSpace/device_space.dart';
+import 'package:videoplayer/Photo/image_album.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:videoplayer/VideoPLayer/AllVideo/all_videos.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -14,7 +15,6 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../HexColorCode/HexColor.dart';
 import '../../Model/property_type.dart';
 import '../../NetWork Stream/stream_video.dart';
-import '../../Photo/photo.dart';
 import '../../RecentlyVideos/RecentlyPlayedManager/recently_played_manager.dart';
 import '../../RecentlyVideos/RecentlyPlayedScreen/recently_played_screen.dart';
 import '../../Utils/textSize.dart';
@@ -831,7 +831,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                   Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => SimpleExamplePage(),
+                        builder: (context) => AlbumScreen(),
                       ));
                 } else if (index == 2) {
                   Navigator.push(

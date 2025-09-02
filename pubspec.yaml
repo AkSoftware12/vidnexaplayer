@@ -2,7 +2,7 @@ name: videoplayer
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.9+9
+version: 1.0.10+10
 
 environment:
   sdk: ^3.7.0
@@ -75,6 +75,8 @@ dependencies:
   upgrader: ^11.5.0
   firebase_core: ^3.15.1
   new_version_plus: ^0.1.1
+  image_cropper: ^8.0.2
+  image: ^4.2.0
 
 
 
