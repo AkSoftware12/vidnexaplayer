@@ -24,4 +24,16 @@ class RecentlyPlayedManager {
     final prefs = await SharedPreferences.getInstance();
     return prefs.getStringList(_key) ?? [];
   }
+
+  // Remove a video from the recently played list
+  static Future<void> removeVideo(String videoPath) async {
+    final prefs = await SharedPreferences.getInstance();
+    List<String> videos = prefs.getStringList(_key) ?? [];
+
+    // Remove the specified video path if it exists
+    if (videos.contains(videoPath)) {
+      videos.remove(videoPath);
+      await prefs.setStringList(_key, videos);
+    }
+  }
 }

@@ -91,56 +91,6 @@ class MyApp extends StatelessWidget {
                   ],
                   home: Scaffold(
                     body:  AuthenticationWrapper(),
-                    // floatingActionButton: Builder(
-                    //   builder: (context) {
-                    //     Future.microtask(() async {
-                    //       // ✅ Upgrader init
-                    //       final upgrader = Upgrader(
-                    //         debugDisplayAlways: false,
-                    //         countryCode: 'IN',
-                    //       );
-                    //
-                    //       String? storeVersion = upgrader.currentAppStoreVersion;
-                    //       String? installedVersion = upgrader.currentInstalledVersion;
-                    //
-                    //       debugPrint('🔥 Installed version (Upgrader): $installedVersion');
-                    //       debugPrint('🔥 Store version (Upgrader): $storeVersion');
-                    //
-                    //       // ✅ Fallback to NewVersionPlus if Upgrader fails
-                    //       if (storeVersion == null || installedVersion == null) {
-                    //         debugPrint('⚠️ Upgrader failed. Trying NewVersionPlus...');
-                    //         final newVersion = NewVersionPlus(androidId: "com.vidnexa.videoplayer");
-                    //         final status = await newVersion.getVersionStatus();
-                    //
-                    //         storeVersion = status?.storeVersion;
-                    //         installedVersion = status?.localVersion;
-                    //
-                    //         debugPrint('🔥 Installed version (NewVersionPlus): $installedVersion');
-                    //         debugPrint('🔥 Store version (NewVersionPlus): $storeVersion');
-                    //       }
-                    //
-                    //       // ✅ Final check
-                    //       if (storeVersion != null && installedVersion != null) {
-                    //         final shouldDisplay = await upgrader.shouldDisplayUpgrade();
-                    //         debugPrint('📢 Should display upgrade? $shouldDisplay');
-                    //
-                    //         if (shouldDisplay && context.mounted) {
-                    //           showDialog(
-                    //             context: context,
-                    //             barrierDismissible: false,
-                    //             builder: (_) => WillPopScope(
-                    //               onWillPop: () async => false,
-                    //               child: CustomUpgradeDialog(upgrader: upgrader),
-                    //             ),
-                    //           );
-                    //         }
-                    //       } else {
-                    //         debugPrint('❌ Both Upgrader & NewVersionPlus failed to fetch version.');
-                    //       }
-                    //     });
-                    //     return const SizedBox.shrink();
-                    //   },
-                    // ),
                   ),
                 );
               },

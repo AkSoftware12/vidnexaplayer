@@ -2,11 +2,12 @@ import 'dart:io';
 import 'package:carousel_slider/carousel_slider.dart' show CarouselOptions, CarouselSlider;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/cupertino.dart';
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide AnimatedScale;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:intl/intl.dart';
 import 'package:videoplayer/DeviceSpace/device_space.dart';
-import 'package:videoplayer/Photo/image_album.dart';
+import 'package:videoplayer/Photo/image_album.dart' hide AnimatedScale;
 import 'package:videoplayer/Utils/color.dart';
 import 'package:videoplayer/VideoPLayer/AllVideo/all_videos.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -237,60 +238,356 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
     super.dispose();
   }
 
-  void _showBottomSheet(BuildContext context) {
-    showModalBottomSheet(
+  String _formatFileSize(int bytes) {
+    if (bytes <= 0) return "0 B";
+    const suffixes = ["B", "KB", "MB", "GB", "TB"];
+    int i = 0;
+    double size = bytes.toDouble();
+    while (size >= 1024 && i < suffixes.length - 1) {
+      size /= 1024;
+      i++;
+    }
+    return "${size.toStringAsFixed(2)} ${suffixes[i]}";
+  }
+
+  String _formatDateTime(DateTime dateTime) {
+    final DateFormat formatter = DateFormat('dd/MM/yyyy ');
+    return formatter.format(dateTime);
+  }
+
+
+  void showFolderInfoDialog(BuildContext context, {
+    required String folderName,
+    required String size,
+    required String location,
+    required String modifiedDate,
+    required List<File> videos,
+  }) {
+
+
+    showDialog(
       context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          backgroundColor: Colors.white,
+          title: Row(
+            children: [
+              Icon(Icons.folder, color: ColorSelect.maineColor, size: 30),
+              SizedBox(width: 8),
+              Text(
+                'Folder Info',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: ColorSelect.maineColor,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildInfoRow('Folder Name', folderName),
+              SizedBox(height: 12),
+              _buildInfoRow('Size', size),
+              SizedBox(height: 12),
+              _buildInfoRow('Location', location),
+              SizedBox(height: 12),
+              _buildInfoRow('Modified Date', modifiedDate),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color:ColorSelect.maineColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'OK',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '$label : ',
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            color: Colors.black87,
+            fontSize: 12.sp,
+          ),
+        ),
+        Expanded(
+          child: Text(
+            value,
+            style: TextStyle(
+              color: Colors.black87,
+              fontSize: 12.sp,
+            ),
+            overflow: TextOverflow.ellipsis,
+            maxLines: 2,
+          ),
+        ),
+      ],
+    );
+  }
+
+
+
+  void showEnhancedDogBehaviorSheet(BuildContext context,String folderName,List<File> videos,String formattedSize,String location,String date) {
+    showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
       shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.0)),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(30.0)),
+        // side: BorderSide(color: ColorSelect.maineColor.withOpacity(0.5), width: 2),
+      ),
+      backgroundColor: Colors.transparent,
+      sheetAnimationStyle: const AnimationStyle(
+        duration: Duration(milliseconds: 700),
+        reverseDuration: Duration(milliseconds: 500),
       ),
       builder: (BuildContext context) {
         return Container(
-          padding: EdgeInsets.all(16.0),
+          padding: const EdgeInsets.all(16.0),
+          decoration: const BoxDecoration(
+            color: Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30.0)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black12,
+                blurRadius: 15,
+                spreadRadius: 5,
+              ),
+            ],
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              ListTile(
-                leading: Icon(Icons.play_arrow),
-                title: Text('Play Video'),
-                onTap: () {
-                  Navigator.pop(context);
-                },
+              // Header
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        padding:  EdgeInsets.all(2.sp),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(5),
+                          border: Border.all(color: ColorSelect.maineColor),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black12,
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            SizedBox(
+                                height: 25.sp,
+                                width: 25.sp,
+                                child: Image.asset('assets/appblue.png', ))
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.start,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Vidnexa Player',
+                            style: GoogleFonts.poppins(
+                              textStyle: TextStyle(
+                                color:  ColorSelect.maineColor,
+                                fontSize: 16.sp,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+
+                          ),
+                          Text(
+                            '(${folderName})',
+                            style: GoogleFonts.poppins(
+                              textStyle: TextStyle(
+                                color: Colors.purple,
+                                fontSize: 10.sp,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+
+                          ),
+
+                        ],
+                      ),
+
+                    ],
+                  ),
+                  IconButton(
+                    icon:  Icon(Icons.close_outlined, color: ColorSelect.maineColor,size: 25.sp,),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ],
               ),
-              ListTile(
-                leading: Icon(Icons.delete),
-                title: Text('Delete'),
-                onTap: () {
-                  Navigator.pop(context);
-                },
+              const SizedBox(height: 16),
+
+              // Instruction Text
+
+              Container(
+                height: 4,
+                margin: const EdgeInsets.only(bottom: 16.0),
+                decoration: BoxDecoration(
+                  color: ColorSelect.maineColor.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(8.0),
+                ),
               ),
-              ListTile(
-                leading: Icon(Icons.info_outline),
-                title: Text('Properties'),
-                onTap: () {
-                  Navigator.pop(context);
-                },
+              // Title
+
+              // Text(
+              //   folderName,
+              //   style: GoogleFonts.poppins(
+              //     textStyle: TextStyle(
+              //       color:  Colors.black54,
+              //       fontSize: 15.sp,
+              //       fontWeight: FontWeight.w600,
+              //     ),
+              //   ),
+              //
+              // ),
+              //  SizedBox(height: 15.sp),
+
+              // Options Grid
+              GridView.count(
+                crossAxisCount: 4,
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                crossAxisSpacing: 12,
+                mainAxisSpacing: 12,
+                childAspectRatio: 1,
+                children: [
+                  _buildOptionCard(context,Icons.folder, 'Open',ColorSelect.maineColor,onTap:(){
+
+                    Navigator.pop(context);
+
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => VideoFolderScreen(
+                          folderName: folderName,
+                          videos: videos,
+                        ),
+                      ),
+                    ).then((value) {
+                      _checkPermissions(); // Check permissions and refresh after returning
+                      _loadRecentlyPlayed();
+                    });
+
+                  }),
+                  _buildOptionCard(context, Icons.delete, 'Delete',Theme.of(context).colorScheme.error, onTap: () {
+
+                  },),
+                  _buildOptionCard(context, Icons.info_outline,'Info',Theme.of(context).colorScheme.secondary, onTap: () {
+                    Navigator.pop(context);
+                    showFolderInfoDialog(context, folderName: folderName, size: formattedSize, location: location, modifiedDate: date, videos: videos);
+                  },),
+                  _buildOptionCard(context,Icons.copy,'Copy',Theme.of(context).colorScheme.secondary, onTap: () {  },),
+                  _buildOptionCard(context,Icons.visibility_off, 'Hide',Theme.of(context).colorScheme.secondary, onTap: () {  },),
+                ],
               ),
-              ListTile(
-                leading: Icon(Icons.copy),
-                title: Text('Duplicate File'),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
-              ListTile(
-                leading: Icon(Icons.visibility_off),
-                title: Text('Hide Folder Video'),
-                onTap: () {
-                  Navigator.pop(context);
-                },
-              ),
+              const SizedBox(height: 24),
             ],
           ),
         );
       },
     );
   }
+  Widget _buildOptionCard(BuildContext context, IconData emoji, String label,Color itemColor,{required  Function() onTap}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(5),
+        decoration: BoxDecoration(
+          color: itemColor.withOpacity(0.1),
+          borderRadius: BorderRadius.circular(20),
+          // border: Border.all(color: itemColor.withOpacity(0.3)),
+          // boxShadow: [
+          //   BoxShadow(
+          //     color: Colors.black12,
+          //     blurRadius: 4,
+          //     offset:  Offset(0, 2),
+          //   ),
+          // ],
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
 
+            Container(
+              padding:  EdgeInsets.all(5.sp),
+              decoration: BoxDecoration(
+                color: Colors.transparent,
+                borderRadius: BorderRadius.circular(5),
+                // border: Border.all(color: itemColor),
+                // boxShadow: [
+                //   BoxShadow(
+                //     color: Colors.black12,
+                //     blurRadius: 4,
+                //     offset: const Offset(0, 2),
+                //   ),
+                // ],
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(emoji,color: itemColor,size: 22.sp,)
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: GoogleFonts.openSans(
+                textStyle: TextStyle(
+                  color: itemColor,
+                  fontSize: 13.sp,
+                  fontWeight: FontWeight.w600,
+
+                ),
+
+              ),
+              textAlign: TextAlign.center,
+
+
+            ),
+
+          ],
+        ),
+      ),
+    );
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -557,6 +854,26 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
                         (index) {
                       String folderName = videosByFolder.keys.elementAt(index);
                       List<File> videos = videosByFolder[folderName]!;
+
+                      // Calculate total folder size
+                      int totalSizeInBytes = videos.fold(0, (sum, file) => sum + file.lengthSync());
+                      String formattedSize = _formatFileSize(totalSizeInBytes);
+                      // Get folder path (from the first file's parent directory)
+                      String folderPath = videos.isNotEmpty
+                          ? (videos.first.parent.path.isNotEmpty ? videos.first.parent.path : 'Unknown Path')
+                          : 'Unknown Path';
+
+                      // Get folder last modified date
+                      String lastModified = 'Unknown Date';
+                      if (videos.isNotEmpty) {
+                        try {
+                          Directory folder = videos.first.parent;
+                          lastModified = _formatDateTime(folder.statSync().modified);
+                        } catch (e) {
+                          lastModified = 'Unknown Date'; // Handle errors (e.g., no access)
+                        }
+                      }
+
                       final List<String> iconAssets = [
                         'assets/open-folder.png',
                         'assets/bluetooth.png',
@@ -604,13 +921,99 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(10.sp),
                           ),
-                          child: CustomFolderTile(
-                            folderName: folderName,
-                            videos: videos,
-                            showBottomSheet: _showBottomSheet,
-                            iconPath: selectedIcon,
-                            color: selectedColor,
+                          child: Padding(
+                            padding: EdgeInsets.symmetric(horizontal: 0.w, vertical: 5.h),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.center,
+                              children: [
+                                SizedBox(width: 8.w),
+
+                                // Leading icon container
+                                Container(
+                                  height: 40.sp,
+                                  width: 40.sp,
+                                  decoration: BoxDecoration(
+                                    color: selectedColor,
+                                    borderRadius: BorderRadius.circular(15.0),
+                                  ),
+                                  child: Padding(
+                                    padding: EdgeInsets.all(8.sp),
+                                    child: Image.asset(
+                                      selectedIcon,
+                                    ),
+                                  ),
+                                ),
+                                SizedBox(width: 16.w),
+                                // Title and subtitle
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        folderName,
+                                        style: GoogleFonts.poppins(
+                                          textStyle: TextStyle(
+                                            color: Theme.of(context).colorScheme.secondary,
+                                            fontSize: 13.sp,
+                                            // Adjust font size as needed
+                                            fontWeight:
+                                            FontWeight.w600, // Adjust font weight as needed
+                                          ),
+                                        ),
+                                      ),
+                                      SizedBox(height: 4.h),
+                                      Text(
+                                        '${videos.length} ${'Videos'}',
+                                        style: GoogleFonts.poppins(
+                                          textStyle: TextStyle(
+                                            color: Theme.of(context).colorScheme.secondary,
+                                            fontSize: 10.sp,
+                                            // Adjust font size as needed
+                                            fontWeight:
+                                            FontWeight.w500, // Adjust font weight as needed
+                                          ),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        'Size: $formattedSize',
+                                        style: GoogleFonts.poppins(
+                                          textStyle: TextStyle(
+                                            color: Theme.of(context).colorScheme.secondary,
+                                            fontSize: 10.sp,
+                                            // Adjust font size as needed
+                                            fontWeight:
+                                            FontWeight.w500, // Adjust font weight as needed
+                                          ),
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Trailing icon
+                                GestureDetector(
+                                  onTap: (){
+                                    showEnhancedDogBehaviorSheet(context,folderName,videos,formattedSize,folderPath,lastModified);
+
+                                  },
+                                  child: Container(
+                                    height: 40.sp,
+                                    width: 50.sp,
+                                    child: Icon(
+                                      Icons.more_vert,
+                                      size: 20.sp,
+                                      color: Theme.of(context).colorScheme.secondary,
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
                           ),
+
+
                         ),
                       );
                     },
@@ -669,100 +1072,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
             ],
           ],
         ),
-      ),
-    );
-  }
-}
-class CustomFolderTile extends StatelessWidget {
-  final String folderName;
-  final List<dynamic> videos;
-  final String iconPath;
-  final Color color;
-  final Function(BuildContext) showBottomSheet;
-
-  const CustomFolderTile({
-    Key? key,
-    required this.folderName,
-    required this.videos,
-    required this.showBottomSheet,
-    required this.iconPath,
-    required this.color,
-  }) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 0.w, vertical: 5.h),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          SizedBox(width: 8.w),
-
-          // Leading icon container
-          Container(
-            height: 40.sp,
-            width: 40.sp,
-            decoration: BoxDecoration(
-              color: color,
-              borderRadius: BorderRadius.circular(15.0),
-            ),
-            child: Padding(
-              padding: EdgeInsets.all(8.sp),
-              child: Image.asset(
-                iconPath,
-              ),
-            ),
-          ),
-          SizedBox(width: 16.w),
-          // Title and subtitle
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '$folderName',
-                  style: GoogleFonts.poppins(
-                    textStyle: TextStyle(
-                      color: Theme.of(context).colorScheme.secondary,
-                      fontSize: 13.sp,
-                      // Adjust font size as needed
-                      fontWeight:
-                          FontWeight.w600, // Adjust font weight as needed
-                    ),
-                  ),
-                ),
-                SizedBox(height: 4.h),
-                Text(
-                  '${videos.length} ${'Videos'}',
-                  style: GoogleFonts.poppins(
-                    textStyle: TextStyle(
-                      color: Theme.of(context).colorScheme.secondary,
-                      fontSize: 10.sp,
-                      // Adjust font size as needed
-                      fontWeight:
-                          FontWeight.w500, // Adjust font weight as needed
-                    ),
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ],
-            ),
-          ),
-          // Trailing icon
-          GestureDetector(
-            onTap: () => showBottomSheet(context),
-            child: Container(
-              height: 40.sp,
-              width: 50.sp,
-              child: Icon(
-                Icons.more_vert,
-                size: 20.sp,
-                color: Theme.of(context).colorScheme.secondary,
-              ),
-            ),
-          ),
-        ],
       ),
     );
   }

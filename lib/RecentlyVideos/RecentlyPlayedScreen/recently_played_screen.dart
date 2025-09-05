@@ -5,59 +5,42 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path/path.dart' as path;
+import 'package:path_provider/path_provider.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
 import '../../Utils/color.dart';
 import '../../VideoPLayer/video_player.dart';
 import '../RecentlyPlayedManager/recently_played_manager.dart';
 
-
 class RecentlyPlayedScreen extends StatefulWidget {
   final bool horizontalView;
-  final  List<String> recentVideos;
-  const RecentlyPlayedScreen({super.key,  this.horizontalView=false, required this.recentVideos});
+  final List<String> recentVideos;
+  const RecentlyPlayedScreen({super.key, this.horizontalView = false, required this.recentVideos});
 
   @override
   _RecentlyPlayedScreenState createState() => _RecentlyPlayedScreenState();
 }
 
 class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen> {
-  // List<String> _recentVideos = [];
   bool isLoading = false;
   String errorMessage = '';
   bool _isGridView = true;
-  bool _isHorizontalView =false ;
+  bool _isHorizontalView = false;
 
   @override
   void initState() {
     super.initState();
-    _isHorizontalView=widget.horizontalView;
-    // _loadRecentVideos();
+    _isHorizontalView = widget.horizontalView;
   }
-
-  // Future<void> _loadRecentVideos() async {
-  //   try {
-  //     final videos = await RecentlyPlayedManager.getVideos();
-  //     setState(() {
-  //       _recentVideos = videos;
-  //       isLoading = false;
-  //       errorMessage = videos.isEmpty ? 'No recently played videos found.' : '';
-  //     });
-  //   } catch (e) {
-  //     setState(() {
-  //       isLoading = false;
-  //       errorMessage = 'Error loading videos: $e';
-  //     });
-  //   }
-  // }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar:(widget.horizontalView==false)?
-    AppBar(
+      appBar: (widget.horizontalView == false)
+          ? AppBar(
         title: Text(
-          'Recently Videos',
+          'Recently Played Videos',
           style: GoogleFonts.poppins(
             fontSize: 15.sp,
             fontWeight: FontWeight.bold,
@@ -67,7 +50,6 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen> {
         backgroundColor: Colors.grey[100],
         elevation: 2,
         actions: [
-          if(widget.horizontalView==false)
           Padding(
             padding: const EdgeInsets.all(8.0),
             child: Row(
@@ -126,37 +108,12 @@ class _RecentlyPlayedScreenState extends State<RecentlyPlayedScreen> {
                     ),
                   ),
                 ),
-                if(widget.horizontalView==true)
-                  GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      _isGridView = false;
-                      _isHorizontalView = true;
-                    });
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(10),
-                    decoration: BoxDecoration(
-                      color: _isHorizontalView
-                          ? ColorSelect.maineColor
-                          : Colors.grey.shade200,
-                      borderRadius: const BorderRadius.only(
-                        topRight: Radius.circular(10),
-                        bottomRight: Radius.circular(10),
-                      ),
-                    ),
-                    child: Icon(
-                      Icons.view_carousel,
-                      color: _isHorizontalView ? Colors.white : Colors.black87,
-                      size: 20,
-                    ),
-                  ),
-                ),
               ],
             ),
           ),
         ],
-      ):null,
+      )
+          : null,
       body: isLoading
           ? Center(
         child: CupertinoActivityIndicator(
@@ -210,19 +167,20 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
     }
 
     try {
-      if (!videoPath.startsWith('http')) {
-        final thumbnailPath = await VideoThumbnail.thumbnailFile(
-          video: videoPath,
-          imageFormat: ImageFormat.PNG,
-          maxHeight: 720,
-          quality: 75,
-        );
-        _thumbnailCache[videoPath] = thumbnailPath;
-        return thumbnailPath;
-      }
-      return null;
+      final tempDir = await getTemporaryDirectory();
+      final thumbnailPath = await VideoThumbnail.thumbnailFile(
+        video: videoPath,
+        thumbnailPath: tempDir.path,
+        imageFormat: ImageFormat.PNG,
+        maxHeight: 720,
+        quality: 75,
+      );
+
+      _thumbnailCache[videoPath] = thumbnailPath;
+      return thumbnailPath;
     } catch (e) {
       print('Error generating thumbnail for $videoPath: $e');
+      _thumbnailCache[videoPath] = null;
       return null;
     }
   }
@@ -255,10 +213,241 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
     return '$minutes:$seconds';
   }
 
+  Future<void> _deleteVideo(String videoPath, int index) async {
+    if (videoPath.startsWith('http')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Cannot delete network videos'),
+          backgroundColor: Colors.red,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      );
+      return;
+    }
+
+    bool? confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete Video', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
+        content: Text('Are you sure you want to delete "${path.basename(videoPath)}"?', style: GoogleFonts.poppins()),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: Text('Cancel', style: GoogleFonts.poppins()),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+
+    if (confirm == true) {
+      try {
+        // await File(videoPath).delete();
+        await RecentlyPlayedManager.removeVideo(videoPath);
+        setState(() {
+          widget.videos.removeAt(index);
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Video deleted successfully'),
+            backgroundColor: Colors.green,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      } catch (e) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error deleting video: $e'),
+            backgroundColor: Colors.red,
+            behavior: SnackBarBehavior.floating,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(8),
+            ),
+          ),
+        );
+      }
+    }
+  }
+
+
+  Future<void> _shareVideo(String videoPath, int index) async {
+    try {
+      // Check if the video is a URL or local file
+      if (videoPath.startsWith('http')) {
+        // Share network video URL
+        await Share.share(
+          'Check out this video: $videoPath',
+          subject: 'Shared Video: ${path.basename(videoPath)}',
+        );
+
+      } else {
+        // Share local video file
+        final file = File(videoPath);
+
+        // Check if file exists and is valid
+        if (!await file.exists() || await file.length() == 0) {
+          throw Exception('Video file not found or empty');
+        }
+
+        // Check file size (WhatsApp video limit: 100 MB)
+        final fileSize = await file.length();
+        const maxVideoSize = 100 * 1024 * 1024; // 100 MB
+        if (fileSize > maxVideoSize) {
+          throw Exception('Video exceeds WhatsApp size limit (100 MB). Try compressing it.');
+        }
+
+        // Check file format
+        const supportedFormats = ['mp4', 'avi', 'mkv', '3gp', 'mov'];
+        final extension = path.extension(videoPath).toLowerCase().replaceFirst('.', '');
+        if (!supportedFormats.contains(extension)) {
+          throw Exception('Unsupported video format: $extension. Convert to MP4 or similar.');
+        }
+
+        // Prepare files to share (video only, excluding thumbnail for simplicity)
+        final shareFiles = <XFile>[XFile(videoPath, mimeType: 'video/$extension')];
+
+        // Share the video
+        await Share.shareXFiles(
+          shareFiles,
+          // text: 'Check out this video: ${path.basename(videoPath)}',
+          // subject: 'Shared Video',
+        );
+
+        // ScaffoldMessenger.of(context).showSnackBar(
+        //   SnackBar(
+        //     content: Text('Video shared successfully'),
+        //     backgroundColor: Colors.green,
+        //     behavior: SnackBarBehavior.floating,
+        //     shape: RoundedRectangleBorder(
+        //       borderRadius: BorderRadius.circular(8),
+        //     ),
+        //   ),
+        // );
+      }
+    } catch (e, stackTrace) {
+      // Log error for debugging
+      print('Error sharing video: $e\nStackTrace: $stackTrace');
+
+    }
+  }
+  Future<void> _showVideoInfo(String videoPath) async {
+    if (videoPath.startsWith('http')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Info not available for network videos',
+            style: TextStyle(color: Colors.white),
+          ),
+          backgroundColor: Colors.orange,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+          margin: EdgeInsets.all(16),
+        ),
+      );
+      return;
+    }
+
+    final file = File(videoPath);
+    final stats = await file.stat();
+    final duration = await _getVideoDuration(videoPath);
+
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16.0),
+          ),
+          backgroundColor: Colors.white,
+          title: Row(
+            children: [
+              Icon(Icons.video_file, color: ColorSelect.maineColor, size: 30),
+              SizedBox(width: 8),
+              Text(
+                'Video Info',
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: ColorSelect.maineColor,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildInfoRow('Name', path.basename(videoPath)),
+              SizedBox(height: 12),
+              _buildInfoRow('Path', videoPath),
+              SizedBox(height: 12),
+              _buildInfoRow('Size', '${(stats.size / (1024 * 1024)).toStringAsFixed(2)} MB'),
+              SizedBox(height: 12),
+              _buildInfoRow('Duration', _formatDuration(duration)),
+              SizedBox(height: 12),
+              _buildInfoRow('Last Modified', stats.modified.toString().split('.')[0]),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: ColorSelect.maineColor,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  'OK',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: TextStyle(
+            fontWeight: FontWeight.w500,
+            color: Colors.grey[600],
+          ),
+        ),
+        SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontWeight: FontWeight.w400,
+            color: Colors.black,
+          ),
+        ),
+      ],
+    );
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor:widget.horizontalView? Colors.white:Colors.grey[100],
+      backgroundColor: widget.horizontalView ? Colors.white : Colors.grey[100],
       body: widget.horizontalView
           ? _buildHorizontalView()
           : widget.gridView
@@ -282,7 +471,7 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
               position: index,
               duration: const Duration(milliseconds: 375),
               child: SlideAnimation(
-                horizontalOffset: 50.0,
+                horizontalOffset: 0.0,
                 child: FadeInAnimation(
                   child: GestureDetector(
                     onTap: () {
@@ -301,7 +490,7 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                     },
                     child: Container(
                       width: MediaQuery.of(context).size.width * 0.4,
-                      margin: EdgeInsets.symmetric(horizontal: 5.sp),
+                      margin: EdgeInsets.symmetric(horizontal: 0.sp),
                       child: Card(
                         elevation: 2,
                         shape: RoundedRectangleBorder(
@@ -319,22 +508,21 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                     children: [
                                       ClipRRect(
                                         borderRadius: BorderRadius.all(Radius.circular(10.sp)),
-                                        child: snapshot.hasData &&
-                                            snapshot.data != null
+                                        child: snapshot.hasData && snapshot.data != null
                                             ? Image.file(
                                           File(snapshot.data!),
                                           width: double.infinity,
-                                          // height: 80.sp,
+                                          height: 110.sp,
                                           fit: BoxFit.cover,
                                         )
                                             : Container(
                                           width: double.infinity,
+                                          height: 110.sp,
                                           decoration: BoxDecoration(
                                             color: Colors.grey.shade200,
                                             borderRadius: BorderRadius.all(Radius.circular(10.sp)),
                                             image: DecorationImage(
-                                              image: AssetImage(
-                                                  'assets/video_thumbnail.jpg'),
+                                              image: AssetImage('assets/video_thumbnail.jpg'),
                                               fit: BoxFit.cover,
                                             ),
                                           ),
@@ -350,21 +538,16 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                           bottom: 2,
                                           left: 3,
                                           child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                                horizontal: 6, vertical: 2),
+                                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                             decoration: BoxDecoration(
-                                              color:
-                                              Colors.black.withOpacity(0.2),
-                                              borderRadius:
-                                              BorderRadius.circular(4),
+                                              color: Colors.black.withOpacity(0.2),
+                                              borderRadius: BorderRadius.circular(4),
                                             ),
                                             child: FutureBuilder<Duration?>(
-                                              future:
-                                              _getVideoDuration(videoPath),
+                                              future: _getVideoDuration(videoPath),
                                               builder: (context, snapshot) {
                                                 return Text(
-                                                  _formatDuration(
-                                                      snapshot.data),
+                                                  _formatDuration(snapshot.data),
                                                   style: TextStyle(
                                                     fontSize: 9.sp,
                                                     color: Colors.white,
@@ -375,87 +558,126 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                             ),
                                           ),
                                         ),
-                                      // if (!isNetwork)
-                                      //   Positioned(
-                                      //     bottom: 2,
-                                      //     right: 4,
-                                      //     child: Container(
-                                      //       padding: const EdgeInsets.symmetric(
-                                      //           horizontal: 6, vertical: 2),
-                                      //       decoration: BoxDecoration(
-                                      //         color: ColorSelect.maineColor,
-                                      //         borderRadius:
-                                      //         BorderRadius.circular(4),
-                                      //       ),
-                                      //       child: Text(
-                                      //         '${(File(videoPath).lengthSync() / (1024 * 1024)).toStringAsFixed(2)} MB',
-                                      //         style: TextStyle(
-                                      //           fontSize: 9.sp,
-                                      //           color: Colors.white,
-                                      //           fontWeight: FontWeight.w600,
-                                      //         ),
-                                      //       ),
-                                      //     ),
-                                      //   ),
                                     ],
                                   );
                                 },
                               ),
                             ),
-                            // SizedBox(
-                            //   height: 30.sp,
-                            //   child: Row(
-                            //     children: [
-                            //       SizedBox(width: 5.sp),
-                            //       Expanded(
-                            //         child: Text(
-                            //           path.basename(videoPath),
-                            //           style: GoogleFonts.poppins(
-                            //             fontSize: 11.sp,
-                            //             fontWeight: FontWeight.w700,
-                            //             color: Colors.black,
-                            //           ),
-                            //           maxLines: 1,
-                            //           overflow: TextOverflow.ellipsis,
-                            //         ),
-                            //       ),
-                            //       PopupMenuButton<String>(
-                            //         icon: const Icon(
-                            //           Icons.more_vert,
-                            //           color: Colors.black54,
-                            //           size: 20,
-                            //         ),
-                            //         onSelected: (value) {
-                            //           ScaffoldMessenger.of(context).showSnackBar(
-                            //             SnackBar(
-                            //               content: Text('Selected: $value'),
-                            //               backgroundColor: Colors.deepPurple,
-                            //               behavior: SnackBarBehavior.floating,
-                            //               shape: RoundedRectangleBorder(
-                            //                 borderRadius:
-                            //                 BorderRadius.circular(8),
-                            //               ),
-                            //             ),
-                            //           );
-                            //         },
-                            //         itemBuilder: (context) => [
-                            //           const PopupMenuItem(
-                            //             value: 'share',
-                            //             child: Text('Share'),
-                            //           ),
-                            //           const PopupMenuItem(
-                            //             value: 'delete',
-                            //             child: Text('Delete'),
-                            //           ),
-                            //           const PopupMenuItem(
-                            //             value: 'info',
-                            //             child: Text('Info'),
-                            //           ),
-                            //         ],
-                            //       ),
-                            //     ],
-                            //   ),
-                            // ),
+                            SizedBox(
+                              height: 25.sp,
+                              child: Row(
+                                children: [
+                                  SizedBox(width: 5.sp),
+                                  Expanded(
+                                    child: Text(
+                                      path.basename(videoPath),
+                                      style: GoogleFonts.poppins(
+                                        fontSize: 8.sp,
+                                        fontWeight: FontWeight.w700,
+                                        color: Colors.black,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  GestureDetector(
+                                    onTapDown: (details) {
+                                      showMenu(
+                                        context: context,
+                                        position: RelativeRect.fromLTRB(
+                                          details.globalPosition.dx,
+                                          details.globalPosition.dy,
+                                          MediaQuery.of(context).size.width - details.globalPosition.dx,
+                                          MediaQuery.of(context).size.height,
+                                        ),
+                                        items: [
+                                          PopupMenuItem(
+                                            value: "Play",
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.play_circle, size: 20.sp, color: ColorSelect.maineColor),
+                                                SizedBox(width: 8),
+                                                Text("Play", style: GoogleFonts.poppins()),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: "delete",
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.delete, size: 20.sp, color: Colors.red),
+                                                SizedBox(width: 8),
+                                                Text("Delete", style: GoogleFonts.poppins()),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: "info",
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+
+                                              children: [
+                                                Icon(Icons.info, size: 20.sp, color: Colors.blue),
+                                                SizedBox(width: 8),
+                                                Text("Info", style: GoogleFonts.poppins()),
+                                              ],
+                                            ),
+                                          ),
+                                          PopupMenuItem(
+                                            value: "share",
+                                            child: Row(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Icon(Icons.share, size: 20.sp, color: Colors.black54),
+                                                SizedBox(width: 8),
+                                                Text("Share", style: GoogleFonts.poppins()),
+                                              ],
+                                            ),
+                                          ),
+                                        ],
+                                      ).then((value) {
+                                        if (value == "share") {
+                                          _shareVideo(videoPath, index);
+                                        } else if (value == "delete") {
+                                          _deleteVideo(videoPath, index);
+                                        } else if (value == "info") {
+                                          _showVideoInfo(videoPath);
+                                        } else if (value == "Play") {
+                                          Navigator.push(
+                                            context,
+                                            MaterialPageRoute(
+                                              builder: (context) => VideoPlayerScreen(
+                                                videos: widget.videos
+                                                    .where((path) => !path.startsWith('http'))
+                                                    .map((path) => File(path))
+                                                    .toList(),
+                                                initialIndex: index,
+                                              ),
+                                            ),
+                                          );
+                                        }
+                                      });
+                                    },
+                                    child: Padding(
+                                      padding: EdgeInsets.only(bottom:0.sp),
+                                      child: SizedBox(
+                                        height: 30.sp,
+                                        width: 30.sp,
+                                        child: Center(
+                                          child: Icon(
+                                            Icons.more_vert,
+                                            color: Colors.black,
+                                            size: 15.sp,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -501,14 +723,12 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                   },
                   child: Card(
                     elevation: 2,
-                    margin:
-                    const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
+                    margin: const EdgeInsets.symmetric(vertical: 6, horizontal: 8),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Padding(
-                      padding: EdgeInsets.symmetric(
-                          horizontal: 5.sp, vertical: 5.sp),
+                      padding: EdgeInsets.symmetric(horizontal: 5.sp, vertical: 5.sp),
                       child: Row(
                         children: [
                           FutureBuilder<String?>(
@@ -531,11 +751,9 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                       height: 60.sp,
                                       decoration: BoxDecoration(
                                         color: Colors.grey.shade200,
-                                        borderRadius:
-                                        BorderRadius.circular(8),
+                                        borderRadius: BorderRadius.circular(8),
                                         image: DecorationImage(
-                                          image: AssetImage(
-                                              'assets/video_thumbnail.jpg'),
+                                          image: AssetImage('assets/video_thumbnail.jpg'),
                                           fit: BoxFit.cover,
                                         ),
                                       ),
@@ -551,12 +769,10 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                       bottom: 4,
                                       right: 4,
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
                                           color: Colors.black.withOpacity(0.6),
-                                          borderRadius:
-                                          BorderRadius.circular(4),
+                                          borderRadius: BorderRadius.circular(4),
                                         ),
                                         child: FutureBuilder<Duration?>(
                                           future: _getVideoDuration(videoPath),
@@ -613,32 +829,46 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                             mainAxisSize: MainAxisSize.min,
                             children: [
                               PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert,
-                                    color: Colors.black54),
+                                icon: const Icon(Icons.more_vert, color: Colors.black54),
                                 onSelected: (value) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Selected: $value'),
-                                      backgroundColor: Colors.deepPurple,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                  );
+                                  if (value == "share") {
+                                    _shareVideo(videoPath, index);
+                                  } else if (value == "delete") {
+                                    _deleteVideo(videoPath, index);
+                                  } else if (value == "info") {
+                                    _showVideoInfo(videoPath);
+                                  }
                                 },
                                 itemBuilder: (context) => [
-                                  const PopupMenuItem(
+                                  PopupMenuItem(
                                     value: 'share',
-                                    child: Text('Share'),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.share, size: 18, color: Colors.black54),
+                                        SizedBox(width: 8),
+                                        Text('Share', style: GoogleFonts.poppins()),
+                                      ],
+                                    ),
                                   ),
-                                  const PopupMenuItem(
+                                  PopupMenuItem(
                                     value: 'delete',
-                                    child: Text('Delete'),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.delete, size: 18, color: Colors.red),
+                                        SizedBox(width: 8),
+                                        Text('Delete', style: GoogleFonts.poppins()),
+                                      ],
+                                    ),
                                   ),
-                                  const PopupMenuItem(
+                                  PopupMenuItem(
                                     value: 'info',
-                                    child: Text('Info'),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.info, size: 18, color: Colors.blue),
+                                        SizedBox(width: 8),
+                                        Text('Info', style: GoogleFonts.poppins()),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
@@ -707,8 +937,7 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                 alignment: Alignment.center,
                                 children: [
                                   ClipRRect(
-                                    borderRadius: BorderRadius.vertical(
-                                        top: Radius.circular(5.sp)),
+                                    borderRadius: BorderRadius.vertical(top: Radius.circular(5.sp)),
                                     child: snapshot.hasData && snapshot.data != null
                                         ? Image.file(
                                       File(snapshot.data!),
@@ -721,11 +950,9 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                       height: 160.sp,
                                       decoration: BoxDecoration(
                                         color: Colors.grey.shade200,
-                                        borderRadius: BorderRadius.vertical(
-                                            top: Radius.circular(5.sp)),
+                                        borderRadius: BorderRadius.vertical(top: Radius.circular(5.sp)),
                                         image: DecorationImage(
-                                          image: AssetImage(
-                                              'assets/video_thumbnail.jpg'),
+                                          image: AssetImage('assets/video_thumbnail.jpg'),
                                           fit: BoxFit.cover,
                                         ),
                                       ),
@@ -741,12 +968,9 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                       bottom: 2,
                                       left: 3,
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
                                           color: Colors.black.withOpacity(0.2),
-                                          borderRadius:
-                                          BorderRadius.circular(4),
                                         ),
                                         child: FutureBuilder<Duration?>(
                                           future: _getVideoDuration(videoPath),
@@ -768,12 +992,10 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                       bottom: 2,
                                       right: 4,
                                       child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                            horizontal: 6, vertical: 2),
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                         decoration: BoxDecoration(
                                           color: ColorSelect.maineColor,
-                                          borderRadius:
-                                          BorderRadius.circular(4),
+                                          borderRadius: BorderRadius.circular(4),
                                         ),
                                         child: Text(
                                           '${(File(videoPath).lengthSync() / (1024 * 1024)).toStringAsFixed(2)} MB',
@@ -808,35 +1030,46 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                 ),
                               ),
                               PopupMenuButton<String>(
-                                icon: const Icon(
-                                  Icons.more_vert,
-                                  color: Colors.black54,
-                                  size: 20,
-                                ),
+                                icon: const Icon(Icons.more_vert, color: Colors.black54, size: 20),
                                 onSelected: (value) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    SnackBar(
-                                      content: Text('Selected: $value'),
-                                      backgroundColor: Colors.deepPurple,
-                                      behavior: SnackBarBehavior.floating,
-                                      shape: RoundedRectangleBorder(
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                    ),
-                                  );
+                                  if (value == "share") {
+                                    _shareVideo(videoPath, index);
+                                  } else if (value == "delete") {
+                                    _deleteVideo(videoPath, index);
+                                  } else if (value == "info") {
+                                    _showVideoInfo(videoPath);
+                                  }
                                 },
                                 itemBuilder: (context) => [
-                                  const PopupMenuItem(
+                                  PopupMenuItem(
                                     value: 'share',
-                                    child: Text('Share'),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.share, size: 18, color: Colors.black54),
+                                        SizedBox(width: 8),
+                                        Text('Share', style: GoogleFonts.poppins()),
+                                      ],
+                                    ),
                                   ),
-                                  const PopupMenuItem(
+                                  PopupMenuItem(
                                     value: 'delete',
-                                    child: Text('Delete'),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.delete, size: 18, color: Colors.red),
+                                        SizedBox(width: 8),
+                                        Text('Delete', style: GoogleFonts.poppins()),
+                                      ],
+                                    ),
                                   ),
-                                  const PopupMenuItem(
+                                  PopupMenuItem(
                                     value: 'info',
-                                    child: Text('Info'),
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.info, size: 18, color: Colors.blue),
+                                        SizedBox(width: 8),
+                                        Text('Info', style: GoogleFonts.poppins()),
+                                      ],
+                                    ),
                                   ),
                                 ],
                               ),
