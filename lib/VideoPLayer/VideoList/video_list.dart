@@ -1,10 +1,12 @@
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
@@ -384,7 +386,10 @@ class _VideoFolderScreenState extends State<VideoFolderScreen> {
                         if (value == "share") {
                           _shareVideo( video.path, index);
                         } else if (value == "delete") {
-                          _deleteVideo(video.path, index,context);
+
+                          deleteVideoFromDevice(context, video.path);
+
+                          // _deleteVideo(video.path, index,context);
                         } else if (value == "info") {
                           _showVideoInfo(video.path);
                         } else if (value == "Play") {
@@ -638,7 +643,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen> {
                             if (value == "share") {
                               _shareVideo( video.path, index);
                             } else if (value == "delete") {
-                              _deleteVideo(video.path, index,context);
+                              deleteVideoFromDevice(context, video.path);
                             } else if (value == "info") {
                               _showVideoInfo(video.path);
                             } else if (value == "Play") {
@@ -686,152 +691,90 @@ class _VideoFolderScreenState extends State<VideoFolderScreen> {
 
 
 
-  Future<void> _deleteVideo(String videoPath, int index, BuildContext context) async {
-    // Check if the video is a network video
-    if (videoPath.startsWith('http')) {
+
+
+
+
+
+  Future<void> deleteVideoFromDevice(BuildContext context, String videoPath) async {
+    // 1️⃣ Permission check
+    final permission = await PhotoManager.requestPermissionExtend();
+    if (!permission.isAuth) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Cannot delete network videos'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
+        const SnackBar(content: Text("Permission denied"), backgroundColor: Colors.red),
       );
       return;
     }
 
-    // Request appropriate permissions
-    bool hasPermission = await _requestStoragePermission();
-    if (!hasPermission) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Storage permission denied. Cannot delete video.'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-      );
-      return;
-    }
-
-    // Check if file exists
-    final file = File(videoPath);
-    if (!await file.exists()) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Video file not found.'),
-          backgroundColor: Colors.red,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-          ),
-        ),
-      );
-      return;
-    }
-
-    // Show confirmation dialog
+    // 2️⃣ Confirmation dialog
     bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('Delete Video', style: GoogleFonts.poppins(fontWeight: FontWeight.bold)),
-        content: Text('Are you sure you want to delete "${path.basename(videoPath)}"?', style: GoogleFonts.poppins()),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        title: const Text("Delete Video"),
+        content: const Text("Are you sure you want to delete this video?"),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: GoogleFonts.poppins()),
+            child: const Text("Cancel", style: TextStyle(color: Colors.teal)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete', style: GoogleFonts.poppins(color: Colors.red)),
+            child: const Text("Delete", style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
 
-    if (confirm == true) {
-      try {
-        // Delete the file
-        await file.delete();
+    if (confirm != true) return;
 
-        // Update media store (optional, for Android)
-        if (Platform.isAndroid) {
-          // Optionally, use a package like `media_scanner` to refresh the media store
-          // Example: await MediaScanner.scanFile(videoPath);
+    // 3️⃣ Fetch all video asset paths
+    final paths = await PhotoManager.getAssetPathList(type: RequestType.video);
+
+    for (final p in paths) {
+      final int total = await p.assetCountAsync; // ✅ Correct way to get asset count
+      final assets = await p.getAssetListRange(start: 0, end: total);
+
+      for (final asset in assets) {
+        final file = await asset.file;
+        if (file != null && file.path == videoPath) {
+          try {
+            final result = await PhotoManager.editor.deleteWithIds([asset.id]);
+            if (result.isNotEmpty) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Video deleted from device"),
+                  backgroundColor: Colors.green,
+                  duration: Duration(seconds: 2),
+                ),
+              );
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text("Failed to delete video"),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
+          } catch (e) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text("Error deleting video: $e"),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return; // Exit once video is deleted
         }
-
-        // Update the UI
-        setState(() {
-          widget.videos.removeAt(index);
-        });
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Video deleted successfully'),
-            backgroundColor: Colors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
-      } catch (e) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to delete video. Please check permissions or file access.'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-          ),
-        );
       }
     }
+
+
   }
 
-  Future<bool> _requestStoragePermission() async {
-    if (Platform.isAndroid) {
-      // For Android 13+ (API 33+), use granular media permissions
-      if (await Permission.videos.isDenied) {
-        var status = await Permission.videos.request();
-        if (status.isPermanentlyDenied) {
-          // Prompt user to enable permission from settings
-          await openAppSettings();
-          return false;
-        }
-        if (!status.isGranted) {
-          return false;
-        }
-      }
-      // For Android 12 and below, use storage permissions
-      if (await Permission.storage.isDenied) {
-        var status = await Permission.storage.request();
-        if (status.isPermanentlyDenied) {
-          await openAppSettings();
-          return false;
-        }
-        if (!status.isGranted) {
-          return false;
-        }
-      }
-    } else if (Platform.isIOS) {
-      // For iOS, request photo library access
-      var status = await Permission.photos.request();
-      if (status.isPermanentlyDenied) {
-        await openAppSettings();
-        return false;
-      }
-      if (!status.isGranted) {
-        return false;
-      }
-    }
-    return true;
-  }
+
+
+
   Future<void> _shareVideo(String videoPath, int index) async {
     try {
       // Check if the video is a URL or local file
@@ -996,5 +939,10 @@ class _VideoFolderScreenState extends State<VideoFolderScreen> {
       ],
     );
   }
+
+
+
+
+
 
 }

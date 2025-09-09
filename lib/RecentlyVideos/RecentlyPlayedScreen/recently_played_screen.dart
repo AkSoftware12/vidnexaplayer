@@ -828,49 +828,100 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                           Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert, color: Colors.black54),
-                                onSelected: (value) {
-                                  if (value == "share") {
-                                    _shareVideo(videoPath, index);
-                                  } else if (value == "delete") {
-                                    _deleteVideo(videoPath, index);
-                                  } else if (value == "info") {
-                                    _showVideoInfo(videoPath);
-                                  }
+                              GestureDetector(
+                                onTapDown: (details) {
+                                  showMenu(
+                                    context: context,
+                                    position: RelativeRect.fromLTRB(
+                                      details.globalPosition.dx,
+                                      details.globalPosition.dy,
+                                      MediaQuery.of(context).size.width - details.globalPosition.dx,
+                                      MediaQuery.of(context).size.height,
+                                    ),
+                                    items: [
+                                      PopupMenuItem(
+                                        value: "Play",
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.play_circle, size: 20.sp, color: ColorSelect.maineColor),
+                                            SizedBox(width: 8),
+                                            Text("Play", style: GoogleFonts.poppins()),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: "delete",
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.delete, size: 20.sp, color: Colors.red),
+                                            SizedBox(width: 8),
+                                            Text("Delete", style: GoogleFonts.poppins()),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: "info",
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+
+                                          children: [
+                                            Icon(Icons.info, size: 20.sp, color: Colors.blue),
+                                            SizedBox(width: 8),
+                                            Text("Info", style: GoogleFonts.poppins()),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: "share",
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.share, size: 20.sp, color: Colors.black54),
+                                            SizedBox(width: 8),
+                                            Text("Share", style: GoogleFonts.poppins()),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ).then((value) {
+                                    if (value == "share") {
+                                      _shareVideo(videoPath, index);
+                                    } else if (value == "delete") {
+                                      _deleteVideo(videoPath, index);
+                                    } else if (value == "info") {
+                                      _showVideoInfo(videoPath);
+                                    } else if (value == "Play") {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => VideoPlayerScreen(
+                                            videos: widget.videos
+                                                .where((path) => !path.startsWith('http'))
+                                                .map((path) => File(path))
+                                                .toList(),
+                                            initialIndex: index,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  });
                                 },
-                                itemBuilder: (context) => [
-                                  PopupMenuItem(
-                                    value: 'share',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.share, size: 18, color: Colors.black54),
-                                        SizedBox(width: 8),
-                                        Text('Share', style: GoogleFonts.poppins()),
-                                      ],
+                                child: Padding(
+                                  padding: EdgeInsets.only(bottom:0.sp),
+                                  child: SizedBox(
+                                    height: 30.sp,
+                                    width: 30.sp,
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.more_vert,
+                                        color: Colors.black,
+                                        size: 15.sp,
+                                      ),
                                     ),
                                   ),
-                                  PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.delete, size: 18, color: Colors.red),
-                                        SizedBox(width: 8),
-                                        Text('Delete', style: GoogleFonts.poppins()),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'info',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.info, size: 18, color: Colors.blue),
-                                        SizedBox(width: 8),
-                                        Text('Info', style: GoogleFonts.poppins()),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
@@ -1029,49 +1080,100 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                   overflow: TextOverflow.ellipsis,
                                 ),
                               ),
-                              PopupMenuButton<String>(
-                                icon: const Icon(Icons.more_vert, color: Colors.black54, size: 20),
-                                onSelected: (value) {
-                                  if (value == "share") {
-                                    _shareVideo(videoPath, index);
-                                  } else if (value == "delete") {
-                                    _deleteVideo(videoPath, index);
-                                  } else if (value == "info") {
-                                    _showVideoInfo(videoPath);
-                                  }
+                              GestureDetector(
+                                onTapDown: (details) {
+                                  showMenu(
+                                    context: context,
+                                    position: RelativeRect.fromLTRB(
+                                      details.globalPosition.dx,
+                                      details.globalPosition.dy,
+                                      MediaQuery.of(context).size.width - details.globalPosition.dx,
+                                      MediaQuery.of(context).size.height,
+                                    ),
+                                    items: [
+                                      PopupMenuItem(
+                                        value: "Play",
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.play_circle, size: 20.sp, color: ColorSelect.maineColor),
+                                            SizedBox(width: 8),
+                                            Text("Play", style: GoogleFonts.poppins()),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: "delete",
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.delete, size: 20.sp, color: Colors.red),
+                                            SizedBox(width: 8),
+                                            Text("Delete", style: GoogleFonts.poppins()),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: "info",
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+
+                                          children: [
+                                            Icon(Icons.info, size: 20.sp, color: Colors.blue),
+                                            SizedBox(width: 8),
+                                            Text("Info", style: GoogleFonts.poppins()),
+                                          ],
+                                        ),
+                                      ),
+                                      PopupMenuItem(
+                                        value: "share",
+                                        child: Row(
+                                          mainAxisSize: MainAxisSize.min,
+                                          children: [
+                                            Icon(Icons.share, size: 20.sp, color: Colors.black54),
+                                            SizedBox(width: 8),
+                                            Text("Share", style: GoogleFonts.poppins()),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ).then((value) {
+                                    if (value == "share") {
+                                      _shareVideo(videoPath, index);
+                                    } else if (value == "delete") {
+                                      _deleteVideo(videoPath, index);
+                                    } else if (value == "info") {
+                                      _showVideoInfo(videoPath);
+                                    } else if (value == "Play") {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => VideoPlayerScreen(
+                                            videos: widget.videos
+                                                .where((path) => !path.startsWith('http'))
+                                                .map((path) => File(path))
+                                                .toList(),
+                                            initialIndex: index,
+                                          ),
+                                        ),
+                                      );
+                                    }
+                                  });
                                 },
-                                itemBuilder: (context) => [
-                                  PopupMenuItem(
-                                    value: 'share',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.share, size: 18, color: Colors.black54),
-                                        SizedBox(width: 8),
-                                        Text('Share', style: GoogleFonts.poppins()),
-                                      ],
+                                child: Padding(
+                                  padding: EdgeInsets.only(bottom:0.sp),
+                                  child: SizedBox(
+                                    height: 30.sp,
+                                    width: 30.sp,
+                                    child: Center(
+                                      child: Icon(
+                                        Icons.more_vert,
+                                        color: Colors.black,
+                                        size: 15.sp,
+                                      ),
                                     ),
                                   ),
-                                  PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.delete, size: 18, color: Colors.red),
-                                        SizedBox(width: 8),
-                                        Text('Delete', style: GoogleFonts.poppins()),
-                                      ],
-                                    ),
-                                  ),
-                                  PopupMenuItem(
-                                    value: 'info',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.info, size: 18, color: Colors.blue),
-                                        SizedBox(width: 8),
-                                        Text('Info', style: GoogleFonts.poppins()),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                                ),
                               ),
                             ],
                           ),
