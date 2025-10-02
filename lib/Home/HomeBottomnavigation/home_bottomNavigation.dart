@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/material.dart' as badges;
@@ -24,6 +25,7 @@ import '../../NetWork Stream/stream_video.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/AppBar/colorList.dart';
+import '../../NotifyListeners/UserData/user_data.dart';
 import '../../Utils/textSize.dart';
 import '../../VideoPLayer/AllVideo/all_videos.dart';
 import '../../app_store/app_store.dart';
@@ -65,6 +67,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   @override
   void initState() {
     super.initState();
+    checkForVersion(context);
 
     _getUsername();
     currentPage = widget.bottomIndex;
@@ -357,43 +360,43 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                     ],
                   ),
 
-                  const SizedBox(width: 16),
+                  const SizedBox(width: 0),
 
                   // Profile picture with green dot
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (context) => const HomeBottomNavigation(
-                                  bottomIndex: 3,
-                                )),
-                      );
-                    },
-                    child: Stack(
-                      children: [
-                        const CircleAvatar(
-                          radius: 20,
-                          // If backgroundImage is not set or fails to load, the child (Icon) will be displayed
-                          backgroundImage: NetworkImage(
-                              'https://img.freepik.com/free-photo/young-bearded-man-with-striped-shirt_273609-5677.jpg'), // Uncomment and replace with your image path
-                        ),
-                        Positioned(
-                          bottom: 0,
-                          right: 0,
-                          child: Container(
-                            width: 12,
-                            height: 12,
-                            decoration: BoxDecoration(
-                              color: Colors.green,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.white, width: 2),
-                            ),
-                          ),
-                        )
-                      ],
-                    ),
-                  ),
+                  // GestureDetector(
+                  //   onTap: () {
+                  //     Navigator.push(
+                  //       context,
+                  //       MaterialPageRoute(
+                  //           builder: (context) => const HomeBottomNavigation(
+                  //                 bottomIndex: 3,
+                  //               )),
+                  //     );
+                  //   },
+                  //   child: Stack(
+                  //     children: [
+                  //       const CircleAvatar(
+                  //         radius: 20,
+                  //         // If backgroundImage is not set or fails to load, the child (Icon) will be displayed
+                  //         backgroundImage: NetworkImage(
+                  //             'https://img.freepik.com/free-photo/young-bearded-man-with-striped-shirt_273609-5677.jpg'), // Uncomment and replace with your image path
+                  //       ),
+                  //       Positioned(
+                  //         bottom: 0,
+                  //         right: 0,
+                  //         child: Container(
+                  //           width: 12,
+                  //           height: 12,
+                  //           decoration: BoxDecoration(
+                  //             color: Colors.green,
+                  //             shape: BoxShape.circle,
+                  //             border: Border.all(color: Colors.white, width: 2),
+                  //           ),
+                  //         ),
+                  //       )
+                  //     ],
+                  //   ),
+                  // ),
                 ],
               ),
             ],
@@ -605,6 +608,8 @@ class SettingsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final user = Provider.of<UserModel>(context);
+
     return Scaffold(
       body: Column(
         children: [
@@ -660,37 +665,65 @@ class SettingsScreen extends StatelessWidget {
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                         ),
-                        child: userImage.isNotEmpty
-                            ? Image.asset('assets/avtar.jpg')
-                            : Image.asset('assets/avtar.jpg'),
+                        child:user.imagePath != null
+                            ? CircleAvatar(
+                          radius: 60,
+                          backgroundImage: FileImage(File(user.imagePath!)),
+                        )
+                            : const CircleAvatar(
+                          radius: 60,
+                          child: Icon(Icons.person, size: 60),
+                        )),
                       ),
-                    ),
+
                     SizedBox(width: 10.sp),
                     Expanded(
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.start,
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          user.isEmpty?
-                          Text(
-                            'User',
-                            style: GoogleFonts.radioCanada(
-                              textStyle: TextStyle(
-                                color: Colors.white,
-                                fontSize: TextSizes.textlarge,
-                                fontWeight: FontWeight.bold,
+                          user.name != null
+                              ? Text.rich(
+                            TextSpan(
+                              text: user.name,
+                              style: GoogleFonts.radioCanada(
+                                textStyle: TextStyle(
+                                  color:
+                                  Colors.white,
+                                  fontSize: 17.sp,
+                                  // Adjust font size as needed
+                                  fontWeight:
+                                  FontWeight
+                                      .bold, // Adjust font weight as needed
+                                ),
                               ),
                             ),
-                          ):  Text(
-                            user,
-                            style: GoogleFonts.radioCanada(
-                              textStyle: TextStyle(
-                                color: Colors.white,
-                                fontSize: TextSizes.textlarge,
-                                fontWeight: FontWeight.bold,
+                            textAlign:
+                            TextAlign
+                                .start, // Ensure text starts at the beginning
+                          )
+                              : Text.rich(
+                            TextSpan(
+                              text: 'User',
+                              style: GoogleFonts.radioCanada(
+                                textStyle: TextStyle(
+                                  color:
+                                  Theme.of(
+                                    context,
+                                  ).colorScheme.secondary,
+                                  fontSize: 17.sp,
+                                  // Adjust font size as needed
+                                  fontWeight:
+                                  FontWeight
+                                      .bold, // Adjust font weight as needed
+                                ),
                               ),
                             ),
+                            textAlign:
+                            TextAlign
+                                .start, // Ensure text starts at the beginning
                           ),
+
                           Text(
                             'Premium Member',
                             style: GoogleFonts.radioCanada(
@@ -1209,58 +1242,42 @@ class SettingsScreen extends StatelessWidget {
                 width: double.infinity,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
-                  gradient: LinearGradient(
-                    colors: [
-                      // HexColor('#3b82f6'),
-                      ColorSelect.maineColor,
-                      ColorSelect.maineColor,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
+                  // gradient: LinearGradient(
+                  //   colors: [
+                  //     // HexColor('#3b82f6'),
+                  //     ColorSelect.maineColor,
+                  //     ColorSelect.maineColor,
+                  //   ],
+                  //   begin: Alignment.topLeft,
+                  //   end: Alignment.bottomRight,
+                  // ),
                 ),
                 padding: EdgeInsets.all(3.sp),
                 child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    SizedBox(width: 10.sp),
 
-                    Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(8.sp),
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.grey.shade200,
-                            Colors.grey.shade200,
-                            // HexColor('#3b82f6'), // Purple
-                            // HexColor('#3b82f6'), // Purple
-                          ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
-                        ),
-                      ),
-                      padding:  EdgeInsets.all(3.sp),
-                      child: SizedBox(
-                        height: 20.sp,
-                          width: 20.sp,
-                          child: Image.asset('assets/appblue.png', ))
-                    ),
-                    SizedBox(width: 10.sp),
+
                     Expanded(
                       child: Column(
-                        mainAxisAlignment: MainAxisAlignment.start,
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.center,
                         children: [
                           SizedBox(
                               height: 25.sp,
-                              child: Image.asset('assets/logo_blue_text.png',color: Colors.white,)),
+                              child: Image.asset('assets/logo_blue_text.png',)),
 
-                          Text(
-                            '  Version : $currentVersion',
-                            style: GoogleFonts.radioCanada(
-                              textStyle: TextStyle(
-                                color: Colors.white,
-                                fontSize: 10.sp,
-                                fontWeight: FontWeight.w600,
+                          Padding(
+                            padding:  EdgeInsets.only(left: 27.sp),
+                            child: Text(
+                              'Version : $currentVersion',
+                              style: GoogleFonts.radioCanada(
+                                textStyle: TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 10.sp,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
                             ),
                           ),
@@ -1272,7 +1289,7 @@ class SettingsScreen extends StatelessWidget {
               ),
             ),
           ),
-          SizedBox(height: 30.sp),
+          SizedBox(height: 20.sp),
         ],
       ),
     );

@@ -14,6 +14,7 @@ import 'NotifyListeners/LanguageProvider/language_provider.dart';
 import 'DarkMode/dark_mode.dart';
 import 'Home/HomeBottomnavigation/home_bottomNavigation.dart';
 import 'NotifyListeners/AppBar/app_bar_color.dart';
+import 'NotifyListeners/UserData/user_data.dart';
 import 'OnboardScreen/onboarding_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -49,6 +50,7 @@ Future<void> main() async {
         ChangeNotifierProvider(create: (context) => ThemeProvider()),
         ChangeNotifierProvider(create: (context) => AppBarColorProvider()),
         ChangeNotifierProvider(create: (context) => LocaleProvider()),
+        ChangeNotifierProvider(create: (context) => UserModel()),
       ],
       child: MyApp(),
     ),

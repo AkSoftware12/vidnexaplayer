@@ -7,6 +7,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:videoplayer/Photo/image_album.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -14,7 +15,8 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
-import '../../ComingSoon/coming_soon.dart' show ComingSoonPage, ComingSoonScreen;
+import '../../ComingSoon/coming_soon.dart'
+    show ComingSoonPage, ComingSoonScreen;
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
 import '../../DeviceSpace/device_space.dart';
@@ -23,6 +25,7 @@ import '../../Model/property_type.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/AppBar/colorList.dart';
+import '../../NotifyListeners/UserData/user_data.dart';
 import '../../Utils/textSize.dart';
 import '../../VideoPLayer/AllVideo/all_videos.dart';
 import '../../app_store/app_store.dart';
@@ -38,6 +41,10 @@ class UserProfilePage extends StatefulWidget {
 class _UserProfilePageState extends State<UserProfilePage> {
   final int _sizePerPage = 50;
   final TextEditingController _controller = TextEditingController();
+
+  final TextEditingController _nameController = TextEditingController();
+  File? _pickedImage;
+
   String userName = "";
   String userImage = "";
   File? file;
@@ -111,20 +118,22 @@ class _UserProfilePageState extends State<UserProfilePage> {
     });
   }
 
-  Future<void> _loadMoreAsset() async {
-    final List<AssetEntity> entities = await _path!.getAssetListPaged(
-      page: _page + 1,
-      size: _sizePerPage,
-    );
-    if (!mounted) {
-      return;
+  Future<void> _pickImageWithSetState(StateSetter localSetState, {ImageSource source = ImageSource.gallery}) async {
+    final picker = ImagePicker();
+    final pickedFile = await picker.pickImage(source: source);
+
+    if (pickedFile != null) {
+      final appDir = await getApplicationDocumentsDirectory();
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final fileName = "profile_image_$timestamp.png";
+      final newImage = File("${appDir.path}/$fileName");
+
+      final savedImage = await File(pickedFile.path).copy(newImage.path);
+
+      localSetState(() {  // Use local setState from StatefulBuilder
+        _pickedImage = savedImage;
+      });
     }
-    setState(() {
-      _entities!.addAll(entities);
-      _page++;
-      _hasMoreToLoad = _entities!.length < _totalEntitiesCount;
-      _isLoadingMore = false;
-    });
   }
 
   void _loadData() async {
@@ -178,6 +187,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       Provider.of<AppBarColorProvider>(context, listen: false).loadColor();
     });
+
+    final user = Provider.of<UserModel>(context);
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
 
@@ -206,14 +218,18 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               spreadRadius: 2,
                               blurRadius: 10,
                               offset: Offset(
-                                  0, -4), // Upar shadow ke liye negative Y
+                                0,
+                                -4,
+                              ), // Upar shadow ke liye negative Y
                             ),
                             BoxShadow(
                               color: ColorSelect.maineColor.withOpacity(0.3),
                               spreadRadius: 2,
                               blurRadius: 10,
                               offset: Offset(
-                                  0, 4), // Niche shadow ke liye positive Y
+                                0,
+                                4,
+                              ), // Niche shadow ke liye positive Y
                             ),
                           ],
                         ),
@@ -222,404 +238,624 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           child: Column(
                             children: [
                               SizedBox(height: 15.sp),
-                              Stack(
-                                children: [
-                                  ClipOval(
-                                    child: Container(
-                                      width: 70.sp,
-                                      height: 70.sp,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                      ),
-                                      child: file != null
-                                          ? Image.file(file!)
-                                          : Image.asset('assets/avtar.jpg'),
-                                    ),
-                                  ),
-                                  Positioned(
-                                    bottom: 2,
-                                    right: 1,
-                                    child: GestureDetector(
-                                      onTap: () {
-                                        showModalBottomSheet(
-                                          context: context,
-                                          isScrollControlled: true,
-                                          builder: (BuildContext context) {
-                                            return Container(
-                                              padding: EdgeInsets.all(16.0),
-                                              decoration: BoxDecoration(
-                                                color: Colors.white,
-                                                borderRadius:
-                                                    BorderRadius.vertical(
-                                                        top: Radius.circular(
-                                                            25.sp)),
-                                              ),
-                                              child: SingleChildScrollView(
+                              GestureDetector(
+                                onTap: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    isScrollControlled: true,
+                                    backgroundColor: Colors.transparent,
+                                    builder: (BuildContext context) {
+                                      return StatefulBuilder(
+                                        builder: (context, setState) {  // Local setState for bottom sheet
+                                          return Container(
+                                            decoration: BoxDecoration(
+                                              color: Colors.white,
+                                              borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                                              boxShadow: [
+                                                BoxShadow(
+                                                  color: Colors.black.withOpacity(0.1),
+                                                  blurRadius: 20,
+                                                  offset: Offset(0, -5),
+                                                ),
+                                              ],
+                                            ),
+                                            child: SingleChildScrollView(  // Add scroll for keyboard handling
+                                              child: Padding(
+                                                padding: EdgeInsets.only(
+                                                  bottom: MediaQuery.of(context).viewInsets.bottom + 20,  // Dynamic padding for keyboard
+                                                ),
                                                 child: Column(
-                                                  mainAxisSize:
-                                                      MainAxisSize.min,
-                                                  children: <Widget>[
-                                                    Row(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Padding(
-                                                          padding:
-                                                              EdgeInsets.all(
-                                                                  12.sp),
-                                                          child: Text.rich(
-                                                            TextSpan(
-                                                              text:
-                                                                  "Edit Profile",
-                                                              style: GoogleFonts
-                                                                  .radioCanada(
-                                                                textStyle:
-                                                                    TextStyle(
-                                                                  color: Colors
-                                                                      .black,
-                                                                  fontSize:
-                                                                      15.sp,
-                                                                  // Adjust font size as needed
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold, // Adjust font weight as needed
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            textAlign: TextAlign
-                                                                .start, // Ensure text starts at the beginning
-                                                          ),
-                                                        ),
-                                                      ],
+                                                  mainAxisSize: MainAxisSize.min,
+                                                  children: [
+                                                    // Drag Handle
+                                                    Container(
+                                                      margin: EdgeInsets.only(top: 10, bottom: 20),
+                                                      width: 40,
+                                                      height: 4,
+                                                      decoration: BoxDecoration(
+                                                        color: Colors.grey.withOpacity(0.3),
+                                                        borderRadius: BorderRadius.circular(2),
+                                                      ),
                                                     ),
-                                                    SizedBox(
-                                                      height: 20.sp,
-                                                    ),
-                                                    Row(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Padding(
-                                                          padding:
-                                                              EdgeInsets.all(
-                                                                  12.sp),
-                                                          child: SizedBox(
-                                                            height: 20.sp,
-                                                            width: 20.sp,
-                                                            child: Icon(
-                                                                Icons
-                                                                    .camera_alt_outlined,
-                                                                color: Colors
-                                                                    .black),
-                                                          ),
-                                                        ),
-                                                        Padding(
-                                                          padding:
-                                                              EdgeInsets.all(
-                                                                  5.sp),
-                                                          child: Text.rich(
-                                                            TextSpan(
-                                                              text:
-                                                                  "Take a photo",
-                                                              style: GoogleFonts
-                                                                  .radioCanada(
-                                                                textStyle:
-                                                                    TextStyle(
-                                                                  color: Colors
-                                                                      .black,
-                                                                  fontSize:
-                                                                      15.sp,
-                                                                  // Adjust font size as needed
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .normal, // Adjust font weight as needed
-                                                                ),
-                                                              ),
-                                                            ),
-                                                            textAlign: TextAlign
-                                                                .start, // Ensure text starts at the beginning
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    GestureDetector(
-                                                      onTap: () {
-                                                        // getImage(ImageSource.gallery);
-                                                        // Navigator.pop(context);
-                                                      },
+                                                    // Header
+                                                    Padding(
+                                                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
                                                       child: Row(
-                                                        mainAxisAlignment:
-                                                            MainAxisAlignment
-                                                                .start,
+                                                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                         children: [
-                                                          Padding(
-                                                            padding:
-                                                                EdgeInsets.all(
-                                                                    12.sp),
-                                                            child: SizedBox(
-                                                              height: 20.sp,
-                                                              width: 20.sp,
-                                                              child: Icon(
-                                                                  Icons.photo,
-                                                                  color: Colors
-                                                                      .black),
+                                                          Text(
+                                                            "Edit Profile",
+                                                            style: GoogleFonts.radioCanada(
+                                                              textStyle: TextStyle(
+                                                                color: Colors.black,
+                                                                fontSize: 20.sp,
+                                                                fontWeight: FontWeight.w600,
+                                                              ),
                                                             ),
                                                           ),
-                                                          Padding(
-                                                            padding:
-                                                                EdgeInsets.all(
-                                                                    5.sp),
-                                                            child: Text.rich(
-                                                              TextSpan(
-                                                                text: "Gallery",
-                                                                style: GoogleFonts
-                                                                    .radioCanada(
-                                                                  textStyle:
-                                                                      TextStyle(
-                                                                    color: Colors
-                                                                        .black,
-                                                                    fontSize:
-                                                                        15.sp,
-                                                                    // Adjust font size as needed
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .normal, // Adjust font weight as needed
-                                                                  ),
-                                                                ),
-                                                              ),
-                                                              textAlign: TextAlign
-                                                                  .start, // Ensure text starts at the beginning
-                                                            ),
+                                                          IconButton(
+                                                            onPressed: () => Navigator.pop(context),
+                                                            icon: Icon(Icons.close, color: Colors.grey[600], size: 24),
                                                           ),
                                                         ],
                                                       ),
                                                     ),
-                                                    SizedBox(
-                                                      height: 30.sp,
-                                                    ),
-                                                    Row(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .start,
-                                                      children: [
-                                                        Padding(
-                                                          padding:
-                                                              EdgeInsets.all(
-                                                                  12.sp),
-                                                          child: Text.rich(
-                                                            TextSpan(
-                                                              text:
-                                                                  "Profile Name",
-                                                              style: GoogleFonts
-                                                                  .radioCanada(
-                                                                textStyle:
-                                                                    TextStyle(
-                                                                  color: Colors
-                                                                      .black,
-                                                                  fontSize:
-                                                                      15.sp,
-                                                                  // Adjust font size as needed
-                                                                  fontWeight:
-                                                                      FontWeight
-                                                                          .bold, // Adjust font weight as needed
+                                                    // Profile Image Section
+                                                    Container(
+                                                      padding: EdgeInsets.symmetric(horizontal: 24),
+                                                      child: Column(
+                                                        children: [
+                                                          Stack(
+                                                            alignment: Alignment.bottomRight,
+                                                            children: [
+                                                              Container(
+                                                                width: 120,
+                                                                height: 120,
+                                                                decoration: BoxDecoration(
+                                                                  shape: BoxShape.circle,
+                                                                  gradient: LinearGradient(
+                                                                    colors: [Colors.blue.shade300, Colors.purple.shade300],
+                                                                    begin: Alignment.topLeft,
+                                                                    end: Alignment.bottomRight,
+                                                                  ),
+                                                                  boxShadow: [
+                                                                    BoxShadow(
+                                                                      color: Colors.black.withOpacity(0.1),
+                                                                      blurRadius: 15,
+                                                                      offset: Offset(0, 5),
+                                                                    ),
+                                                                  ],
+                                                                ),
+                                                                child: ClipOval(
+                                                                  child: _pickedImage != null
+                                                                      ? Image.file(
+                                                                    File(_pickedImage!.path),
+                                                                    fit: BoxFit.cover,
+                                                                    width: 120,
+                                                                    height: 120,
+                                                                  )
+                                                                      : (user.imagePath != null
+                                                                      ? Image.file(
+                                                                    File(user.imagePath!),
+                                                                    fit: BoxFit.cover,
+                                                                    width: 120,
+                                                                    height: 120,
+                                                                  )
+                                                                      : Icon(
+                                                                    Icons.person,
+                                                                    size: 60,
+                                                                    color: Colors.white.withOpacity(0.8),
+                                                                  )),
                                                                 ),
                                                               ),
-                                                            ),
-                                                            textAlign: TextAlign
-                                                                .start, // Ensure text starts at the beginning
-                                                          ),
-                                                        ),
-                                                      ],
-                                                    ),
-                                                    SizedBox(
-                                                      height: 20.sp,
-                                                    ),
-                                                    Padding(
-                                                      padding:
-                                                          EdgeInsets.all(12.sp),
-                                                      child: TextFormField(
-                                                        controller: _controller,
-                                                        decoration:
-                                                            InputDecoration(
-                                                          labelText:
-                                                              'Profile Name',
-                                                          suffixIcon:
-                                                              IconButton(
-                                                            icon: Icon(
-                                                                Icons.clear,
-                                                                size: 15.sp),
-                                                            onPressed: () {
-                                                              _controller
-                                                                  .clear();
-                                                            },
-                                                          ),
-                                                        ),
-                                                        style: TextStyle(
-                                                            color:
-                                                                Colors.black),
-                                                      ),
-                                                    ),
-                                                    SizedBox(
-                                                      height: 40.sp,
-                                                    ),
-                                                    ElevatedButton(
-                                                      style: ElevatedButton
-                                                          .styleFrom(
-                                                        backgroundColor: Colors
-                                                            .green, // Replace 'Colors.blue' with your desired color
-                                                      ),
-                                                      onPressed: () {
-                                                        String name =
-                                                            _controller.text;
-
-                                                        AppStore()
-                                                            .setUserName(name);
-                                                        _updateText();
-
-                                                        Navigator.pop(context);
-                                                      },
-                                                      child: Text('Save',
-                                                          style: TextStyle(
-                                                              color: Colors
-                                                                  .white)),
-                                                    ),
-                                                    SizedBox(
-                                                      height: 30.sp,
-                                                    ),
-                                                    Row(
-                                                      mainAxisAlignment:
-                                                          MainAxisAlignment
-                                                              .center,
-                                                      children: [
-                                                        Padding(
-                                                          padding:
-                                                              EdgeInsets.all(
-                                                                  12.sp),
-                                                          child:
-                                                              GestureDetector(
-                                                            onTap: () {
-                                                              Navigator.pop(
-                                                                  context);
-                                                            },
-                                                            child: Text.rich(
-                                                              TextSpan(
-                                                                text:
-                                                                    "Back to home",
-                                                                style: GoogleFonts
-                                                                    .radioCanada(
-                                                                  textStyle:
-                                                                      TextStyle(
-                                                                    color: Colors
-                                                                        .black,
-                                                                    fontSize:
-                                                                        15.sp,
-                                                                    // Adjust font size as needed
-                                                                    fontWeight:
-                                                                        FontWeight
-                                                                            .bold, // Adjust font weight as needed
+                                                              Positioned(
+                                                                bottom: 0,
+                                                                right: 0,
+                                                                child: GestureDetector(
+                                                                  onTap: () => _pickImageWithSetState(setState),  // Pass local setState
+                                                                  child: Container(
+                                                                    padding: EdgeInsets.all(8),
+                                                                    decoration: BoxDecoration(
+                                                                      color: Colors.white,
+                                                                      shape: BoxShape.circle,
+                                                                      boxShadow: [
+                                                                        BoxShadow(
+                                                                          color: Colors.black.withOpacity(0.2),
+                                                                          blurRadius: 10,
+                                                                        ),
+                                                                      ],
+                                                                    ),
+                                                                    child: Icon(
+                                                                      Icons.camera_alt,
+                                                                      color: Colors.blue.shade600,
+                                                                      size: 24,
+                                                                    ),
                                                                   ),
                                                                 ),
                                                               ),
-                                                              textAlign: TextAlign
-                                                                  .start, // Ensure text starts at the beginning
+                                                            ],
+                                                          ),
+                                                          SizedBox(height: 16),
+                                                          // Image Options as Chips
+                                                          Wrap(
+                                                            spacing: 12,
+                                                            runSpacing: 8,
+                                                            children: [
+                                                              ActionChip(
+                                                                avatar: Icon(Icons.camera_alt_outlined, size: 18, color: Colors.white),
+                                                                label: Text("Take Photo"),
+                                                                backgroundColor: ColorSelect.maineColor,
+                                                                onPressed: () => _pickImageWithSetState(setState, source: ImageSource.camera),  // Pass setState
+                                                                labelStyle: TextStyle(color: Colors.white, fontSize: 12.sp),
+                                                              ),
+                                                              ActionChip(
+                                                                avatar: Icon(Icons.photo_library_outlined, size: 18, color: Colors.white),
+                                                                label: Text("From Gallery"),
+                                                                backgroundColor: Colors.purple.shade600,
+                                                                onPressed: () => _pickImageWithSetState(setState, source: ImageSource.gallery),  // Pass setState
+                                                                labelStyle: TextStyle(color: Colors.white, fontSize: 12.sp),
+                                                              ),
+                                                            ],
+                                                          ),
+                                                          SizedBox(height: 24),
+                                                        ],
+                                                      ),
+                                                    ),
+                                                    // Divider
+                                                    Divider(height: 1, color: Colors.grey[300]),
+                                                    // Name Input
+                                                    Padding(
+                                                      padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                                      child: TextFormField(
+                                                        controller: _nameController,
+                                                        cursorColor: ColorSelect.maineColor,  // Cursor color black kar diya
+                                                        decoration: InputDecoration(
+                                                          labelText: 'Profile Name',
+                                                          labelStyle: TextStyle(color: Colors.grey[600]),
+                                                          prefixIcon: Icon(Icons.person_outline, color: Colors.grey[600]),
+                                                          suffixIcon: _nameController.text.isNotEmpty
+                                                              ? IconButton(
+                                                            icon: Icon(Icons.clear, size: 18, color: Colors.grey[600]),
+                                                            onPressed: () => _nameController.clear(),
+                                                          )
+                                                              : null,
+                                                          border: OutlineInputBorder(
+                                                            borderRadius: BorderRadius.circular(12),
+                                                            borderSide: BorderSide(color: Colors.grey[300]!),
+                                                          ),
+                                                          focusedBorder: OutlineInputBorder(
+                                                            borderRadius: BorderRadius.circular(12),
+                                                            borderSide: BorderSide(color: ColorSelect.maineColor, width: 2),
+                                                          ),
+                                                          filled: true,
+                                                          fillColor: Colors.grey[50],
+                                                        ),
+                                                        style: GoogleFonts.radioCanada(
+                                                          fontSize: 16.sp,
+                                                          color: Colors.black,
+                                                        ),
+                                                        onChanged: (value) => setState(() {}),  // Update suffix on change
+                                                      ),
+                                                    ),
+                                                    // Save Button
+                                                    Padding(
+                                                      padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
+                                                      child: SizedBox(
+                                                        width: double.infinity,
+                                                        height: 52,
+                                                        child: ElevatedButton(
+                                                          style: ElevatedButton.styleFrom(
+                                                            backgroundColor: ColorSelect.maineColor,
+                                                            foregroundColor: Colors.white,
+                                                            shape: RoundedRectangleBorder(
+                                                              borderRadius: BorderRadius.circular(16),
                                                             ),
+                                                            elevation: 2,
+                                                            shadowColor: Colors.green.withOpacity(0.3),
+                                                          ),
+                                                          onPressed: () {
+                                                            user.updateUser(
+                                                              _nameController.text.isEmpty ? user.name : _nameController.text,
+                                                              _pickedImage?.path ?? user.imagePath,
+                                                            );
+                                                            Navigator.pop(context);
+                                                          },
+                                                          child: Row(
+                                                            mainAxisAlignment: MainAxisAlignment.center,
+                                                            children: [
+                                                              Icon(Icons.save, size: 20),
+                                                              SizedBox(width: 8),
+                                                              Text(
+                                                                'Save Changes',
+                                                                style: GoogleFonts.radioCanada(
+                                                                  fontSize: 16.sp,
+                                                                  fontWeight: FontWeight.w600,
+                                                                ),
+                                                              ),
+                                                            ],
                                                           ),
                                                         ),
-                                                      ],
-                                                    ),
-                                                    SizedBox(
-                                                      height: 10.sp,
+                                                      ),
                                                     ),
                                                   ],
                                                 ),
                                               ),
-                                            );
-                                          },
-                                        );
-                                      },
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
+                                  );
+
+                                },
+
+                                child: Stack(
+                                  children: [
+                                    ClipOval(
                                       child: Container(
-                                        width: 20.sp,
-                                        height: 20.sp,
+                                        width: 70.sp,
+                                        height: 70.sp,
                                         decoration: BoxDecoration(
-                                          color: Colors.white,
                                           shape: BoxShape.circle,
-                                          boxShadow: [
-                                            BoxShadow(
-                                              color: ColorSelect.maineColor
-                                                  .withOpacity(0.6),
-                                              // Shadow color
-                                              spreadRadius: 2,
-                                              blurRadius: 10,
-                                              offset: Offset(0,
-                                                  -4), // Upar shadow ke liye negative Y
-                                            ),
-                                            BoxShadow(
-                                              color: ColorSelect.maineColor
-                                                  .withOpacity(0.6),
-                                              spreadRadius: 2,
-                                              blurRadius: 10,
-                                              offset: Offset(0,
-                                                  4), // Niche shadow ke liye positive Y
-                                            ),
-                                          ],
                                         ),
-                                        child: Icon(
-                                          Icons.edit,
-                                          size: 15.sp,
-                                          color: ColorSelect.maineColor,
+                                        child:
+                                            user.imagePath != null
+                                                ? CircleAvatar(
+                                                  radius: 60,
+                                                  backgroundImage: FileImage(
+                                                    File(user.imagePath!),
+                                                  ),
+                                                )
+                                                : const CircleAvatar(
+                                                  radius: 60,
+                                                  child: Icon(
+                                                    Icons.person,
+                                                    size: 60,
+                                                  ),
+                                                ),
+                                      ),
+                                    ),
+                                    Positioned(
+                                      bottom: 2,
+                                      right: 1,
+                                      child: GestureDetector(
+                                        onTap: () {
+                                          showModalBottomSheet(
+                                            context: context,
+                                            isScrollControlled: true,
+                                            backgroundColor: Colors.transparent,
+                                            builder: (BuildContext context) {
+                                              return StatefulBuilder(
+                                                builder: (context, setState) {  // Local setState for bottom sheet
+                                                  return Container(
+                                                    decoration: BoxDecoration(
+                                                      color: Colors.white,
+                                                      borderRadius: BorderRadius.vertical(top: Radius.circular(30)),
+                                                      boxShadow: [
+                                                        BoxShadow(
+                                                          color: Colors.black.withOpacity(0.1),
+                                                          blurRadius: 20,
+                                                          offset: Offset(0, -5),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    child: SingleChildScrollView(  // Add scroll for keyboard handling
+                                                      child: Padding(
+                                                        padding: EdgeInsets.only(
+                                                          bottom: MediaQuery.of(context).viewInsets.bottom + 20,  // Dynamic padding for keyboard
+                                                        ),
+                                                        child: Column(
+                                                          mainAxisSize: MainAxisSize.min,
+                                                          children: [
+                                                            // Drag Handle
+                                                            Container(
+                                                              margin: EdgeInsets.only(top: 10, bottom: 20),
+                                                              width: 40,
+                                                              height: 4,
+                                                              decoration: BoxDecoration(
+                                                                color: Colors.grey.withOpacity(0.3),
+                                                                borderRadius: BorderRadius.circular(2),
+                                                              ),
+                                                            ),
+                                                            // Header
+                                                            Padding(
+                                                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 8),
+                                                              child: Row(
+                                                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                                                children: [
+                                                                  Text(
+                                                                    "Edit Profile",
+                                                                    style: GoogleFonts.radioCanada(
+                                                                      textStyle: TextStyle(
+                                                                        color: Colors.black,
+                                                                        fontSize: 20.sp,
+                                                                        fontWeight: FontWeight.w600,
+                                                                      ),
+                                                                    ),
+                                                                  ),
+                                                                  IconButton(
+                                                                    onPressed: () => Navigator.pop(context),
+                                                                    icon: Icon(Icons.close, color: Colors.grey[600], size: 24),
+                                                                  ),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                            // Profile Image Section
+                                                            Container(
+                                                              padding: EdgeInsets.symmetric(horizontal: 24),
+                                                              child: Column(
+                                                                children: [
+                                                                  Stack(
+                                                                    alignment: Alignment.bottomRight,
+                                                                    children: [
+                                                                      Container(
+                                                                        width: 120,
+                                                                        height: 120,
+                                                                        decoration: BoxDecoration(
+                                                                          shape: BoxShape.circle,
+                                                                          gradient: LinearGradient(
+                                                                            colors: [Colors.blue.shade300, Colors.purple.shade300],
+                                                                            begin: Alignment.topLeft,
+                                                                            end: Alignment.bottomRight,
+                                                                          ),
+                                                                          boxShadow: [
+                                                                            BoxShadow(
+                                                                              color: Colors.black.withOpacity(0.1),
+                                                                              blurRadius: 15,
+                                                                              offset: Offset(0, 5),
+                                                                            ),
+                                                                          ],
+                                                                        ),
+                                                                        child: ClipOval(
+                                                                          child: _pickedImage != null
+                                                                              ? Image.file(
+                                                                            File(_pickedImage!.path),
+                                                                            fit: BoxFit.cover,
+                                                                            width: 120,
+                                                                            height: 120,
+                                                                          )
+                                                                              : (user.imagePath != null
+                                                                              ? Image.file(
+                                                                            File(user.imagePath!),
+                                                                            fit: BoxFit.cover,
+                                                                            width: 120,
+                                                                            height: 120,
+                                                                          )
+                                                                              : Icon(
+                                                                            Icons.person,
+                                                                            size: 60,
+                                                                            color: Colors.white.withOpacity(0.8),
+                                                                          )),
+                                                                        ),
+                                                                      ),
+                                                                      Positioned(
+                                                                        bottom: 0,
+                                                                        right: 0,
+                                                                        child: GestureDetector(
+                                                                          onTap: () => _pickImageWithSetState(setState),  // Pass local setState
+                                                                          child: Container(
+                                                                            padding: EdgeInsets.all(8),
+                                                                            decoration: BoxDecoration(
+                                                                              color: Colors.white,
+                                                                              shape: BoxShape.circle,
+                                                                              boxShadow: [
+                                                                                BoxShadow(
+                                                                                  color: Colors.black.withOpacity(0.2),
+                                                                                  blurRadius: 10,
+                                                                                ),
+                                                                              ],
+                                                                            ),
+                                                                            child: Icon(
+                                                                              Icons.camera_alt,
+                                                                              color: Colors.blue.shade600,
+                                                                              size: 24,
+                                                                            ),
+                                                                          ),
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                  SizedBox(height: 16),
+                                                                  // Image Options as Chips
+                                                                  Wrap(
+                                                                    spacing: 12,
+                                                                    runSpacing: 8,
+                                                                    children: [
+                                                                      ActionChip(
+                                                                        avatar: Icon(Icons.camera_alt_outlined, size: 18, color: Colors.white),
+                                                                        label: Text("Take Photo"),
+                                                                        backgroundColor: Colors.blue.shade600,
+                                                                        onPressed: () => _pickImageWithSetState(setState, source: ImageSource.camera),  // Pass setState
+                                                                        labelStyle: TextStyle(color: Colors.white, fontSize: 12.sp),
+                                                                      ),
+                                                                      ActionChip(
+                                                                        avatar: Icon(Icons.photo_library_outlined, size: 18, color: Colors.white),
+                                                                        label: Text("From Gallery"),
+                                                                        backgroundColor: Colors.purple.shade600,
+                                                                        onPressed: () => _pickImageWithSetState(setState, source: ImageSource.gallery),  // Pass setState
+                                                                        labelStyle: TextStyle(color: Colors.white, fontSize: 12.sp),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                  SizedBox(height: 24),
+                                                                ],
+                                                              ),
+                                                            ),
+                                                            // Divider
+                                                            Divider(height: 1, color: Colors.grey[300]),
+                                                            // Name Input
+                                                            Padding(
+                                                              padding: EdgeInsets.symmetric(horizontal: 24, vertical: 16),
+                                                              child: TextFormField(
+                                                                controller: _nameController,
+                                                                decoration: InputDecoration(
+                                                                  labelText: 'Profile Name',
+                                                                  labelStyle: TextStyle(color: Colors.grey[600]),
+                                                                  prefixIcon: Icon(Icons.person_outline, color: Colors.grey[600]),
+                                                                  suffixIcon: _nameController.text.isNotEmpty
+                                                                      ? IconButton(
+                                                                    icon: Icon(Icons.clear, size: 18, color: Colors.grey[600]),
+                                                                    onPressed: () => _nameController.clear(),
+                                                                  )
+                                                                      : null,
+                                                                  border: OutlineInputBorder(
+                                                                    borderRadius: BorderRadius.circular(12),
+                                                                    borderSide: BorderSide(color: Colors.grey[300]!),
+                                                                  ),
+                                                                  focusedBorder: OutlineInputBorder(
+                                                                    borderRadius: BorderRadius.circular(12),
+                                                                    borderSide: BorderSide(color: Colors.blue.shade600, width: 2),
+                                                                  ),
+                                                                  filled: true,
+                                                                  fillColor: Colors.grey[50],
+                                                                ),
+                                                                style: GoogleFonts.radioCanada(
+                                                                  fontSize: 16.sp,
+                                                                  color: Colors.black,
+                                                                ),
+                                                                onChanged: (value) => setState(() {}),  // Update suffix on change
+                                                              ),
+                                                            ),
+                                                            // Save Button
+                                                            Padding(
+                                                              padding: EdgeInsets.fromLTRB(24, 0, 24, 32),
+                                                              child: SizedBox(
+                                                                width: double.infinity,
+                                                                height: 52,
+                                                                child: ElevatedButton(
+                                                                  style: ElevatedButton.styleFrom(
+                                                                    backgroundColor: Colors.green.shade600,
+                                                                    foregroundColor: Colors.white,
+                                                                    shape: RoundedRectangleBorder(
+                                                                      borderRadius: BorderRadius.circular(16),
+                                                                    ),
+                                                                    elevation: 2,
+                                                                    shadowColor: Colors.green.withOpacity(0.3),
+                                                                  ),
+                                                                  onPressed: () {
+                                                                    user.updateUser(
+                                                                      _nameController.text.isEmpty ? user.name : _nameController.text,
+                                                                      _pickedImage?.path ?? user.imagePath,
+                                                                    );
+                                                                    Navigator.pop(context);
+                                                                  },
+                                                                  child: Row(
+                                                                    mainAxisAlignment: MainAxisAlignment.center,
+                                                                    children: [
+                                                                      Icon(Icons.save, size: 20),
+                                                                      SizedBox(width: 8),
+                                                                      Text(
+                                                                        'Save Changes',
+                                                                        style: GoogleFonts.radioCanada(
+                                                                          fontSize: 16.sp,
+                                                                          fontWeight: FontWeight.w600,
+                                                                        ),
+                                                                      ),
+                                                                    ],
+                                                                  ),
+                                                                ),
+                                                              ),
+                                                            ),
+                                                          ],
+                                                        ),
+                                                      ),
+                                                    ),
+                                                  );
+                                                },
+                                              );
+                                            },
+                                          );
+
+                                        },
+                                        child: Container(
+                                          width: 20.sp,
+                                          height: 20.sp,
+                                          decoration: BoxDecoration(
+                                            color: Colors.white,
+                                            shape: BoxShape.circle,
+                                            boxShadow: [
+                                              BoxShadow(
+                                                color: ColorSelect.maineColor
+                                                    .withOpacity(0.6),
+                                                // Shadow color
+                                                spreadRadius: 2,
+                                                blurRadius: 10,
+                                                offset: Offset(
+                                                  0,
+                                                  -4,
+                                                ), // Upar shadow ke liye negative Y
+                                              ),
+                                              BoxShadow(
+                                                color: ColorSelect.maineColor
+                                                    .withOpacity(0.6),
+                                                spreadRadius: 2,
+                                                blurRadius: 10,
+                                                offset: Offset(
+                                                  0,
+                                                  4,
+                                                ), // Niche shadow ke liye positive Y
+                                              ),
+                                            ],
+                                          ),
+                                          child: Icon(
+                                            Icons.edit,
+                                            size: 15.sp,
+                                            color: ColorSelect.maineColor,
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  )
-                                ],
+                                  ],
+                                ),
                               ),
                               Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: [
-                                  SizedBox(
-                                    height: 5.sp,
-                                  ),
+                                  SizedBox(height: 5.sp),
 
-                                  userName.isEmpty?
-                                  Text.rich(
-                                    TextSpan(
-                                      text: 'User',
-                                      style: GoogleFonts.radioCanada(
-                                        textStyle: TextStyle(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .secondary,
-                                          fontSize: 17.sp,
-                                          // Adjust font size as needed
-                                          fontWeight: FontWeight
-                                              .bold, // Adjust font weight as needed
+                                  user.name != null
+                                      ? Text.rich(
+                                        TextSpan(
+                                          text: user.name,
+                                          style: GoogleFonts.radioCanada(
+                                            textStyle: TextStyle(
+                                              color:
+                                                  Theme.of(
+                                                    context,
+                                                  ).colorScheme.secondary,
+                                              fontSize: 17.sp,
+                                              // Adjust font size as needed
+                                              fontWeight:
+                                                  FontWeight
+                                                      .bold, // Adjust font weight as needed
+                                            ),
+                                          ),
                                         ),
-                                      ),
-                                    ),
-                                    textAlign: TextAlign
-                                        .start, // Ensure text starts at the beginning
-                                  )
-
-                            : Text.rich(
-                                    TextSpan(
-                                      text: userName,
-                                      style: GoogleFonts.radioCanada(
-                                        textStyle: TextStyle(
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .secondary,
-                                          fontSize: 17.sp,
-                                          // Adjust font size as needed
-                                          fontWeight: FontWeight
-                                              .bold, // Adjust font weight as needed
+                                        textAlign:
+                                            TextAlign
+                                                .start, // Ensure text starts at the beginning
+                                      )
+                                      : Text.rich(
+                                        TextSpan(
+                                          text: 'User',
+                                          style: GoogleFonts.radioCanada(
+                                            textStyle: TextStyle(
+                                              color:
+                                                  Theme.of(
+                                                    context,
+                                                  ).colorScheme.secondary,
+                                              fontSize: 17.sp,
+                                              // Adjust font size as needed
+                                              fontWeight:
+                                                  FontWeight
+                                                      .bold, // Adjust font weight as needed
+                                            ),
+                                          ),
                                         ),
+                                        textAlign:
+                                            TextAlign
+                                                .start, // Ensure text starts at the beginning
                                       ),
-                                    ),
-                                    textAlign: TextAlign
-                                        .start, // Ensure text starts at the beginning
-                                  ),
 
                                   Text.rich(
                                     TextSpan(
@@ -629,17 +865,22 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                           color: Colors.grey,
                                           fontSize: 11.sp,
                                           // Adjust font size as needed
-                                          fontWeight: FontWeight
-                                              .w600, // Adjust font weight as needed
+                                          fontWeight:
+                                              FontWeight
+                                                  .w600, // Adjust font weight as needed
                                         ),
                                       ),
                                     ),
-                                    textAlign: TextAlign
-                                        .start, // Ensure text starts at the beginning
+                                    textAlign:
+                                        TextAlign
+                                            .start, // Ensure text starts at the beginning
                                   ),
                                   Padding(
                                     padding: EdgeInsets.only(
-                                        left: 50.sp, right: 50.sp, top: 10.sp),
+                                      left: 50.sp,
+                                      right: 50.sp,
+                                      top: 10.sp,
+                                    ),
                                     child: Container(
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(15),
@@ -672,13 +913,15 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                                   color: Colors.white,
                                                   fontSize: 13.sp,
                                                   // Adjust font size as needed
-                                                  fontWeight: FontWeight
-                                                      .bold, // Adjust font weight as needed
+                                                  fontWeight:
+                                                      FontWeight
+                                                          .bold, // Adjust font weight as needed
                                                 ),
                                               ),
                                             ),
-                                            textAlign: TextAlign
-                                                .start, // Ensure text starts at the beginning
+                                            textAlign:
+                                                TextAlign
+                                                    .start, // Ensure text starts at the beginning
                                           ),
                                         ],
                                       ),
@@ -717,8 +960,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               color: Colors.black,
                               fontSize: 16.sp,
                               // Adjust font size as needed
-                              fontWeight: FontWeight
-                                  .bold, // Adjust font weight as needed
+                              fontWeight:
+                                  FontWeight
+                                      .bold, // Adjust font weight as needed
                             ),
                           ),
                         ),
@@ -729,8 +973,9 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               color: Colors.grey,
                               fontSize: 12.sp,
                               // Adjust font size as needed
-                              fontWeight: FontWeight
-                                  .w700, // Adjust font weight as needed
+                              fontWeight:
+                                  FontWeight
+                                      .w700, // Adjust font weight as needed
                             ),
                           ),
                         ),
@@ -752,161 +997,173 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               );
                             },
                             child: Container(
-                                width: MediaQuery.of(context).size.width *
-                                    0.3, // Adjust width as needed
-                                padding: EdgeInsets.all(3.sp),
-                                child: Container(
-                                  height: 25.sp,
-                                  width:
-                                      MediaQuery.of(context).size.width * 0.35,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        HexColor('#2563eb'),
-                                        HexColor('#3b82f6'), // ending color
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10.sp),
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 30.sp,
-                                        height: 30.sp,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white24,
-                                          borderRadius:
-                                              BorderRadius.circular(10.sp),
-                                        ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(8.0),
-                                          child: Image.asset(
-                                            'assets/files.png',
-                                            color: Colors.white,
-                                            height: 25.sp,
-                                            width: 25.sp,
-                                          ),
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: EdgeInsets.only(
-                                            bottom: 0.sp, top: 3.sp),
-                                        child: Text(
-                                          '3.2 GB',
-                                          style: GoogleFonts.poppins(
-                                            textStyle: TextStyle(
-                                              fontSize: 12.sp,
-                                              fontWeight: FontWeight.w800,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: EdgeInsets.only(
-                                            bottom: 0.sp, top: 0.sp),
-                                        child: Text(
-                                          'File Manager',
-                                          style: GoogleFonts.poppins(
-                                            textStyle: TextStyle(
-                                              fontSize: 12.sp,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
+                              width:
+                                  MediaQuery.of(context).size.width *
+                                  0.3, // Adjust width as needed
+                              padding: EdgeInsets.all(3.sp),
+                              child: Container(
+                                height: 25.sp,
+                                width: MediaQuery.of(context).size.width * 0.35,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      HexColor('#2563eb'),
+                                      HexColor('#3b82f6'), // ending color
                                     ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
-                                )),
+                                  borderRadius: BorderRadius.circular(10.sp),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 30.sp,
+                                      height: 30.sp,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white24,
+                                        borderRadius: BorderRadius.circular(
+                                          10.sp,
+                                        ),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Image.asset(
+                                          'assets/files.png',
+                                          color: Colors.white,
+                                          height: 25.sp,
+                                          width: 25.sp,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: 0.sp,
+                                        top: 3.sp,
+                                      ),
+                                      child: Text(
+                                        '3.2 GB',
+                                        style: GoogleFonts.poppins(
+                                          textStyle: TextStyle(
+                                            fontSize: 12.sp,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: 0.sp,
+                                        top: 0.sp,
+                                      ),
+                                      child: Text(
+                                        'File Manager',
+                                        style: GoogleFonts.poppins(
+                                          textStyle: TextStyle(
+                                            fontSize: 12.sp,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                           GestureDetector(
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                  builder: (context) => AllVideosScreen(icon: 'AppBar',),
+                                  builder:
+                                      (context) =>
+                                          AllVideosScreen(icon: 'AppBar'),
                                 ),
                               );
                             },
                             child: Container(
-                                width: MediaQuery.of(context).size.width *
-                                    0.3, // Adjust width as needed
-                                padding: EdgeInsets.all(3.sp),
-                                child: Container(
-                                  height: 25.sp,
-                                  width:
-                                      MediaQuery.of(context).size.width * 0.35,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        HexColor('#f97316'),
-                                        HexColor('#eab308'),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10.sp),
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 30.sp,
-                                        height: 30.sp,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white24,
-                                          borderRadius:
-                                              BorderRadius.circular(10.sp),
-                                        ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(8.0),
-                                          child: Image.asset(
-                                            'assets/videos.png',
-                                            color: Colors.white,
-                                            height: 25.sp,
-                                            width: 25.sp,
-                                          ),
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: EdgeInsets.only(
-                                            bottom: 0.sp, top: 3.sp),
-                                        child: Text(
-                                          '3.2 GB',
-                                          style: GoogleFonts.poppins(
-                                            textStyle: TextStyle(
-                                              fontSize: 12.sp,
-                                              fontWeight: FontWeight.w800,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: EdgeInsets.only(
-                                            bottom: 0.sp, top: 0.sp),
-                                        child: Text(
-                                          'Videos',
-                                          style: GoogleFonts.poppins(
-                                            textStyle: TextStyle(
-                                              fontSize: 12.sp,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
+                              width:
+                                  MediaQuery.of(context).size.width *
+                                  0.3, // Adjust width as needed
+                              padding: EdgeInsets.all(3.sp),
+                              child: Container(
+                                height: 25.sp,
+                                width: MediaQuery.of(context).size.width * 0.35,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      HexColor('#f97316'),
+                                      HexColor('#eab308'),
                                     ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
-                                )),
+                                  borderRadius: BorderRadius.circular(10.sp),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 30.sp,
+                                      height: 30.sp,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white24,
+                                        borderRadius: BorderRadius.circular(
+                                          10.sp,
+                                        ),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Image.asset(
+                                          'assets/videos.png',
+                                          color: Colors.white,
+                                          height: 25.sp,
+                                          width: 25.sp,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: 0.sp,
+                                        top: 3.sp,
+                                      ),
+                                      child: Text(
+                                        '3.2 GB',
+                                        style: GoogleFonts.poppins(
+                                          textStyle: TextStyle(
+                                            fontSize: 12.sp,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: 0.sp,
+                                        top: 0.sp,
+                                      ),
+                                      child: Text(
+                                        'Videos',
+                                        style: GoogleFonts.poppins(
+                                          textStyle: TextStyle(
+                                            fontSize: 12.sp,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                           GestureDetector(
                             onTap: () {
@@ -918,62 +1175,69 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               );
                             },
                             child: Container(
-                                width: MediaQuery.of(context).size.width *
-                                    0.3, // Adjust width as needed
-                                padding: EdgeInsets.all(3.sp),
-                                child: Container(
-                                  height: 25.sp,
-                                  width:
-                                      MediaQuery.of(context).size.width * 0.35,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        HexColor('#dc2626'),
-                                        HexColor('#ef4444'),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10.sp),
+                              width:
+                                  MediaQuery.of(context).size.width *
+                                  0.3, // Adjust width as needed
+                              padding: EdgeInsets.all(3.sp),
+                              child: Container(
+                                height: 25.sp,
+                                width: MediaQuery.of(context).size.width * 0.35,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      HexColor('#dc2626'),
+                                      HexColor('#ef4444'),
+                                    ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 30.sp,
-                                        height: 30.sp,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white24,
-                                          borderRadius:
-                                              BorderRadius.circular(10.sp),
-                                        ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(8.0),
-                                          child: Image.asset(
-                                            'assets/image.png',
-                                            color: Colors.white,
-                                            height: 25.sp,
-                                            width: 25.sp,
-                                          ),
+                                  borderRadius: BorderRadius.circular(10.sp),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 30.sp,
+                                      height: 30.sp,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white24,
+                                        borderRadius: BorderRadius.circular(
+                                          10.sp,
                                         ),
                                       ),
-                                      Padding(
-                                        padding: EdgeInsets.only(
-                                            bottom: 0.sp, top: 3.sp),
-                                        child: _isLoading
-                                            ? SizedBox(
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Image.asset(
+                                          'assets/image.png',
+                                          color: Colors.white,
+                                          height: 25.sp,
+                                          width: 25.sp,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: 0.sp,
+                                        top: 3.sp,
+                                      ),
+                                      child:
+                                          _isLoading
+                                              ? SizedBox(
                                                 height: 10.sp,
                                                 width: 10.sp,
                                                 child: Center(
-                                                    child:
-                                                        CupertinoActivityIndicator(
-                                                  radius: 10,
-                                                  color: ColorSelect.maineColor,
-                                                  animating: true,
-                                                )))
-                                            : Text(
+                                                  child:
+                                                      CupertinoActivityIndicator(
+                                                        radius: 10,
+                                                        color:
+                                                            ColorSelect
+                                                                .maineColor,
+                                                        animating: true,
+                                                      ),
+                                                ),
+                                              )
+                                              : Text(
                                                 _totalEntitiesCount.toString(),
                                                 style: GoogleFonts.poppins(
                                                   textStyle: TextStyle(
@@ -983,109 +1247,118 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                                   ),
                                                 ),
                                               ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: 0.sp,
+                                        top: 0.sp,
                                       ),
-                                      Padding(
-                                        padding: EdgeInsets.only(
-                                            bottom: 0.sp, top: 0.sp),
-                                        child: Text(
-                                          'Images',
-                                          style: GoogleFonts.poppins(
-                                            textStyle: TextStyle(
-                                              fontSize: 12.sp,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
+                                      child: Text(
+                                        'Images',
+                                        style: GoogleFonts.poppins(
+                                          textStyle: TextStyle(
+                                            fontSize: 12.sp,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
                                           ),
                                         ),
                                       ),
-                                    ],
-                                  ),
-                                )),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                           GestureDetector(
                             onTap: () {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
-                                    builder: (context) =>
-                                        const HomeBottomNavigation(
-                                          bottomIndex: 1,
-                                        )),
+                                  builder:
+                                      (context) => const HomeBottomNavigation(
+                                        bottomIndex: 1,
+                                      ),
+                                ),
                               );
                             },
                             child: Container(
-                                width: MediaQuery.of(context).size.width *
-                                    0.3, // Adjust width as needed
-                                padding: EdgeInsets.all(3.sp),
-                                child: Container(
-                                  height: 25.sp,
-                                  width:
-                                      MediaQuery.of(context).size.width * 0.35,
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      colors: [
-                                        HexColor('#7e22ce'),
-                                        HexColor('#9333ea'),
-                                      ],
-                                      begin: Alignment.topLeft,
-                                      end: Alignment.bottomRight,
-                                    ),
-                                    borderRadius: BorderRadius.circular(10.sp),
-                                  ),
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.center,
-                                    children: [
-                                      Container(
-                                        width: 30.sp,
-                                        height: 30.sp,
-                                        decoration: BoxDecoration(
-                                          color: Colors.white24,
-                                          borderRadius:
-                                              BorderRadius.circular(10.sp),
-                                        ),
-                                        child: Padding(
-                                          padding: const EdgeInsets.all(8.0),
-                                          child: Image.asset(
-                                            'assets/musics.png',
-                                            color: Colors.white,
-                                            height: 25.sp,
-                                            width: 25.sp,
-                                          ),
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: EdgeInsets.only(
-                                            bottom: 0.sp, top: 3.sp),
-                                        child: Text(
-                                          '3.2 GB',
-                                          style: GoogleFonts.poppins(
-                                            textStyle: TextStyle(
-                                              fontSize: 12.sp,
-                                              fontWeight: FontWeight.w800,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: EdgeInsets.only(
-                                            bottom: 0.sp, top: 0.sp),
-                                        child: Text(
-                                          'Music',
-                                          style: GoogleFonts.poppins(
-                                            textStyle: TextStyle(
-                                              fontSize: 12.sp,
-                                              fontWeight: FontWeight.w600,
-                                              color: Colors.white,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
+                              width:
+                                  MediaQuery.of(context).size.width *
+                                  0.3, // Adjust width as needed
+                              padding: EdgeInsets.all(3.sp),
+                              child: Container(
+                                height: 25.sp,
+                                width: MediaQuery.of(context).size.width * 0.35,
+                                decoration: BoxDecoration(
+                                  gradient: LinearGradient(
+                                    colors: [
+                                      HexColor('#7e22ce'),
+                                      HexColor('#9333ea'),
                                     ],
+                                    begin: Alignment.topLeft,
+                                    end: Alignment.bottomRight,
                                   ),
-                                )),
+                                  borderRadius: BorderRadius.circular(10.sp),
+                                ),
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  crossAxisAlignment: CrossAxisAlignment.center,
+                                  children: [
+                                    Container(
+                                      width: 30.sp,
+                                      height: 30.sp,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white24,
+                                        borderRadius: BorderRadius.circular(
+                                          10.sp,
+                                        ),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(8.0),
+                                        child: Image.asset(
+                                          'assets/musics.png',
+                                          color: Colors.white,
+                                          height: 25.sp,
+                                          width: 25.sp,
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: 0.sp,
+                                        top: 3.sp,
+                                      ),
+                                      child: Text(
+                                        '3.2 GB',
+                                        style: GoogleFonts.poppins(
+                                          textStyle: TextStyle(
+                                            fontSize: 12.sp,
+                                            fontWeight: FontWeight.w800,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: EdgeInsets.only(
+                                        bottom: 0.sp,
+                                        top: 0.sp,
+                                      ),
+                                      child: Text(
+                                        'Music',
+                                        style: GoogleFonts.poppins(
+                                          textStyle: TextStyle(
+                                            fontSize: 12.sp,
+                                            fontWeight: FontWeight.w600,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
                           ),
                         ],
                       ),
@@ -1221,7 +1494,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     //     ),
                     //   ),
                     // ),
-
                     SizedBox(height: 16),
                     // Quick Actions
                     Text(
@@ -1260,9 +1532,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
                               mainAxisAlignment: MainAxisAlignment.start,
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                SizedBox(
-                                  height: 5.sp,
-                                ),
+                                SizedBox(height: 5.sp),
+
                                 // ListTile(
                                 //   trailing: Icon(
                                 //     Icons.arrow_forward_ios,
@@ -1542,11 +1813,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 //   thickness: 1.sp,
                                 //   color: Colors.grey.shade100,
                                 // ),
-
-
                                 ListTile(
-                                  trailing: Icon(Icons.arrow_forward_ios,
-                                      color: Colors.grey, size: 17.sp),
+                                  trailing: Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: Colors.grey,
+                                    size: 17.sp,
+                                  ),
                                   leading: Container(
                                     height: 35.sp,
                                     width: 35.sp,
@@ -1562,11 +1834,15 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                       ),
                                     ),
                                     padding: EdgeInsets.all(0.sp),
-                                    child: Icon(Icons.notifications_none, color: Colors.white),
+                                    child: Icon(
+                                      Icons.notifications_none,
+                                      color: Colors.white,
+                                    ),
                                   ),
                                   title: Column(
                                     mainAxisAlignment: MainAxisAlignment.start,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Notifications',
@@ -1594,25 +1870,23 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                     Navigator.push(
                                       context,
                                       MaterialPageRoute(
-                                        builder: (context) => NotificationScreen(),
+                                        builder:
+                                            (context) => NotificationScreen(),
                                       ),
                                     );
                                   },
                                 ),
-
-
-
-
-
-
 
                                 Divider(
                                   thickness: 1.sp,
                                   color: Colors.grey.shade100,
                                 ),
                                 ListTile(
-                                  trailing: Icon(Icons.arrow_forward_ios,
-                                      color: Colors.grey, size: 17.sp),
+                                  trailing: Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: Colors.grey,
+                                    size: 17.sp,
+                                  ),
                                   leading: Container(
                                     decoration: BoxDecoration(
                                       borderRadius: BorderRadius.circular(12),
@@ -1633,7 +1907,8 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   ),
                                   title: Column(
                                     mainAxisAlignment: MainAxisAlignment.start,
-                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
                                     children: [
                                       Text(
                                         'Privacy',
@@ -1658,8 +1933,13 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                     ],
                                   ),
                                   onTap: () async {
-                                    final Uri _url = Uri.parse('https://www.freeprivacypolicy.com/live/3a47e749-0364-44f5-8cc3-559f2cd90336');
-                                    if (!await launchUrl(_url, mode: LaunchMode.externalApplication)) {
+                                    final Uri _url = Uri.parse(
+                                      'https://www.freeprivacypolicy.com/live/3a47e749-0364-44f5-8cc3-559f2cd90336',
+                                    );
+                                    if (!await launchUrl(
+                                      _url,
+                                      mode: LaunchMode.externalApplication,
+                                    )) {
                                       throw 'Could not launch $_url';
                                     }
                                   },
@@ -1669,10 +1949,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   color: Colors.grey.shade100,
                                 ),
 
-
                                 ListTile(
-                                  trailing: Icon(Icons.arrow_forward_ios,
-                                      color: Colors.grey, size: 17.sp),
+                                  trailing: Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: Colors.grey,
+                                    size: 17.sp,
+                                  ),
                                   leading: Container(
                                     height: 35.sp,
                                     width: 35.sp,
@@ -1681,8 +1963,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                       color: Colors.blue.shade50,
                                     ),
                                     padding: EdgeInsets.all(10.sp),
-                                    child: Icon(Icons.share,
-                                        color: Colors.blue, size: 17.sp),
+                                    child: Icon(
+                                      Icons.share,
+                                      color: Colors.blue,
+                                      size: 17.sp,
+                                    ),
                                   ),
                                   title: Column(
                                     mainAxisAlignment: MainAxisAlignment.start,
@@ -1724,8 +2009,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                 ),
 
                                 ListTile(
-                                  trailing: Icon(Icons.arrow_forward_ios,
-                                      color: Colors.grey, size: 17.sp),
+                                  trailing: Icon(
+                                    Icons.arrow_forward_ios,
+                                    color: Colors.grey,
+                                    size: 17.sp,
+                                  ),
                                   leading: Container(
                                     height: 35.sp,
                                     width: 35.sp,
@@ -1734,8 +2022,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                       color: Colors.red.shade50,
                                     ),
                                     padding: EdgeInsets.all(10.sp),
-                                    child: Icon(HeroIcons.paint_brush,
-                                        color: Colors.red, size: 17.sp),
+                                    child: Icon(
+                                      HeroIcons.paint_brush,
+                                      color: Colors.red,
+                                      size: 17.sp,
+                                    ),
                                   ),
                                   title: Column(
                                     mainAxisAlignment: MainAxisAlignment.start,
@@ -1769,10 +2060,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                       context: context,
                                       shape: const RoundedRectangleBorder(
                                         borderRadius: BorderRadius.vertical(
-                                            top: Radius.circular(20)),
+                                          top: Radius.circular(20),
+                                        ),
                                       ),
-                                      builder: (context) =>
-                                          const ColorPickerBottomSheet(),
+                                      builder:
+                                          (context) =>
+                                              const ColorPickerBottomSheet(),
                                     );
                                   },
                                 ),
@@ -1784,11 +2077,20 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                   trailing: Transform.scale(
                                     scale: 0.8,
                                     child: Switch(
-                                      value: themeProvider.themeDataStyle == ThemeDataStyle.dark ? true : false,
-                                      activeColor: ColorSelect.maineColor,          // ON hone par thumb ka color
-                                      activeTrackColor: ColorSelect.maineColor.withOpacity(0.6), // ON hone par track ka color
-                                      inactiveThumbColor: Colors.black,  // OFF hone par thumb ka color
-                                      inactiveTrackColor: Colors.black26, // OFF hone par track ka halka color
+                                      value:
+                                          themeProvider.themeDataStyle ==
+                                                  ThemeDataStyle.dark
+                                              ? true
+                                              : false,
+                                      activeColor: ColorSelect.maineColor,
+                                      // ON hone par thumb ka color
+                                      activeTrackColor: ColorSelect.maineColor
+                                          .withOpacity(0.6),
+                                      // ON hone par track ka color
+                                      inactiveThumbColor: Colors.black,
+                                      // OFF hone par thumb ka color
+                                      inactiveTrackColor: Colors.black26,
+                                      // OFF hone par track ka halka color
                                       onChanged: (isOn) {
                                         themeProvider.changeTheme();
                                       },
@@ -1802,8 +2104,11 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                       color: Colors.blueGrey.shade50,
                                     ),
                                     padding: EdgeInsets.all(10.sp),
-                                    child: Icon(Icons.nightlight_round,
-                                        color: Colors.blueGrey, size: 17.sp),
+                                    child: Icon(
+                                      Icons.nightlight_round,
+                                      color: Colors.blueGrey,
+                                      size: 17.sp,
+                                    ),
                                   ),
                                   title: Column(
                                     mainAxisAlignment: MainAxisAlignment.start,
@@ -1837,16 +2142,16 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                       context: context,
                                       shape: const RoundedRectangleBorder(
                                         borderRadius: BorderRadius.vertical(
-                                            top: Radius.circular(20)),
+                                          top: Radius.circular(20),
+                                        ),
                                       ),
-                                      builder: (context) =>
-                                          const ColorPickerBottomSheet(),
+                                      builder:
+                                          (context) =>
+                                              const ColorPickerBottomSheet(),
                                     );
                                   },
                                 ),
-                                SizedBox(
-                                  height: 5.sp,
-                                ),
+                                SizedBox(height: 5.sp),
                               ],
                             ),
                           ),
@@ -1857,7 +2162,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                 ),
               ),
               SizedBox(height: 80.sp),
-
             ],
           ),
         ),
@@ -1865,9 +2169,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
     );
   }
 
-  Future getImage(
-    ImageSource img,
-  ) async {
+  Future getImage(ImageSource img) async {
     setState(() {
       _loading = true; // Show progress indicator
     });
@@ -1876,12 +2178,12 @@ class _UserProfilePageState extends State<UserProfilePage> {
     XFile? pickedFile = await imagePicker
         .pickImage(source: ImageSource.gallery)
         .catchError((err) {
-      Fluttertoast.showToast(msg: err.toString());
-      setState(() {
-        _loading = false; // Hide progress indicator
-      });
-      return null;
-    });
+          Fluttertoast.showToast(msg: err.toString());
+          setState(() {
+            _loading = false; // Hide progress indicator
+          });
+          return null;
+        });
     File? image;
     if (pickedFile != null) {
       image = File(pickedFile.path);
@@ -1954,74 +2256,80 @@ class _ProfileQuickActionListState extends State<ProfileQuickActionList> {
             return GestureDetector(
               onTap: () {
                 Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => ComingSoonScreen(title: items[index].text.toString(),),
-                    ));
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => ComingSoonScreen(
+                          title: items[index].text.toString(),
+                        ),
+                  ),
+                );
               },
               child: Container(
-                  width: MediaQuery.of(context).size.width *
-                      0.25, // Adjust width as needed
-                  padding: EdgeInsets.all(3.sp),
-                  child: Container(
-                    height: 25.sp,
-                    width: MediaQuery.of(context).size.width * 0.25,
-                    // decoration: BoxDecoration(
-                    //   gradient: LinearGradient(
-                    //     colors: [
-                    //       items[index].color, // starting color
-                    //       items[index].color2, // ending color
-                    //     ],
-                    //     begin: Alignment.topLeft,
-                    //     end: Alignment.bottomRight,
-                    //   ),
-                    //   borderRadius: BorderRadius.circular(10.sp),
-                    //
-                    // ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        Container(
-                          width: 50.sp,
-                          height: 50.sp,
-                          decoration: BoxDecoration(
-                            gradient: LinearGradient(
-                              colors: [
-                                items[index].color, // starting color
-                                items[index].color2, // ending color
-                              ],
-                              begin: Alignment.topLeft,
-                              end: Alignment.bottomRight,
-                            ),
-                            borderRadius: BorderRadius.circular(10.sp),
+                width:
+                    MediaQuery.of(context).size.width *
+                    0.25, // Adjust width as needed
+                padding: EdgeInsets.all(3.sp),
+                child: Container(
+                  height: 25.sp,
+                  width: MediaQuery.of(context).size.width * 0.25,
+                  // decoration: BoxDecoration(
+                  //   gradient: LinearGradient(
+                  //     colors: [
+                  //       items[index].color, // starting color
+                  //       items[index].color2, // ending color
+                  //     ],
+                  //     begin: Alignment.topLeft,
+                  //     end: Alignment.bottomRight,
+                  //   ),
+                  //   borderRadius: BorderRadius.circular(10.sp),
+                  //
+                  // ),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 50.sp,
+                        height: 50.sp,
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              items[index].color, // starting color
+                              items[index].color2, // ending color
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
                           ),
-                          child: Padding(
-                            padding: EdgeInsets.all(12.sp),
-                            child: Image.asset(
-                              items[index].imageUrl,
-                              color: Colors.white,
-                              height: 25.sp,
-                              width: 25.sp,
+                          borderRadius: BorderRadius.circular(10.sp),
+                        ),
+                        child: Padding(
+                          padding: EdgeInsets.all(12.sp),
+                          child: Image.asset(
+                            items[index].imageUrl,
+                            color: Colors.white,
+                            height: 25.sp,
+                            width: 25.sp,
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.only(bottom: 0.sp, top: 10.sp),
+                        child: Text(
+                          items[index].text,
+                          style: GoogleFonts.poppins(
+                            textStyle: TextStyle(
+                              fontSize: 12.sp,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.black,
                             ),
                           ),
                         ),
-                        Padding(
-                          padding: EdgeInsets.only(bottom: 0.sp, top: 10.sp),
-                          child: Text(
-                            items[index].text,
-                            style: GoogleFonts.poppins(
-                              textStyle: TextStyle(
-                                fontSize: 12.sp,
-                                fontWeight: FontWeight.w600,
-                                color: Colors.black,
-                              ),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  )),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             );
           },
         ),
