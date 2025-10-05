@@ -3,6 +3,7 @@ import 'package:carousel_slider/carousel_slider.dart' show CarouselOptions, Caro
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' hide AnimatedScale;
+import 'package:flutter_media_delete/flutter_media_delete.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
@@ -214,6 +215,36 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
       }
     }
   }
+
+  Future<void> _deleteFolder(String path) async {
+    try {
+      final dir = Directory(path);
+
+      if (await dir.exists()) {
+        await dir.delete(recursive: true); // deletes folder + contents
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Folder deleted successfully")),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Folder not found")),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Error deleting folder: $e")),
+        );
+      }
+    } finally {
+      _loadVideos(); // reload list after deletion
+    }
+  }
+
 
   @override
   void didChangeDependencies() {
@@ -506,9 +537,21 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
                     });
 
                   }),
-                  _buildOptionCard(context, Icons.delete, 'Delete',Theme.of(context).colorScheme.error, onTap: () {
+                  _buildOptionCard(
+                    context,
+                    Icons.delete,
+                    'Delete',
+                    Theme.of(context).colorScheme.error,
+                    onTap: () async {
+                      Navigator.pop(context);
+                      _deleteFolder(location);
+                      // await deleteFolderWithVideosLight(context, folderName, videos);
+                      _loadRecentlyPlayed(); // refresh UI
+                    },
+                  ),
 
-                  },),
+
+
                   _buildOptionCard(context, Icons.info_outline,'Info',Theme.of(context).colorScheme.secondary, onTap: () {
                     Navigator.pop(context);
                     showFolderInfoDialog(context, folderName: folderName, size: formattedSize, location: location, modifiedDate: date, videos: videos);
@@ -588,6 +631,8 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
       ),
     );
   }
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
