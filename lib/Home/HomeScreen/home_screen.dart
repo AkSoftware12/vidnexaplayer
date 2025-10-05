@@ -3,7 +3,6 @@ import 'package:carousel_slider/carousel_slider.dart' show CarouselOptions, Caro
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart' hide AnimatedScale;
-import 'package:flutter_media_delete/flutter_media_delete.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';

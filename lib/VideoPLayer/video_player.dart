@@ -17,11 +17,11 @@ import '../Utils/color.dart';
 import 'custom_video_appBar.dart';
 
 class VideoPlayerScreen extends StatefulWidget {
-  final List<FileSystemEntity>? videos; // Made optional to support URL-only use case
+  final List<FileSystemEntity>?videos;
   final int initialIndex;
   final String? url;
 
-  VideoPlayerScreen({this.videos, this.initialIndex = 0, this.url});
+  const VideoPlayerScreen({this.videos, this.initialIndex = 0, this.url});
 
   @override
   _VideoPlayerScreenState createState() => _VideoPlayerScreenState();
@@ -37,32 +37,33 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
   double _playbackSpeed = 1.0;
   bool _showControls = false;
   Timer? _hideControlsTimer;
-  bool _isMuted = false;  // Track mute state
+  bool _isMuted = false; // Track mute state
   bool _isZoomedIn = false;
-  double _scale = 1.5; // Default scale (fit screen)
+  double _scale = 1.0; // Default scale (fit screen)
   ScreenshotController screenshotController = ScreenshotController();
   double _brightness = 1.0; // default Light
   ThemeMode _themeMode = ThemeMode.light;
   bool _isLocked = false; // Add this as a state variable in your StatefulWidget
   bool _isVolumeOn = true;
+  bool _isHDR = false;
+  String _selectedOption = 'HDR'; // Default selection
 
   // List of zoom levels
   // Zoom levels (double ke saath ek "null" stretch ke liye)
   final List<double?> _zoomLevels = [1.0, 5.0, 10.0, 15.0, null];
-// null => stretch mode
+
+  // null => stretch mode
 
   final List<IconData> _zoomIcons = [
-    Icons.fit_screen,     // for 1.0
-    Icons.crop_square,    // for 5.0
-    Icons.zoom_out_map,   // for 15.0
-    Icons.crop,           // for 20.0
-    Icons.open_in_full,   // for stretch
+    Icons.fit_screen, // for 1.0
+    Icons.crop_square, // for 5.0
+    Icons.zoom_out_map, // for 15.0
+    Icons.crop, // for 20.0
+    Icons.open_in_full, // for stretch
   ];
 
   int _currentZoomIndex = 0;
   bool _isStretch = false;
-
-
 
   @override
   void initState() {
@@ -87,12 +88,16 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
-  Future<void> _initializePlayer(String source, {required bool isNetwork}) async {
+  Future<void> _initializePlayer(
+    String source, {
+    required bool isNetwork,
+  }) async {
     try {
       // Initialize controller based on source type (network or file)
-      _videoPlayerController = isNetwork
-          ? VideoPlayerController.networkUrl(Uri.parse(source))
-          : VideoPlayerController.file(File(source));
+      _videoPlayerController =
+          isNetwork
+              ? VideoPlayerController.networkUrl(Uri.parse(source))
+              : VideoPlayerController.file(File(source));
 
       await _videoPlayerController.initialize();
       _videoPlayerController.addListener(() {
@@ -105,6 +110,11 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
       // Save the video to recently played list
       await RecentlyPlayedManager.addVideo(source);
+
+      // Check HDR detection (simple check based on format)
+      if (_videoPlayerController.dataSource.toLowerCase().contains("hdr")) {
+        _isHDR = true;
+      }
 
       setState(() {
         _isControllerInitialized = true;
@@ -174,7 +184,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
-
   void _toggleLock() {
     setState(() {
       _isLocked = !_isLocked;
@@ -189,7 +198,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       fontSize: 16.0,
     );
   }
-// 📸 Screenshot function (Gallery me save hoga)
+
+  // 📸 Screenshot function (Gallery me save hoga)
   Future<void> _takeScreenshot() async {
     try {
       final image = await screenshotController.capture();
@@ -225,9 +235,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
-  void _editVideo() {
-    print('Edit video');
-  }
+
 
   void _toggleAudio() {
     setState(() {
@@ -249,7 +257,10 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
           builder: (context, setDialogState) {
             return Dialog(
               backgroundColor: Colors.transparent, // keep transparent
-              insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 40),
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 40,
+              ),
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
@@ -311,8 +322,12 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                         activeTrackColor: Colors.white,
                         inactiveTrackColor: Colors.white24,
                         trackHeight: 6,
-                        thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 10),
-                        overlayShape: const RoundSliderOverlayShape(overlayRadius: 18),
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 10,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 18,
+                        ),
                         overlayColor: Colors.white24,
                       ),
                       child: Slider(
@@ -348,7 +363,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
 
   // Add this function
   Future<void> _changeSpeed() async {
-    final double originalSpeed = _playbackSpeed;  // Store original for cancel
+    final double originalSpeed = _playbackSpeed; // Store original for cancel
     double newSpeed = _playbackSpeed;
     await showDialog<double>(
       context: context,
@@ -400,7 +415,8 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     value: newSpeed,
                     min: 0.5,
                     max: 3.0,
-                    divisions: 25,  // For 0.5 to 3.0 in 0.1 steps
+                    divisions: 25,
+                    // For 0.5 to 3.0 in 0.1 steps
                     activeColor: ColorSelect.maineColor,
                     inactiveColor: Colors.grey[300],
                     onChanged: (value) {
@@ -418,10 +434,34 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text("0.5x", style: TextStyle(color: Colors.grey[600], fontSize: 12.sp)),
-                      Text("1.0x", style: TextStyle(color: Colors.grey[600], fontSize: 12.sp)),
-                      Text("2.0x", style: TextStyle(color: Colors.grey[600], fontSize: 12.sp)),
-                      Text("3.0x", style: TextStyle(color: Colors.grey[600], fontSize: 12.sp)),
+                      Text(
+                        "0.5x",
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12.sp,
+                        ),
+                      ),
+                      Text(
+                        "1.0x",
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12.sp,
+                        ),
+                      ),
+                      Text(
+                        "2.0x",
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12.sp,
+                        ),
+                      ),
+                      Text(
+                        "3.0x",
+                        style: TextStyle(
+                          color: Colors.grey[600],
+                          fontSize: 12.sp,
+                        ),
+                      ),
                     ],
                   ),
                 ],
@@ -430,11 +470,13 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: ColorSelect.maineColor),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: () {
                     setDialogState(() {
-                      newSpeed = 1.0;  // Reset to 1.0x
+                      newSpeed = 1.0; // Reset to 1.0x
                     });
                     // Immediately update player
                     setState(() {
@@ -453,7 +495,9 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                 OutlinedButton(
                   style: OutlinedButton.styleFrom(
                     side: BorderSide(color: Colors.red[400]!),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   onPressed: () {
                     setState(() {
@@ -511,8 +555,6 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     }
   }
 
-
-
   void _toggleVolume() {
     setState(() {
       _isVolumeOn = !_isVolumeOn;
@@ -524,411 +566,666 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       }
     });
   }
+
+  String _selectedDisplayMode = 'Auto';
+  bool _isHDRSupported = false; // Set true if your device supports HDR
+
+  void _showPremiumHDRDialog() {
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.white10,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title:  Center(
+            child: Text(
+              "Select Display Mode",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 16.sp,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const SizedBox(height: 20),
+              _buildRadioOption('Auto'),
+              _buildRadioOption('HDR'),
+              _buildRadioOption('SDR'),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildRadioOption(String title) {
+    return RadioListTile<String>(
+      value: title,
+      groupValue: _selectedDisplayMode,
+      activeColor: Colors.white,
+      title: Text(
+        title,
+        style: const TextStyle(color: Colors.white, fontSize: 16),
+      ),
+      onChanged: (value) {
+        if (value == 'HDR' && !_isHDRSupported) {
+          Fluttertoast.showToast(
+            msg: "Device not support",
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.BOTTOM,
+            backgroundColor: Colors.redAccent,
+            textColor: Colors.white,
+            fontSize: 16.0,
+          );
+          return; // do not select HDR or close dialog
+        }
+
+        setState(() {
+          _selectedDisplayMode = value!;
+        });
+
+        Fluttertoast.showToast(
+          msg: "$value",
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: ColorSelect.maineColor,
+          textColor: Colors.white,
+          fontSize: 16.0,
+        );
+
+        Navigator.pop(context); // close dialog after selection
+      },
+      toggleable: false,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0),
+    );
+  }
+
+
+
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
       body: Screenshot(
         controller: screenshotController,
-        child: _hasError
-            ? Center(child: Text(_errorMessage, style: TextStyle(color: Colors.white)))
-            : Stack(
-          children: [
-            GestureDetector(
-              onTap: _toggleControls,
-              child: Container(
-                color: Colors.black,
-                height: double.infinity,
-              ),
-            ),
-            Center(
-              child: _isControllerInitialized
-                  ? GestureDetector(
-                onTap: _toggleControls,
-                child: Transform.scale(
-                  scale: _scale,
-                  child: AspectRatio(
-                    aspectRatio: _videoPlayerController.value.aspectRatio,
-                    child: VideoPlayer(_videoPlayerController),
+        child:
+            _hasError
+                ? Center(
+                  child: Text(
+                    _errorMessage,
+                    style: TextStyle(color: Colors.white),
                   ),
-                ),
-              )
-                  : CircularProgressIndicator(color: Colors.white),
-            ),
-            if (_isControllerInitialized && _showControls&& !_isLocked)
-              GestureDetector(
-                onTap: _toggleControls,
-                child: Container(
-                  height: double.infinity,
-                  color: Colors.black26,
-                ),
-              ),
-            if (_isControllerInitialized && _showControls&& !_isLocked)
-              Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Container(
-                    color: Colors.transparent,
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Text(
-                          _formatDuration(_currentPosition),
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                            fontFamily: 'PoppinsSemiBold',
-                          ),
-                        ),
-                        SizedBox(
-                          width: MediaQuery.of(context).size.width * 0.7,
-                          child: _videoPlayerController.value.isInitialized &&
-                              _videoPlayerController.value.duration.inSeconds > 0
-                              ? Slider(
-                            value: _currentPosition.inSeconds.toDouble(),
-                            min: 0.0,
-                            max: _videoPlayerController.value.duration.inSeconds.toDouble(),
-                            activeColor: Colors.red,
-                            inactiveColor: Colors.grey,
-                            onChanged: (value) {
-                              setState(() {
-                                _currentPosition = Duration(seconds: value.toInt());
-                                _videoPlayerController.seekTo(_currentPosition);
-                              });
-                            },
-                          )
-                              : Slider(
-                            value: 0.0,
-                            min: 0.0,
-                            max: 1.0,
-                            activeColor: Colors.red,
-                            inactiveColor: Colors.grey,
-                            onChanged: null,
-                          ),
-                        ),
-                        Text(
-                          _formatDuration(_videoPlayerController.value.duration),
-                          style: TextStyle(
-                            fontSize: 12.sp,
-                            fontWeight: FontWeight.w500,
-                            color: Colors.white,
-                            fontFamily: 'PoppinsSemiBold',
-                          ),
-                        ),
-                      ],
+                )
+                : Stack(
+                  children: [
+                    GestureDetector(
+                      onTap: _toggleControls,
+                      child: Container(
+                        color: Colors.black,
+                        height: double.infinity,
+                      ),
                     ),
-                  ),
-                  Container(
-                    color: Colors.black54,
-                    child: Padding(
-                      padding: EdgeInsets.zero,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    Center(
+                      child:
+                          _isControllerInitialized
+                              ? GestureDetector(
+                                onTap: _toggleControls,
+                                child: Transform.scale(
+                                  scale: _scale,
+                                  child: AspectRatio(
+                                    aspectRatio:
+                                        _videoPlayerController
+                                            .value
+                                            .aspectRatio,
+                                    child: VideoPlayer(_videoPlayerController),
+                                  ),
+                                ),
+                              )
+                              : CircularProgressIndicator(color: Colors.white),
+                    ),
+                    if (_isControllerInitialized && _showControls && !_isLocked)
+                      GestureDetector(
+                        onTap: _toggleControls,
+                        child: Container(
+                          height: double.infinity,
+                          color: Colors.black26,
+                        ),
+                      ),
+                    if (_isControllerInitialized && _showControls && !_isLocked)
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          IconButton(
-                            icon: Icon(Icons.lock, color: Colors.white),
-                            onPressed: _toggleLock,
-                          ),
-                          IconButton(
-                            icon: Icon(Icons.skip_previous_rounded, color: Colors.white, size: 35.sp),
-                            onPressed: widget.videos != null ? _playPrevious : null, // Disable if no videos
-                          ),
-                          IconButton(
-                            icon: Icon(
-                              _videoPlayerController.value.isPlaying
-                                  ? Icons.pause_circle
-                                  : Icons.play_circle,
-                              color: Colors.white,
-                              size: 50.sp,
+                          Container(
+                            color: Colors.transparent,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Text(
+                                  _formatDuration(_currentPosition),
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                    fontFamily: 'PoppinsSemiBold',
+                                  ),
+                                ),
+                                SizedBox(
+                                  width:
+                                      MediaQuery.of(context).size.width * 0.7,
+                                  child:
+                                      _videoPlayerController
+                                                  .value
+                                                  .isInitialized &&
+                                              _videoPlayerController
+                                                      .value
+                                                      .duration
+                                                      .inSeconds >
+                                                  0
+                                          ? Slider(
+                                            value:
+                                                _currentPosition.inSeconds
+                                                    .toDouble(),
+                                            min: 0.0,
+                                            max:
+                                                _videoPlayerController
+                                                    .value
+                                                    .duration
+                                                    .inSeconds
+                                                    .toDouble(),
+                                            activeColor: Colors.red,
+                                            inactiveColor: Colors.grey,
+                                            onChanged: (value) {
+                                              setState(() {
+                                                _currentPosition = Duration(
+                                                  seconds: value.toInt(),
+                                                );
+                                                _videoPlayerController.seekTo(
+                                                  _currentPosition,
+                                                );
+                                              });
+                                            },
+                                          )
+                                          : Slider(
+                                            value: 0.0,
+                                            min: 0.0,
+                                            max: 1.0,
+                                            activeColor: Colors.red,
+                                            inactiveColor: Colors.grey,
+                                            onChanged: null,
+                                          ),
+                                ),
+                                Text(
+                                  _formatDuration(
+                                    _videoPlayerController.value.duration,
+                                  ),
+                                  style: TextStyle(
+                                    fontSize: 12.sp,
+                                    fontWeight: FontWeight.w500,
+                                    color: Colors.white,
+                                    fontFamily: 'PoppinsSemiBold',
+                                  ),
+                                ),
+                              ],
                             ),
-                            onPressed: _playPause,
                           ),
-                          IconButton(
-                            icon: Icon(Icons.skip_next_rounded, color: Colors.white, size: 35.sp),
-                            onPressed: widget.videos != null ? _playNext : null, // Disable if no videos
-                          ),
-                          Padding(
-                            padding: const EdgeInsets.all(8.0),
-                            child: IconButton(
-                              icon: Icon(
-                                _zoomIcons[_currentZoomIndex],
-                                color: Colors.white,
-                                size: 20.sp,
+                          Container(
+                            color: Colors.black54,
+                            child: Padding(
+                              padding: EdgeInsets.zero,
+                              child: Row(
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(Icons.lock, color: Colors.white),
+                                    onPressed: _toggleLock,
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.skip_previous_rounded,
+                                      color: Colors.white,
+                                      size: 35.sp,
+                                    ),
+                                    onPressed:
+                                        widget.videos != null
+                                            ? _playPrevious
+                                            : null, // Disable if no videos
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      _videoPlayerController.value.isPlaying
+                                          ? Icons.pause_circle
+                                          : Icons.play_circle,
+                                      color: Colors.white,
+                                      size: 50.sp,
+                                    ),
+                                    onPressed: _playPause,
+                                  ),
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.skip_next_rounded,
+                                      color: Colors.white,
+                                      size: 35.sp,
+                                    ),
+                                    onPressed:
+                                        widget.videos != null
+                                            ? _playNext
+                                            : null, // Disable if no videos
+                                  ),
+                                  Padding(
+                                    padding: const EdgeInsets.all(8.0),
+                                    child: IconButton(
+                                      icon: Icon(
+                                        _zoomIcons[_currentZoomIndex],
+                                        color: Colors.white,
+                                        size: 20.sp,
+                                      ),
+                                      onPressed: _toggleZoom,
+                                    ),
+                                  ),
+                                ],
                               ),
-                              onPressed: _toggleZoom,
                             ),
                           ),
                         ],
                       ),
-                    ),
-                  ),
-                ],
-              ),
-            if (_isControllerInitialized && _showControls&& !_isLocked)
-              Positioned(
-                right: 10,
-                bottom: 100.sp,
-                child: Column(
-                  children: [
-
-                    Padding(
-                      padding:  EdgeInsets.all(3.sp),
-                      child: IconButton(
-                        icon: Icon(
-                          _themeMode == ThemeMode.dark
-                              ?Icons.dark_mode    // 👈 Light ka icon
-                              : Icons.light_mode,   // 👈 Dark ka icon
-                          color: Colors.white,
-                        ),
-                        onPressed: _toggleTheme, // 👈 toggle function
-                        tooltip: "Toggle Theme",
-                      ),
-                    ),
-                    Padding(
-                      padding:  EdgeInsets.all(3.sp),
-                      child: IconButton(
-                        icon: Icon(Icons.volume_up, color: Colors.white),
-                        onPressed: _adjustVolume,
-                      ),
-                    ),
-
-                    Padding(
-                      padding:  EdgeInsets.all(3.sp),
-                      child: IconButton(
-                        icon: Icon(Icons.speed, color: Colors.white),
-                        onPressed: _changeSpeed,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            if (_isControllerInitialized && _showControls&& !_isLocked)
-              Positioned(
-                left: 10,
-                bottom: 100.sp,
-                child: Column(
-                  children: [
-
-                    Padding(
-                      padding:  EdgeInsets.all(3.sp),
-                      child: IconButton(
-                        icon: Icon(Icons.camera_alt, color: Colors.white),
-                        onPressed: _takeScreenshot,
-                      ),
-                    ),
-                    Padding(
-                      padding:  EdgeInsets.all(3.sp),
-                      child: IconButton(
-                        icon: const Icon(
-                          Icons.equalizer,
-                          color: Colors.white,
-                          size: 28,
-                        ),
-                        onPressed: () {
-                          showModalBottomSheet(
-                            context: context,
-                            backgroundColor: Colors.black87,
-                            shape: const RoundedRectangleBorder(
-                              borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+                    if (_isControllerInitialized && _showControls && !_isLocked)
+                      Positioned(
+                        right: 10,
+                        bottom: 100.sp,
+                        child: Column(
+                          children: [
+                            Padding(
+                              padding: EdgeInsets.all(3.sp),
+                              child: IconButton(
+                                icon: Icon(
+                                  _themeMode == ThemeMode.dark
+                                      ? Icons
+                                          .dark_mode // 👈 Light ka icon
+                                      : Icons.light_mode, // 👈 Dark ka icon
+                                  color: Colors.white,
+                                ),
+                                onPressed: _toggleTheme, // 👈 toggle function
+                                tooltip: "Toggle Theme",
+                              ),
                             ),
-                            builder: (context) {
-                              double bass = 0.5;
-                              double mid = 0.5;
-                              double treble = 0.5;
+                            Padding(
+                              padding: EdgeInsets.all(3.sp),
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.volume_up,
+                                  color: Colors.white,
+                                ),
+                                onPressed: _adjustVolume,
+                              ),
+                            ),
 
-                              return StatefulBuilder(
-                                builder: (context, setSheetState) {
-                                  return Padding(
-                                    padding: const EdgeInsets.all(16.0),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Container(
-                                          height: 4,
-                                          width: 40,
-                                          margin: const EdgeInsets.only(bottom: 16),
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey[600],
-                                            borderRadius: BorderRadius.circular(2),
-                                          ),
-                                        ),
-                                        const Text(
-                                          "Equalizer",
-                                          style: TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 20),
-
-                                        // Vertical Sliders in a Row
-                                        Row(
-                                          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                          children: [
-                                            // Bass
-                                            Column(
-                                              children: [
-                                                const Text("Normal", style: TextStyle(color: Colors.white)),
-                                                RotatedBox(
-                                                  quarterTurns: -1,
-                                                  child: Slider(
-                                                    value: bass,
-                                                    min: 0.0,
-                                                    max: 1.0,
-                                                    divisions: 10,
-                                                    activeColor: ColorSelect.maineColor,
-                                                    label: bass.toStringAsFixed(1),
-                                                    onChanged: (v) => setSheetState(() => bass = v),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            // Bass
-                                            Column(
-                                              children: [
-                                                const Text("Bass", style: TextStyle(color: Colors.white)),
-                                                RotatedBox(
-                                                  quarterTurns: -1,
-                                                  child: Slider(
-                                                    value: bass,
-                                                    min: 0.0,
-                                                    max: 1.0,
-                                                    divisions: 10,
-                                                    activeColor: ColorSelect.maineColor,
-                                                    label: bass.toStringAsFixed(1),
-                                                    onChanged: (v) => setSheetState(() => bass = v),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-
-                                            // Mid
-                                            Column(
-                                              children: [
-                                                const Text("Mid", style: TextStyle(color: Colors.white)),
-                                                RotatedBox(
-                                                  quarterTurns: -1,
-                                                  child: Slider(
-                                                    value: mid,
-                                                    min: 0.0,
-                                                    max: 1.0,
-                                                    divisions: 10,
-                                                    activeColor: ColorSelect.maineColor,
-                                                    label: mid.toStringAsFixed(1),
-                                                    onChanged: (v) => setSheetState(() => mid = v),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-
-                                            // Treble
-                                            Column(
-                                              children: [
-                                                const Text("Treble", style: TextStyle(color: Colors.white)),
-                                                RotatedBox(
-                                                  quarterTurns: -1,
-                                                  child: Slider(
-                                                    value: treble,
-                                                    min: 0.0,
-                                                    max: 1.0,
-                                                    divisions: 10,
-                                                    activeColor: ColorSelect.maineColor,
-                                                    label: treble.toStringAsFixed(1),
-                                                    onChanged: (v) => setSheetState(() => treble = v),
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                          ],
-                                        ),
-
-                                        const SizedBox(height: 20),
-                                        ElevatedButton(
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: ColorSelect.maineColor,
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius: BorderRadius.circular(8),
-                                            ),
-                                          ),
-                                          onPressed: () => Navigator.pop(context),
-                                          child: const Text("Close"),
-                                        ),
-                                      ],
+                            Padding(
+                              padding: EdgeInsets.all(3.sp),
+                              child: IconButton(
+                                icon: Icon(Icons.speed, color: Colors.white),
+                                onPressed: _changeSpeed,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    if (_isControllerInitialized && _showControls && !_isLocked)
+                      Positioned(
+                        left: 10,
+                        bottom: 100.sp,
+                        child: Column(
+                          children: [
+                            // HDR badge
+                            // if (_isHDR)
+                            Padding(
+                              padding: EdgeInsets.all(8.sp),
+                              child: GestureDetector(
+                                onTap: _showPremiumHDRDialog,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: ColorSelect.maineColor.withOpacity(
+                                      0.8,
+                                    ), // Example color
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Text(
+                                    _selectedDisplayMode, // Shows the selected option
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
                                     ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.all(3.sp),
+                              child: IconButton(
+                                icon: Icon(
+                                  Icons.camera_alt,
+                                  color: Colors.white,
+                                ),
+                                onPressed: _takeScreenshot,
+                              ),
+                            ),
+                            Padding(
+                              padding: EdgeInsets.all(3.sp),
+                              child: IconButton(
+                                icon: const Icon(
+                                  Icons.equalizer,
+                                  color: Colors.white,
+                                  size: 28,
+                                ),
+                                onPressed: () {
+                                  showModalBottomSheet(
+                                    context: context,
+                                    backgroundColor: Colors.black87,
+                                    shape: const RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.vertical(
+                                        top: Radius.circular(16),
+                                      ),
+                                    ),
+                                    builder: (context) {
+                                      double bass = 0.5;
+                                      double mid = 0.5;
+                                      double treble = 0.5;
+
+                                      return StatefulBuilder(
+                                        builder: (context, setSheetState) {
+                                          return Padding(
+                                            padding: const EdgeInsets.all(16.0),
+                                            child: Column(
+                                              mainAxisSize: MainAxisSize.min,
+                                              children: [
+                                                Container(
+                                                  height: 4,
+                                                  width: 40,
+                                                  margin: const EdgeInsets.only(
+                                                    bottom: 16,
+                                                  ),
+                                                  decoration: BoxDecoration(
+                                                    color: Colors.grey[600],
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          2,
+                                                        ),
+                                                  ),
+                                                ),
+                                                const Text(
+                                                  "Equalizer",
+                                                  style: TextStyle(
+                                                    color: Colors.white,
+                                                    fontSize: 18,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(height: 20),
+
+                                                // Vertical Sliders in a Row
+                                                Row(
+                                                  mainAxisAlignment:
+                                                      MainAxisAlignment
+                                                          .spaceEvenly,
+                                                  children: [
+                                                    // Bass
+                                                    Column(
+                                                      children: [
+                                                        const Text(
+                                                          "Normal",
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                        RotatedBox(
+                                                          quarterTurns: -1,
+                                                          child: Slider(
+                                                            value: bass,
+                                                            min: 0.0,
+                                                            max: 1.0,
+                                                            divisions: 10,
+                                                            activeColor:
+                                                                ColorSelect
+                                                                    .maineColor,
+                                                            label: bass
+                                                                .toStringAsFixed(
+                                                                  1,
+                                                                ),
+                                                            onChanged:
+                                                                (v) =>
+                                                                    setSheetState(
+                                                                      () =>
+                                                                          bass =
+                                                                              v,
+                                                                    ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                    // Bass
+                                                    Column(
+                                                      children: [
+                                                        const Text(
+                                                          "Bass",
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                        RotatedBox(
+                                                          quarterTurns: -1,
+                                                          child: Slider(
+                                                            value: bass,
+                                                            min: 0.0,
+                                                            max: 1.0,
+                                                            divisions: 10,
+                                                            activeColor:
+                                                                ColorSelect
+                                                                    .maineColor,
+                                                            label: bass
+                                                                .toStringAsFixed(
+                                                                  1,
+                                                                ),
+                                                            onChanged:
+                                                                (v) =>
+                                                                    setSheetState(
+                                                                      () =>
+                                                                          bass =
+                                                                              v,
+                                                                    ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+
+                                                    // Mid
+                                                    Column(
+                                                      children: [
+                                                        const Text(
+                                                          "Mid",
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                        RotatedBox(
+                                                          quarterTurns: -1,
+                                                          child: Slider(
+                                                            value: mid,
+                                                            min: 0.0,
+                                                            max: 1.0,
+                                                            divisions: 10,
+                                                            activeColor:
+                                                                ColorSelect
+                                                                    .maineColor,
+                                                            label: mid
+                                                                .toStringAsFixed(
+                                                                  1,
+                                                                ),
+                                                            onChanged:
+                                                                (v) =>
+                                                                    setSheetState(
+                                                                      () =>
+                                                                          mid =
+                                                                              v,
+                                                                    ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+
+                                                    // Treble
+                                                    Column(
+                                                      children: [
+                                                        const Text(
+                                                          "Treble",
+                                                          style: TextStyle(
+                                                            color: Colors.white,
+                                                          ),
+                                                        ),
+                                                        RotatedBox(
+                                                          quarterTurns: -1,
+                                                          child: Slider(
+                                                            value: treble,
+                                                            min: 0.0,
+                                                            max: 1.0,
+                                                            divisions: 10,
+                                                            activeColor:
+                                                                ColorSelect
+                                                                    .maineColor,
+                                                            label: treble
+                                                                .toStringAsFixed(
+                                                                  1,
+                                                                ),
+                                                            onChanged:
+                                                                (
+                                                                  v,
+                                                                ) => setSheetState(
+                                                                  () =>
+                                                                      treble =
+                                                                          v,
+                                                                ),
+                                                          ),
+                                                        ),
+                                                      ],
+                                                    ),
+                                                  ],
+                                                ),
+
+                                                const SizedBox(height: 20),
+                                                ElevatedButton(
+                                                  style: ElevatedButton.styleFrom(
+                                                    backgroundColor:
+                                                        ColorSelect.maineColor,
+                                                    shape: RoundedRectangleBorder(
+                                                      borderRadius:
+                                                          BorderRadius.circular(
+                                                            8,
+                                                          ),
+                                                    ),
+                                                  ),
+                                                  onPressed:
+                                                      () => Navigator.pop(
+                                                        context,
+                                                      ),
+                                                  child: const Text("Close"),
+                                                ),
+                                              ],
+                                            ),
+                                          );
+                                        },
+                                      );
+                                    },
                                   );
                                 },
-                              );
-                            },
-                          );
+                              ),
+                            ),
 
-                        },
-                      ),
-                    ),
-
-                    Padding(
-                      padding:  EdgeInsets.all(3.sp),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: _isVolumeOn
-                              ? Colors.transparent            // 🔊 ON → no background
-                              : ColorSelect.maineColor,       // 🔇 OFF → colored background
-                          borderRadius: BorderRadius.circular(8),
+                            Padding(
+                              padding: EdgeInsets.all(3.sp),
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color:
+                                      _isVolumeOn
+                                          ? Colors
+                                              .transparent // 🔊 ON → no background
+                                          : ColorSelect.maineColor,
+                                  // 🔇 OFF → colored background
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: IconButton(
+                                  icon: Icon(
+                                    _isVolumeOn
+                                        ? Icons.volume_off
+                                        : Icons.volume_off,
+                                    color: Colors.white,
+                                    size: 20.sp,
+                                  ),
+                                  onPressed: _toggleVolume,
+                                ),
+                              ),
+                            ),
+                          ],
                         ),
-                        child: IconButton(
-                          icon: Icon(
-                            _isVolumeOn ? Icons.volume_off : Icons.volume_off,
-                            color: Colors.white,
-                            size: 20.sp,
-                          ),
-                          onPressed: _toggleVolume,
+                      ),
+                    if (_isControllerInitialized && _showControls && !_isLocked)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: CustomVideoAppBar(
+                          title: widget.url != null
+                              ? widget.url!.split('/').last
+                              : widget.videos != null
+                              ? widget.videos![currentIndex].path.split('/').last
+                              : 'Video',
+                          onBackPressed: () => Navigator.pop(context),
+                          videos: widget.videos,
+                          currentIndex: currentIndex,
+                          onVideoSelected: (index) {
+                            setState(() {
+                              currentIndex = index; // Update playing video
+                              _initializePlayer(widget.videos![index].path, isNetwork: false);
+                            });
+                          },
                         ),
                       ),
-                    )
 
-                  ],
-                ),
-              ),
-            if (_isControllerInitialized && _showControls&& !_isLocked)
-              Positioned(
-                top: 0,
-                left: 0,
-                right: 0,
-                child: CustomVideoAppBar(
-                  title: widget.url != null
-                      ? widget.url!.split('/').last
-                      : widget.videos != null
-                      ? widget.videos![currentIndex].path.split('/').last
-                      : 'Video',
-                  onBackPressed: () => Navigator.pop(context),
-                ),
-              ),
-            if (_showControls && _isLocked)
-              Column(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: [
-                  Container(
-                    color: Colors.black54,
-                    child: Padding(
-                      padding: EdgeInsets.zero,
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.start,
+
+                    if (_showControls && _isLocked)
+                      Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
                         children: [
-                          IconButton(
-                            icon: Icon(Icons.lock, color: Colors.redAccent),
-                            onPressed: _toggleLock,
+                          Container(
+                            color: Colors.black54,
+                            child: Padding(
+                              padding: EdgeInsets.zero,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.start,
+                                children: [
+                                  IconButton(
+                                    icon: Icon(
+                                      Icons.lock,
+                                      color: Colors.redAccent,
+                                    ),
+                                    onPressed: _toggleLock,
+                                  ),
+                                ],
+                              ),
+                            ),
                           ),
-
                         ],
                       ),
-                    ),
-                  ),
-                ],
-              ),
-
-          ],
-        ),
+                  ],
+                ),
       ),
     );
   }
