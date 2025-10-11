@@ -8,13 +8,14 @@ import 'package:gallery_saver_plus/gallery_saver.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:screen_brightness/screen_brightness.dart';
-import 'package:screenshot/screenshot.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:io';
 import 'package:flutter/services.dart'; // For SystemChrome
 import '../RecentlyVideos/RecentlyPlayedManager/recently_played_manager.dart';
 import '../Utils/color.dart';
 import 'custom_video_appBar.dart';
+import 'package:screenshot/screenshot.dart';
+
 
 class VideoPlayerScreen extends StatefulWidget {
   final List<FileSystemEntity>?videos;

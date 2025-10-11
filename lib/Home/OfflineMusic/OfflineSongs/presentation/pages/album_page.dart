@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart' show SongModel, AlbumModel, OnAudioQuery, AudiosFromType, ArtworkType, QueryArtworkWidget;
 import '../../../../../Mp3Player/mp3_player.dart';
 import '../../song_repository.dart';
@@ -17,6 +18,7 @@ class AlbumPage extends StatefulWidget {
 class _AlbumPageState extends State<AlbumPage> {
   late List<SongModel> _songs;
   late final SongRepository songRepository;
+  final AudioPlayer audioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -142,6 +144,7 @@ class _AlbumPageState extends State<AlbumPage> {
                             return  Mp3Player(
                               songs: _songs,
                               initialIndex: index,
+                              audioPlayer: audioPlayer,
                             );
                           },
                         ),

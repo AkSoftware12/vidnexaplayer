@@ -174,91 +174,92 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
                     Column(
                       children: [
 
-                OpenContainer(
-                transitionType: ContainerTransitionType.fadeThrough,
-                  closedColor: Theme.of(context).cardColor,
-                  closedElevation: 0.0,
-                  openElevation: 4.0,
-                  transitionDuration: Duration(milliseconds: 1000),
-                  openBuilder: (BuildContext context, VoidCallback _) =>
-                      // PlayerScreen(
-                      //   songs: songs,
-                      //   initialIndex: index,
-                      // ),
+                        OpenContainer(
+                          transitionType: ContainerTransitionType.fadeThrough,
+                          closedColor: Theme.of(context).cardColor,
+                          closedElevation: 0.0,
+                          openElevation: 4.0,
+                          transitionDuration: Duration(milliseconds: 1000),
+                          openBuilder: (BuildContext context, VoidCallback _) =>
+                          // PlayerScreen(
+                          //   songs: songs,
+                          //   initialIndex: index,
+                          // ),
 
-                  Mp3Player(
-                      songs: songs,
-                      initialIndex: index,
-                    ),
-                  closedBuilder: (BuildContext _, VoidCallback openContainer) {
-                    return  ListTile(
-                      title: Text(
-                        item.data![index].title,
-                        style: GoogleFonts.openSans(
-                          textStyle: TextStyle(
-                            color:widget.colortext,
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.bold,
+                          Mp3Player(
+                            songs: songs,
+                            initialIndex: index,
+                            audioPlayer: audioPlayer,
                           ),
-                        ),
-                      ),
-                      subtitle: Text(
-                        item.data![index].artist ?? "No Artist",
-                        style: GoogleFonts.poppins(
-                          textStyle: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 11.sp,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                      trailing:  GestureDetector(
-                          onTap: () {
-                            _showBottomSheet(context);
+                          closedBuilder: (BuildContext _, VoidCallback openContainer) {
+                            return  ListTile(
+                              title: Text(
+                                item.data![index].title,
+                                style: GoogleFonts.openSans(
+                                  textStyle: TextStyle(
+                                    color:widget.colortext,
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              subtitle: Text(
+                                item.data![index].artist ?? "No Artist",
+                                style: GoogleFonts.poppins(
+                                  textStyle: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 11.sp,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              ),
+                              trailing:  GestureDetector(
+                                  onTap: () {
+                                    _showBottomSheet(context);
 
+                                  },
+                                  child: Container(
+                                    height: 40.sp,
+                                    width: 50.sp,
+                                    child: Icon(
+                                      Icons.more_vert,
+                                      size: 20.sp,
+                                      color: Colors.black54,
+                                    ),
+                                  )),
+
+                              leading: QueryArtworkWidget(
+                                controller: audioQuery,
+                                id: item.data![index].id,
+                                type: ArtworkType.AUDIO,
+                                artworkBorder: BorderRadius.circular(8),
+                                nullArtworkWidget: Padding(
+                                  padding: const EdgeInsets.all(0.0),
+                                  child:
+
+                                  Image.asset(
+                                    'assets/music_folder.png', // Replace with your placeholder asset path
+                                    fit: BoxFit.cover,
+                                    width: 50,
+                                    height: 50,
+                                  ),
+                                ),
+                              ),                      // onTap: () async {
+                              //
+                              //   Navigator.push(
+                              //     context,
+                              //     MaterialPageRoute(
+                              //       builder: (context) => PlayerScreen(
+                              //         songs: songs,
+                              //         initialIndex: index,
+                              //       ),
+                              //     ),
+                              //   );
+                              //
+                              // },
+                            );
                           },
-                          child: Container(
-                            height: 40.sp,
-                            width: 50.sp,
-                            child: Icon(
-                              Icons.more_vert,
-                              size: 20.sp,
-                              color: Colors.black54,
-                            ),
-                          )),
-
-                      leading: QueryArtworkWidget(
-                        controller: audioQuery,
-                        id: item.data![index].id,
-                        type: ArtworkType.AUDIO,
-                        artworkBorder: BorderRadius.circular(8),
-                        nullArtworkWidget: Padding(
-                          padding: const EdgeInsets.all(0.0),
-                          child:
-
-                          Image.asset(
-                            'assets/music_folder.png', // Replace with your placeholder asset path
-                            fit: BoxFit.cover,
-                            width: 50,
-                            height: 50,
-                          ),
                         ),
-                      ),                      // onTap: () async {
-                      //
-                      //   Navigator.push(
-                      //     context,
-                      //     MaterialPageRoute(
-                      //       builder: (context) => PlayerScreen(
-                      //         songs: songs,
-                      //         initialIndex: index,
-                      //       ),
-                      //     ),
-                      //   );
-                      //
-                      // },
-                    );
-                  },
-                ),
 
 
                         // Add a Divider after each ListTile, except for the last one

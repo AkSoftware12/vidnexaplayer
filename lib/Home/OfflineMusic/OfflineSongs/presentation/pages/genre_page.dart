@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 
 import '../../../../../Mp3Player/mp3_player.dart';
@@ -16,6 +17,7 @@ class GenrePage extends StatefulWidget {
 
 class _GenrePageState extends State<GenrePage> {
   late List<SongModel> _songs;
+  final AudioPlayer audioPlayer = AudioPlayer();
 
   @override
   void initState() {
@@ -88,7 +90,7 @@ class _GenrePageState extends State<GenrePage> {
                               builder: (context) {
                                 return  Mp3Player(
                                   songs: _songs,
-                                  initialIndex: index,
+                                  initialIndex: index, audioPlayer: audioPlayer,
                                 );
                               },
                             ),

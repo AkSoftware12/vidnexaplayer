@@ -15,8 +15,10 @@ import '../Utils/textSize.dart';
 class Mp3Player extends StatefulWidget {
   final List<SongModel> songs;
   final int initialIndex;
+  final AudioPlayer audioPlayer;
 
-  const Mp3Player({Key? key, required this.songs, required this.initialIndex})
+
+  const Mp3Player({Key? key, required this.songs, required this.initialIndex, required this.audioPlayer})
       : super(key: key);
 
   @override
