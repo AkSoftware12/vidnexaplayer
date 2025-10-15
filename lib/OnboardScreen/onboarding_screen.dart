@@ -5,10 +5,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:videoplayer/OnboardScreen/size_config.dart';
 import 'package:videoplayer/Utils/color.dart';
-
+import 'package:animate_do/animate_do.dart'; // Added for animations if needed
 import '../Permission/permission_page.dart';
 import 'onboarding_contents.dart';
-
 
 class OnboardingScreen extends StatefulWidget {
   const OnboardingScreen({Key? key}) : super(key: key);
@@ -27,14 +26,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   }
 
   int _currentPage = 0;
-  List colors = const [
-
-    Colors.white,
-    Colors.white,
-    Colors.white,
-    // Color(0xffDAD3C8),
-    // Color(0xffFFE5DE),
-    // Color(0xffDCF6E6),
+  List colors = [
+    HexColor('#081740'),
+    HexColor('#081740'),
+    HexColor('#081740'),
   ];
 
   AnimatedContainer _buildDots({
@@ -53,7 +48,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
       curve: Curves.easeIn,
       width: _currentPage == index ? 40 : 10,
     );
-
   }
 
   @override
@@ -62,202 +56,299 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     double width = SizeConfig.screenW!;
     double height = SizeConfig.screenH!;
 
-
     return Scaffold(
-
       backgroundColor: colors[_currentPage],
-      body: SafeArea(
-        child: Column(
-          children: [
-            Expanded(
-              flex: 3,
-              child: PageView.builder(
-                physics: const BouncingScrollPhysics(),
-                controller: _controller,
-                onPageChanged: (value) => setState(() => _currentPage = value),
-                itemCount: contents.length,
-                itemBuilder: (context, i) {
-                  return Padding(
-                    padding:  EdgeInsets.all(0.0),
-                    child: Column(
-                      children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.end,
+      body: Column(
+        children: [
+          SizedBox(
+            height: 20.sp,
+          ),
 
-                          children: [
-
-                            TextButton(
-                              onPressed: () {
-                                _controller.jumpToPage(2);
-                              },
-                              style: TextButton.styleFrom(
-                                elevation: 0,
-                                textStyle: TextStyle(
-                                  fontWeight: FontWeight.w600,
-                                  fontSize: (width <= 550) ? 13 : 17,
-                                ),
-                              ),
-                              child:  Text(
-                                "Skip",
-                                style: GoogleFonts.openSans(
-                                  fontSize: 15.sp,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.grey,
-
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                        Image.asset(
-                          contents[i].image,
-                          height: SizeConfig.blockV! * 35,
-                        ),
-                         SizedBox(height: 30.sp),
-
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: List.generate(
-                            contents.length,
-                                (int index) => _buildDots(
-                              index: index,
-                            ),
-                          ),
-                        ),
-
-                        SizedBox(
-                          height: (height >= 840) ? 60 : 30,
-                        ),
-                        Text(
-                          contents[i].title,
-                          textAlign: TextAlign.center,
-                          style: GoogleFonts.openSans(
-                            fontSize: (width <= 550) ? 25.sp : 30.sp,
-                            fontWeight: FontWeight.w700,
-                            color: ColorSelect.titletextColor,
-
-                          ),
-
-                        ),
-                        const SizedBox(height: 15),
-                        Padding(
-                          padding:  EdgeInsets.only(left: 20.sp,right: 20.sp),
-                          child: Text(
-                            contents[i].desc,
-                            style: GoogleFonts.openSans(
-                              fontSize: (width <= 550) ? 17.sp : 25.sp,
-                              fontWeight: FontWeight.w500,
-                              color: ColorSelect.subtextColor,
-                            ),
-
-                            textAlign: TextAlign.center,
-                          ),
-                        )
-                      ],
-                    ),
-                  );
-                },
-              ),
-            ),
-            Expanded(
-              flex: 1,
-              child: Column(
+          Container(
+            // height: 50.sp,
+            color: HexColor('#081740'),
+            child: Padding(
+              padding:  EdgeInsets.all(10.sp),
+              child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _currentPage + 1 == contents.length
-                      ? Padding(
-                          padding: const EdgeInsets.all(30),
-                          child: ElevatedButton(
-                            onPressed: () {
+                  Text(
+                    'All Features',
+                    style: GoogleFonts.poppins(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.all(8.0),
+                    child: TextButton(
+                      onPressed: () {
+                        _controller.jumpToPage(contents.length - 1);
 
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(builder: (context) => PermissionPage()),
-                              );
-                            },
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor:ColorSelect.maineColor,
-                              shape: RoundedRectangleBorder(
-                                borderRadius: BorderRadius.circular(13),
+                      },
+
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 0.h),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.r),
+                          side: BorderSide(color: Colors.blue.shade200, width: 1),
+                        ),
+                      ),
+                      child: Text(
+                        'Skip',
+                        style: GoogleFonts.openSans(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                ],
+              ),
+            ),
+          ),
+
+          Expanded(
+            flex: 8,
+            child: PageView.builder(
+              physics: const BouncingScrollPhysics(),
+              controller: _controller,
+              onPageChanged: (value) => setState(() => _currentPage = value),
+              itemCount: contents.length,
+              itemBuilder: (context, i) {
+                final content = contents[i];
+                return SingleChildScrollView(
+                  padding: EdgeInsets.all(5.sp),
+                  child: Column(
+                    children: [
+                      FadeInDown(
+                        duration: const Duration(milliseconds: 800),
+                        child: Container(
+                          height: 180.sp,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(20.sp),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.1),
+                                blurRadius: 10,
+                                offset: const Offset(0, 4),
                               ),
-                              padding: (width <= 550)
-                                  ? const EdgeInsets.symmetric(horizontal: 100, vertical: 12)
-                                  : const EdgeInsets.symmetric(horizontal: 100, vertical: 12),
-                              textStyle: TextStyle(fontSize: (width <= 550) ? 13 : 17),
-                            ),
-                            child:  Text("Get Started",
-                              style: GoogleFonts.openSans(
-                              fontSize: 15.sp,
-                              fontWeight: FontWeight.w700,
-                              color: Colors.white,
-
-                            ),
-
-
+                            ],
                           ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(20.sp),
+                            child: Image.asset(content.image),
                           ),
-                        )
-                      : Padding(
-                          padding: const EdgeInsets.all(30),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-
-                              ElevatedButton(
-                                onPressed: () {
-                                  _controller.nextPage(
-                                    duration: const Duration(milliseconds: 200),
-                                    curve: Curves.easeIn,
-                                  );
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: ColorSelect.maineColor,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(10),
-                                  ),
-                                  elevation: 0,
-                                  padding: (width <= 550)
-                                      ? const EdgeInsets.symmetric(horizontal: 20, vertical: 12)
-                                      : const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                                  textStyle: TextStyle(fontSize: (width <= 550) ? 13 : 17),
+                        ),
+                      ),
+                      SizedBox(height: 10.sp),
+                      Center(
+                        child: Padding(
+                          padding:  EdgeInsets.all(5.sp),
+                          child: Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                colors: [
+                                  HexColor('#c30917'),
+                                  Colors.purple,
+                                  Colors.blue,
+                                  Colors.blue,
+                                  Colors.purple,
+                                  HexColor('#c30917'),
+                                ],
+                              ),
+                              borderRadius: BorderRadius.circular(20),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black26,
+                                  blurRadius: 10,
+                                  offset: Offset(4, 4),
                                 ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      "Next",
-                                      style: GoogleFonts.openSans(
-                                        fontSize: 15.sp,
-                                        fontWeight: FontWeight.w700,
+                              ],
+                            ),
+                            padding: EdgeInsets.all(10),
+                            child: Center(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment: CrossAxisAlignment.center,
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      const Icon(
+                                        Icons.safety_check_rounded,
                                         color: Colors.white,
-                                        letterSpacing: 1.0,
-                                        shadows: [
-                                          const Shadow(
-                                            blurRadius: 3.0,
-                                            color: Colors.black54,
-                                            offset: Offset(1.0, 1.0),
+                                        size: 20,
+                                      ),
+                                      SizedBox(width: 10),
+                                      Text(
+                                        'Your data is safe with us.',
+                                        style: TextStyle(
+                                          fontSize: 15.sp,
+                                          fontWeight: FontWeight.w600,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // Features List
+                      ...List.generate(
+                        content.list.length,
+                            (index) {
+                          final feature = content.list[index];
+                          return FadeInUp(
+                            duration: Duration(milliseconds: 300 + (index * 100)),
+                            child: Card(
+                              elevation: 0,
+                              color: Colors.transparent,
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(15.sp),
+                              ),
+                              margin: EdgeInsets.symmetric(vertical: 5.sp),
+                              child: Padding(
+                                padding: EdgeInsets.all(5.sp),
+                                child: Row(
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(5.sp),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey.shade100,
+                                        borderRadius: BorderRadius.circular(8.sp),
+                                      ),
+                                      child: Icon(
+                                        feature.icon,
+                                        color: HexColor('#7209B7'),
+                                        size: 20.sp,
+                                      ),
+                                    ),
+                                    SizedBox(width: 16.sp),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            feature.title,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 14.sp,
+                                              fontWeight: FontWeight.w500,
+                                              color: Colors.white,
+                                            ),
+                                          ),
+                                          SizedBox(height: 4.sp),
+                                          Text(
+                                            feature.description,
+                                            style: GoogleFonts.poppins(
+                                              fontSize: 11.sp,
+                                              fontWeight: FontWeight.w300,
+                                              color: Colors.grey.shade100,
+                                            ),
                                           ),
                                         ],
                                       ),
                                     ),
-                                    SizedBox(width: 8.w),
-                                    SvgPicture.asset(
-                                      'assets/svgviewer-output.svg',
-                                      color: Colors.white, // Sets the SVG fill color to white
-                                      width: 20.sp, // Matches the size of 18.sp
-                                      height: 20.sp,
-                                    ),
                                   ],
                                 ),
-                              )
-                            ],
-                          ),
-                        )
-                ],
-              ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
-          ],
-        ),
+          ),
+          // Bottom Navigation
+          Expanded(
+            flex: 1,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _currentPage + 1 == contents.length
+                    ? Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(builder: (context) => const PermissionPage()),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(13),
+                        ),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                        textStyle: TextStyle(fontSize: (width <= 550) ? 13 : 17),
+                      ),
+                      child: Text(
+                        "Get Started",
+                        style: GoogleFonts.openSans(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+                )
+                    : Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () {
+                        _controller.nextPage(
+                          duration: const Duration(milliseconds: 200),
+                          curve: Curves.easeIn,
+                        );
+                      },
+                      icon: SvgPicture.asset(
+                        'assets/svgviewer-output.svg',
+                        color: Colors.white,
+                        width: 20.sp,
+                        height: 20.sp,
+                      ),
+                      label: Text(
+                        "Next",
+                        style: GoogleFonts.openSans(
+                          fontSize: 15.sp,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                          letterSpacing: 1.0,
+                        ),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blue,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        elevation: 0,
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
+                        textStyle: TextStyle(fontSize: (width <= 550) ? 13 : 17),
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

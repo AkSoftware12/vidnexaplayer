@@ -20,6 +20,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:new_version_plus/new_version_plus.dart';
 
+import 'SplashScreen/splash_screen.dart';
+
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -92,7 +94,7 @@ class MyApp extends StatelessWidget {
                     Locale('hi', ' '), // Hindi
                   ],
                   home: Scaffold(
-                    body:  AuthenticationWrapper(),
+                    body:  SplashScreen(),
                   ),
                 );
               },
@@ -191,218 +193,8 @@ class NotificationService {
   }
 }
 
-/// 🎨 Custom Upgrade Dialog
-/// 🎨 Custom Upgrade Dialog with improved UI
 
-class CustomUpgradeDialog extends StatelessWidget {
-  final String androidAppUrl = 'https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer&pcampaignid=web_share';
-  final String iosAppUrl = 'https://apps.apple.com/app/idYOUR_IOS_APP_ID'; // Replace with your iOS app URL
-  final String currentVersion; // Old version
-  final String newVersion; // New version
-  final List<String> releaseNotes; // Release notes
 
-  const CustomUpgradeDialog({
-    Key? key,
-    required this.currentVersion,
-    required this.newVersion,
-    required this.releaseNotes,
-  }) : super(key: key);
 
-  Future<void> _launchStore() async {
-    final Uri androidUri = Uri.parse(androidAppUrl);
-    final Uri iosUri = Uri.parse(iosAppUrl);
-
-    if (Theme.of(navigatorKey.currentContext!).platform == TargetPlatform.iOS) {
-      if (await canLaunchUrl(iosUri)) {
-        await launchUrl(iosUri, mode: LaunchMode.externalApplication);
-      }
-    } else {
-      if (await canLaunchUrl(androidUri)) {
-        await launchUrl(androidUri, mode: LaunchMode.externalApplication);
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Dialog(
-      insetPadding: EdgeInsets.symmetric(horizontal: 10.sp, vertical: 20.sp),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.sp)),
-      elevation: 12,
-      child: Container(
-        constraints: BoxConstraints(maxWidth: 420),
-        padding: EdgeInsets.all(25.sp),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            colors: [HexColor('#4A00E0'), HexColor('#8E2DE2')],
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-          ),
-          borderRadius: BorderRadius.circular(25.sp),
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Container(
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  gradient: RadialGradient(
-                    colors: [
-                      HexColor('#FFFFFF'),
-                      HexColor('#4A00E0').withOpacity(0.9),
-                    ],
-                    radius: 0.85,
-                    center: Alignment.center,
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.white60,
-                      blurRadius: 30,
-                      spreadRadius: 4,
-                    ),
-                  ],
-                ),
-                padding: EdgeInsets.all(20.sp),
-                child: Icon(
-                  Icons.rocket_launch_outlined,
-                  size: 72.sp,
-                  color: Colors.white,
-                ),
-              ),
-              SizedBox(height: 10.sp),
-              Text(
-                "🚀 New Update Available!",
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
-                  fontSize: 20.sp,
-                  fontWeight: FontWeight.bold,
-                  letterSpacing: 1.2,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black.withOpacity(0.4),
-                      offset: Offset(1, 1),
-                      blurRadius: 3,
-                    ),
-                  ],
-                ),
-                textAlign: TextAlign.center,
-              ),
-              SizedBox(height: 10.sp),
-              Center(
-                child: Text(
-                  "A new version of Upgrader is available! Version $newVersion is now available - you have $currentVersion",
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-              SizedBox(height: 10.sp),
-
-              Center(
-                child: Text(
-                  " Would you like to update it now?",
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
-                    fontSize: 12.sp,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ),
-              // SizedBox(height: 15.sp),
-              // Text(
-              //   "A fresh version of this app is ready for you.\nUpdate now to enjoy the latest features and improvements!",
-              //   style: GoogleFonts.poppins(
-              //     color: Colors.white.withOpacity(0.9),
-              //     fontSize: 13.sp,
-              //     height: 1.5,
-              //     fontWeight: FontWeight.w500,
-              //   ),
-              //   textAlign: TextAlign.center,
-              // ),
-              SizedBox(height: 10.sp),
-              Container(
-                width: double.infinity,
-                padding: EdgeInsets.all(15.sp),
-                decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(15.sp),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      "What's New in Version $newVersion",
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
-                        fontSize: 16.sp,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                    SizedBox(height: 10.sp),
-                    ...releaseNotes.asMap().entries.map((entry) => Padding(
-                      padding: EdgeInsets.only(bottom: 8.sp),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            "• ",
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
-                              fontSize: 12.sp,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          Expanded(
-                            child: Text(
-                              entry.value,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white.withOpacity(0.9),
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    )),
-                  ],
-                ),
-              ),
-              SizedBox(height: 25.sp),
-              ElevatedButton.icon(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: HexColor('#00008B'),
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(horizontal: 28.sp, vertical: 14.sp),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20.sp),
-                    side: BorderSide(color: Colors.white60, width: 1.sp),
-                  ),
-                ),
-                icon: Icon(Icons.rocket_launch, size: 24.sp),
-                label: Text(
-                  "Update Now",
-                  style: GoogleFonts.poppins(
-                    fontSize: 15.sp,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                onPressed: () async {
-                  await _launchStore();
-                },
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-// You need to define a global navigator key to access context outside widgets
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 

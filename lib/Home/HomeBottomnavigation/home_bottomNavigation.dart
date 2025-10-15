@@ -26,6 +26,7 @@ import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/AppBar/colorList.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
+import '../../SplashScreen/splash_screen.dart';
 import '../../Utils/textSize.dart';
 import '../../VideoPLayer/AllVideo/all_videos.dart';
 import '../../app_store/app_store.dart';

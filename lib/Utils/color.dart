@@ -3,6 +3,7 @@ import 'package:videoplayer/HexColorCode/HexColor.dart' show HexColor;
 
 class ColorSelect {
   static final maineColor=HexColor('#4e14d1');
+  static final maineColor2=HexColor('#081740');
   static final subtextColor=HexColor('#4B5563');
   static final titletextColor=HexColor('#111827');
 

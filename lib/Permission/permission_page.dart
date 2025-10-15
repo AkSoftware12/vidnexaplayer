@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -64,6 +65,7 @@ class _HomeScreenState extends State<PermissionPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: HexColor('#081740'),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -86,12 +88,13 @@ class _HomeScreenState extends State<PermissionPage> {
                   height: 60.sp,
                 ),
 
+
                 Center(
                   child: Text('Grant Permission',
                     style: GoogleFonts.openSans(
                       fontSize: 22.sp,
                       fontWeight: FontWeight.w700,
-                      color: ColorSelect.titletextColor,
+                      color: Colors.white,
 
                     ),
 
@@ -105,7 +108,7 @@ class _HomeScreenState extends State<PermissionPage> {
                       style: GoogleFonts.openSans(
                         fontSize: 14.sp,
                         fontWeight: FontWeight.w600,
-                        color: ColorSelect.subtextColor,
+                        color: Colors.white,
 
                       ),
                     ),
@@ -131,7 +134,7 @@ class _HomeScreenState extends State<PermissionPage> {
                                   height: 20.sp,
                                     width: 20.sp,
 
-                                    child: Image.asset('assets/video_camera.png')),
+                                    child: Image.asset('assets/video_camera.png',color: Colors.white,)),
                                 // Icon(Icons.videocam, color: Colors.black,),
 
                                 SizedBox(width: 25.sp,),
@@ -139,7 +142,7 @@ class _HomeScreenState extends State<PermissionPage> {
                                   style: GoogleFonts.openSans(
                                     fontSize: 15.sp,
                                     fontWeight: FontWeight.w600,
-                                    color: ColorSelect.subtextColor,
+                                    color: Colors.white,
 
                                   ),
                                 ),
@@ -171,14 +174,14 @@ class _HomeScreenState extends State<PermissionPage> {
                                     height: 20.sp,
                                     width: 20.sp,
 
-                                    child: Image.asset('assets/subtitle.png')),
+                                    child: Image.asset('assets/subtitle.png',color: Colors.white,)),
 
                                 SizedBox(width: 25.sp,),
                                 Text('Subtitle files',
                                   style: GoogleFonts.openSans(
                                     fontSize: 15.sp,
                                     fontWeight: FontWeight.w600,
-                                    color: ColorSelect.subtextColor,
+                                    color: Colors.white,
 
                                   ),
                                 ),
