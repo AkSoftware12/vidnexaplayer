@@ -69,24 +69,82 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
   }
 
   // Check permissions for photos and videos
+  // Future<void> _checkPermissions() async {
+  //   bool photosPermission;
+  //   bool videosPermission;
+  //
+  //   if (Platform.isAndroid) {
+  //     photosPermission = await Permission.photos.isGranted;
+  //     videosPermission = await Permission.videos.isGranted;
+  //   } else if (Platform.isIOS) {
+  //     photosPermission = await Permission.photos.isGranted;
+  //     videosPermission = await Permission.videos.isGranted;
+  //   } else {
+  //     photosPermission = false;
+  //     videosPermission = false;
+  //   }
+  //
+  //   if (mounted) {
+  //     setState(() {
+  //       hasPermissions = photosPermission && videosPermission;
+  //     });
+  //
+  //     if (hasPermissions) {
+  //       await _loadVideos(); // Load videos if permissions are granted
+  //     }
+  //   }
+  // }
+
+  // Request permissions for photos and videos
+
+  Future<int> _getAndroidSdkInt() async {
+    if (Platform.isAndroid) {
+      final deviceInfo = DeviceInfoPlugin();
+      final androidInfo = await deviceInfo.androidInfo;
+      return androidInfo.version.sdkInt;
+    }
+    return 0; // Non-Android
+  }
+
   Future<void> _checkPermissions() async {
-    bool photosPermission;
-    bool videosPermission;
+    bool hasPhotosPermission;
+    bool hasVideosPermission;
+    int sdkInt = await _getAndroidSdkInt();
 
     if (Platform.isAndroid) {
-      photosPermission = await Permission.photos.isGranted;
-      videosPermission = await Permission.videos.isGranted;
+      if (sdkInt < 33) {
+        // Android 12 aur neeche: Storage permission use karo (photos/videos ke liye)
+        PermissionStatus storageStatus = await Permission.storage.status;
+        if (!storageStatus.isGranted) {
+          storageStatus = await Permission.storage.request();
+        }
+        hasPhotosPermission = storageStatus.isGranted;
+        hasVideosPermission = storageStatus.isGranted; // Same storage for both
+      } else {
+        // Android 13+: Granular permissions
+        hasPhotosPermission = await Permission.photos.isGranted;
+        hasVideosPermission = await Permission.videos.isGranted;
+        if (!hasPhotosPermission) {
+          await Permission.photos.request();
+          hasPhotosPermission = await Permission.photos.isGranted;
+        }
+        if (!hasVideosPermission) {
+          await Permission.videos.request();
+          hasVideosPermission = await Permission.videos.isGranted;
+        }
+      }
     } else if (Platform.isIOS) {
-      photosPermission = await Permission.photos.isGranted;
-      videosPermission = await Permission.videos.isGranted;
+      hasPhotosPermission = await Permission.photos.isGranted;
+      hasVideosPermission = await Permission.videos.isGranted;
+      // iOS pe request bhi add kar sakte ho agar chahiye
     } else {
-      photosPermission = false;
-      videosPermission = false;
+      hasPhotosPermission = false;
+      hasVideosPermission = false;
     }
 
     if (mounted) {
       setState(() {
-        hasPermissions = photosPermission && videosPermission;
+        hasPermissions = hasPhotosPermission && hasVideosPermission;
       });
 
       if (hasPermissions) {
@@ -94,8 +152,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
       }
     }
   }
-
-  // Request permissions for photos and videos
   Future<void> _requestPermissions() async {
     Map<Permission, PermissionStatus> statuses = await [
       Permission.photos,
@@ -119,7 +175,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
     }
   }
 
-  // Load videos from device
   Future<void> _loadVideos() async {
     if (mounted) {
       setState(() {
@@ -134,25 +189,12 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
       Map<String, List<File>> tempVideosByFolder = {};
 
       if (Platform.isAndroid) {
-        List<Directory> directories = [
-          Directory('/storage/emulated/0/'),
-          Directory('/storage/emulated/0/Movies'),
-          Directory('/storage/emulated/0/DCIM'),
-          Directory('/storage/emulated/0/Download'),
-          Directory('/storage/emulated/0/Videos'),
-        ];
+        // 🔸 Root of internal storage
+        Directory rootDir = Directory('/storage/emulated/0');
 
-        directories = directories.where((dir) => dir.existsSync()).toList();
-        await Future.wait(directories.map((dir) async {
-          if (await dir.exists()) {
-            await _scanDirectory(dir, videoExtensions, tempVideosByFolder);
-            if (mounted) {
-              setState(() {
-                videosByFolder = Map.from(tempVideosByFolder);
-              });
-            }
-          }
-        }));
+        if (await rootDir.exists()) {
+          await _scanDirectory(rootDir, videoExtensions, tempVideosByFolder);
+        }
       } else if (Platform.isIOS) {
         Directory? dir = await Directory.systemTemp.createTemp();
         await _scanDirectory(dir, videoExtensions, tempVideosByFolder);
@@ -174,21 +216,29 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
     }
   }
 
-  Future<void> _scanDirectory(Directory dir, List<String> videoExtensions,
-      Map<String, List<File>> tempVideosByFolder) async {
+  Future<void> _scanDirectory(
+      Directory dir,
+      List<String> videoExtensions,
+      Map<String, List<File>> tempVideosByFolder,
+      ) async {
     try {
+      // ❌ Skip Android/data and obb folders
       if (dir.path.contains('/Android/data') || dir.path.contains('/Android/obb')) {
         return;
       }
 
-      await for (var entity in dir.list(recursive: false)) {
+      List<FileSystemEntity> entities = dir.listSync(recursive: false);
+
+      for (var entity in entities) {
         if (!mounted) return;
+
         if (entity is File &&
             videoExtensions.any((ext) => entity.path.toLowerCase().endsWith(ext))) {
           String folderPath = entity.parent.path;
           String folderName = path.basename(folderPath);
           tempVideosByFolder.putIfAbsent(folderName, () => []).add(entity);
         } else if (entity is Directory) {
+          // Recursively go deeper
           await _scanDirectory(entity, videoExtensions, tempVideosByFolder);
         }
       }
@@ -196,6 +246,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
       print('Error scanning directory ${dir.path}: $e');
     }
   }
+
 
   Future<void> _loadRecentlyPlayed() async {
     try {
@@ -256,7 +307,6 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
 
   @override
   void didPopNext() {
-    // Called when HomeScreen is revealed after popping another screen
     _checkPermissions(); // Re-check permissions and load videos if granted
     _loadRecentlyPlayed(); // Refresh recently played videos
   }

@@ -1,8 +1,11 @@
+import 'package:animate_do/animate_do.dart';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/widgets.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:lottie/lottie.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -14,15 +17,35 @@ class PermissionPage extends StatefulWidget {
   const PermissionPage({super.key});
 
   @override
-  State<PermissionPage> createState() => _HomeScreenState();
+  State<PermissionPage> createState() => _PermissionPageState();
 }
 
-class _HomeScreenState extends State<PermissionPage> {
+class _PermissionPageState extends State<PermissionPage> with TickerProviderStateMixin {
+  late AnimationController _animationController;
+  late Animation<double> _fadeAnimation;
+  late Animation<Offset> _slideAnimation;
+
   @override
   void initState() {
     super.initState();
+    _animationController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeInOut),
+    );
+    _slideAnimation = Tween<Offset>(begin: const Offset(0, 0.3), end: Offset.zero).animate(
+      CurvedAnimation(parent: _animationController, curve: Curves.easeOutBack),
+    );
+    _animationController.forward();
   }
 
+  @override
+  void dispose() {
+    _animationController.dispose();
+    super.dispose();
+  }
   Future<void> requestPermissions() async {
     Map<Permission, PermissionStatus> statuses = await [
       Permission.camera,
@@ -62,222 +85,232 @@ class _HomeScreenState extends State<PermissionPage> {
       MaterialPageRoute(builder: (context) => const HomeBottomNavigation(bottomIndex: 0,)),
     );
   }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: HexColor('#081740'),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Container(),
-            Container(),
-            Container(),
-            Container(),
+      body: SingleChildScrollView(
+        child: FadeTransition(
+          opacity: _fadeAnimation,
+          child: SlideTransition(
+            position: _slideAnimation,
+            child: SafeArea(
+              child: Padding(
+                padding: EdgeInsets.symmetric(horizontal: 10.sp),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
 
+                    FadeInDown(
+                      duration: const Duration(milliseconds: 800),
+                      child: Hero(
+                        tag: 'app_logo',
+                        child: Container(
+                          height: MediaQuery.of(context).size.height * 0.4,
+                          width: double.infinity,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 20.sp,
+                                offset: Offset(0, 1.sp),
+                              ),
+                            ],
+                          ),
 
-            Column(
-              children: [
+                          child:Lottie.asset('assets/permisssion.json'),
 
-                SizedBox(
-                    height: 130.sp,
-                    width: 130.sp,
-                    child: Image.asset('assets/appblue.png')),
-
-                SizedBox(
-                  height: 60.sp,
-                ),
-
-
-                Center(
-                  child: Text('Grant Permission',
-                    style: GoogleFonts.openSans(
-                      fontSize: 22.sp,
-                      fontWeight: FontWeight.w700,
-                      color: Colors.white,
+                          // child: ClipOval(
+                          //   child:Lottie.asset('assets/permission.json'),
+                          //
+                          //   // Image.asset(
+                          //   //   'assets/appblue.png',
+                          //   //   fit: BoxFit.cover,
+                          //   // ),
+                          // ),
+                        ),
+                      ),
 
                     ),
 
-                  ),
-                ),
-                Padding(
-                  padding:  EdgeInsets.all(5.sp),
-                  child: Center(
-                    child: Text('Please grant permission to access all \n  video files on your device ',
+                    // Logo with subtle shadow
+                    // SizedBox(height: 40.sp),
+
+                    // Title
+                    Text(
+                      'Grant Permissions',
+                      textAlign: TextAlign.center,
+                      style: GoogleFonts.openSans(
+                        fontSize: 22.sp,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                    SizedBox(height: 2.sp),
+
+                    // Subtitle
+                    Text(
+                      'Please grant access to all video files on your device for the best experience',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.openSans(
                         fontSize: 14.sp,
-                        fontWeight: FontWeight.w600,
-                        color: Colors.white,
-
+                        fontWeight: FontWeight.w400,
+                        color: Colors.white70,
+                        height: 1.4,
                       ),
                     ),
-                  ),
-                ),
+                    SizedBox(height: 20.sp),
 
-                Center(
-                  child: Padding(
-                    padding:  EdgeInsets.only(top: 28.sp),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
+                    // Features section with cards
+                    _buildFeatureCard(
+                      iconPath: 'assets/video_camera.png',
+                      title: 'All Video Formats',
+                      subtitle: 'Support for MP4, AVI, MKV & more',
+                    ),
+                    SizedBox(height: 10.sp),
+                    _buildFeatureCard(
+                      iconPath: 'assets/subtitle.png',
+                      title: 'Subtitle Files',
+                      subtitle: 'SRT, ASS, VTT & embedded subs',
+                    ),
+                    SizedBox(height: 50.sp),
 
-                        SizedBox(),
+                    // Grant Permissions Button
 
-                        Center(
-                          child: Container(
-                            width: 200.sp,
+                    FadeInUp(
+                      duration: const Duration(milliseconds: 1500),
+                      child:  Padding(
+                        padding:  EdgeInsets.all(10.sp),
+                        child: SizedBox(
+                          width: double.infinity,
+                          height: 55.sp,
+
+                          child: TextButton(
+                            onPressed: requestPermissions,
+                            style: TextButton.styleFrom(
+                              backgroundColor: HexColor('#008000'),
+                              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(60.sp),
+                                side: const BorderSide(color: Colors.white, width: 1),
+                              ),
+                            ),
                             child: Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-
-                                SizedBox(
-                                  height: 20.sp,
-                                    width: 20.sp,
-
-                                    child: Image.asset('assets/video_camera.png',color: Colors.white,)),
-                                // Icon(Icons.videocam, color: Colors.black,),
-
-                                SizedBox(width: 25.sp,),
-                                Text('All Video formats',
+                                Icon(Icons.security, size: 20.sp),
+                                SizedBox(width: 8.sp),
+                                Text(
+                                  'Grant All Permissions',
                                   style: GoogleFonts.openSans(
-                                    fontSize: 15.sp,
+                                    fontSize: 16.sp,
                                     fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-
                                   ),
                                 ),
                               ],
                             ),
                           ),
                         ),
-                        SizedBox(),
-
-                      ],
+                      ),
                     ),
-                  ),
-                ),
-                Center(
-                  child: Padding(
-                    padding:  EdgeInsets.only(top: 10.sp),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-
-                        SizedBox(),
-
-                        Center(
-                          child: Container(
-                            width: 200.sp,
-                            child: Row(
-                              children: [
-                                SizedBox(
-                                    height: 20.sp,
-                                    width: 20.sp,
-
-                                    child: Image.asset('assets/subtitle.png',color: Colors.white,)),
-
-                                SizedBox(width: 25.sp,),
-                                Text('Subtitle files',
-                                  style: GoogleFonts.openSans(
-                                    fontSize: 15.sp,
-                                    fontWeight: FontWeight.w600,
-                                    color: Colors.white,
-
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        SizedBox(),
-
-                      ],
-                    ),
-                  ),
-                ),
-              ],
-            ),
 
 
-        Padding(
-          padding:  EdgeInsets.only(left: 20.sp,right: 20.sp),
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.all(10.0),
-              child: SizedBox(
-                width: double.infinity, // Full width
-                height: 50, // Height 60
-                child: Ink(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [ColorSelect.maineColor, ColorSelect.maineColor],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: BorderRadius.circular(15), // Rounded corners with radius 30
-                  ),
-                  child: InkWell(
-                    borderRadius: BorderRadius.circular(15),
-                    onTap: () {
-                      requestPermissions();
-                    },
-                    child: Center(
+
+                    SizedBox(height: 35.sp),
+
+                    // Not Now Option
+                    GestureDetector(
+                      onTap: () async {
+
+                        Navigator.pushReplacement(
+                          context,
+                          MaterialPageRoute(builder: (context) => const HomeBottomNavigation(bottomIndex: 0,)),
+                        );
+                      },
                       child: Text(
-                        'ALL PERMISSION',
+                        'Skip for now ',
                         style: GoogleFonts.openSans(
                           fontSize: 16.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-
+                          fontWeight: FontWeight.w500,
+                          color: ColorSelect.subtextColor,
+                          decoration: TextDecoration.underline,
                         ),
                       ),
                     ),
-                  ),
+                    SizedBox(height: 50.sp),
+                  ],
                 ),
               ),
             ),
           ),
         ),
-
-            Center(
-              child: Column(
-                children: [
-                  GestureDetector(
-                    onTap:(){
-
-                      Navigator.pushReplacement(
-                        context,
-                        MaterialPageRoute(builder: (context) => const HomeBottomNavigation(bottomIndex: 0,)),
-                      );
-
-
-                    },
-                    child: SizedBox(
-                      width: 100.sp,
-                      child: Center(
-                        child: Text('Not Now',
-                          style:TextStyle(
-                              color: ColorSelect.subtextColor,
-                              fontSize: 15.sp,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      ),
-                    ),
-                  ),
-                  SizedBox(
-                    height: 20.sp,
-                  )
-                ],
-              ),
-            ),
-
-            Container(),
-
-
-          ],
-        ),
       ),
     );
+  }
 
+  Widget _buildFeatureCard({
+    required String iconPath,
+    required String title,
+    required String subtitle,
+  }) {
+    return Container(
+      padding: EdgeInsets.all(8.sp),
+      decoration: BoxDecoration(
+        color: HexColor('#0A1A3F').withOpacity(0.8),
+        borderRadius: BorderRadius.circular(16.sp),
+        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.2),
+            blurRadius: 10.sp,
+            offset: Offset(0, 4.sp),
+          ),
+        ],
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: EdgeInsets.all(8.sp),
+            decoration: BoxDecoration(
+              color: ColorSelect.maineColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(12.sp),
+            ),
+            child: Image.asset(
+              iconPath,
+              height: 20.sp,
+              width: 20.sp,
+              color: Colors.white,
+            ),
+          ),
+          SizedBox(width: 16.sp),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: GoogleFonts.openSans(
+                    fontSize: 14.sp,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+                Text(
+                  subtitle,
+                  style: GoogleFonts.openSans(
+                    fontSize: 12.sp,
+                    fontWeight: FontWeight.w400,
+                    color: Colors.white60,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }

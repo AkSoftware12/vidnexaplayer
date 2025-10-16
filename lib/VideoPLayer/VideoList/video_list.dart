@@ -123,7 +123,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen> {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         title: Text(
-          widget.folderName,
+          '${widget.folderName} ${'(${widget.videos.length.toString()})'}',
           style: const TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.black,

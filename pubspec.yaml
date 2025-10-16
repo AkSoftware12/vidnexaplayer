@@ -86,6 +86,7 @@ dependencies:
   flutter_speed_dial: ^7.0.0
   font_awesome_flutter: ^10.9.1
   animate_do: ^4.2.0
+  lottie: ^3.3.1
 
 
 
@@ -118,6 +119,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/
+    - assets/permisssion.json
     - assets/fonts/
   fonts:
     - family: PoppinsRegular

@@ -145,23 +145,24 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           ),
                         ),
                       ),
-                      SizedBox(height: 10.sp),
+                      SizedBox(height: 5.sp),
                       Center(
                         child: Padding(
-                          padding:  EdgeInsets.all(5.sp),
+                          padding:  EdgeInsets.all(0.sp),
                           child: Container(
+                            margin: EdgeInsets.zero,
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 colors: [
-                                  HexColor('#c30917'),
-                                  Colors.purple,
+                                  // HexColor('#c30917'),
+                                  // Colors.purple,
                                   Colors.blue,
                                   Colors.blue,
-                                  Colors.purple,
-                                  HexColor('#c30917'),
+                                  // Colors.purple,
+                                  // HexColor('#c30917'),
                                 ],
                               ),
-                              borderRadius: BorderRadius.circular(20),
+                              borderRadius: BorderRadius.circular(5),
                               boxShadow: [
                                 BoxShadow(
                                   color: Colors.black26,
@@ -170,7 +171,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 ),
                               ],
                             ),
-                            padding: EdgeInsets.all(10),
+                            padding: EdgeInsets.all(3.sp),
                             child: Center(
                               child: Column(
                                 crossAxisAlignment: CrossAxisAlignment.center,
@@ -180,16 +181,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.center,
                                     mainAxisAlignment: MainAxisAlignment.center,
                                     children: [
-                                      const Icon(
+                                       Icon(
                                         Icons.safety_check_rounded,
                                         color: Colors.white,
-                                        size: 20,
+                                        size: 15.sp,
                                       ),
-                                      SizedBox(width: 10),
+                                      SizedBox(width: 5.sp),
                                       Text(
                                         'Your data is safe with us.',
                                         style: TextStyle(
-                                          fontSize: 15.sp,
+                                          fontSize: 12.sp,
                                           fontWeight: FontWeight.w600,
                                           color: Colors.white,
                                         ),
@@ -277,74 +278,111 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 _currentPage + 1 == contents.length
-                    ? Padding(
-                  padding: const EdgeInsets.all(10),
+                    ?
+                Padding(
+                  padding:  EdgeInsets.all(10.sp),
                   child: SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton(
+                    height: 40.sp,
+
+                    child: TextButton(
                       onPressed: () {
                         Navigator.push(
                           context,
                           MaterialPageRoute(builder: (context) => const PermissionPage()),
                         );
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+
+                      style: TextButton.styleFrom(
+                        backgroundColor: HexColor('#008000'),
+                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(13),
+                          borderRadius: BorderRadius.circular(20.sp),
+                          side: const BorderSide(color: Colors.white, width: 1),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                        textStyle: TextStyle(fontSize: (width <= 550) ? 13 : 17),
                       ),
-                      child: Text(
-                        "Get Started",
-                        style: GoogleFonts.openSans(
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          // SvgPicture.asset(
+                          //   'assets/svgviewer-output.svg',
+                          //   color: Colors.white,
+                          //   width: 25.sp,
+                          //   height: 25.sp,
+                          // ),
+                          // SizedBox(
+                          //   width: 5.sp,
+                          // ),
+                          Text(
+                            "Get Started",
+                            style: GoogleFonts.openSans(
+                              fontSize: 15.sp,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 )
-                    : Padding(
-                  padding: const EdgeInsets.all(10),
+
+
+
+                    :
+
+                Padding(
+                  padding:  EdgeInsets.all(10.sp),
                   child: SizedBox(
                     width: double.infinity,
-                    child: ElevatedButton.icon(
+                    height: 40.sp,
+
+                    child: TextButton(
                       onPressed: () {
                         _controller.nextPage(
                           duration: const Duration(milliseconds: 200),
                           curve: Curves.easeIn,
                         );
                       },
-                      icon: SvgPicture.asset(
-                        'assets/svgviewer-output.svg',
-                        color: Colors.white,
-                        width: 20.sp,
-                        height: 20.sp,
-                      ),
-                      label: Text(
-                        "Next",
-                        style: GoogleFonts.openSans(
-                          fontSize: 15.sp,
-                          fontWeight: FontWeight.w700,
-                          color: Colors.white,
-                          letterSpacing: 1.0,
-                        ),
-                      ),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.blue,
+
+                      style: TextButton.styleFrom(
+                        backgroundColor: HexColor('#008000'),
+                        padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(10),
+                          borderRadius: BorderRadius.circular(20.sp),
+                          side: const BorderSide(color: Colors.white, width: 1),
                         ),
-                        elevation: 0,
-                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
-                        textStyle: TextStyle(fontSize: (width <= 550) ? 13 : 17),
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          SvgPicture.asset(
+                            'assets/svgviewer-output.svg',
+                            color: Colors.white,
+                            width: 25.sp,
+                            height: 25.sp,
+                          ),
+                          SizedBox(
+                            width: 5.sp,
+                          ),
+                          Text(
+                            "Next",
+                            style: GoogleFonts.openSans(
+                              fontSize: 15.sp,
+                              fontWeight: FontWeight.w700,
+                              color: Colors.white,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
                 ),
+
+
+
               ],
             ),
           ),
