@@ -21,6 +21,7 @@ import 'package:videoplayer/Utils/color.dart';
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
 import '../../DeviceSpace/device_space.dart';
+import '../../Docouments/docouments.dart';
 import '../../NetWork Stream/stream_video.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
@@ -334,7 +335,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => NotificationScreen(),
+                              builder: (context) => AllDevicePdfsScreen(),
                             ),
                           );
                         },

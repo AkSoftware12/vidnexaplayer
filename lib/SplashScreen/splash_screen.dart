@@ -53,8 +53,8 @@ class _SplashScreenState extends State<SplashScreen> {
           children: [
             // Logo image
             Container(
-              height: 150.sp,
-              width: 150.sp,
+              height: 130.sp,
+              width: 130.sp,
               decoration: const BoxDecoration(
                   color: Colors.white,
                   borderRadius: BorderRadius.all(Radius.circular(20))
@@ -66,8 +66,8 @@ class _SplashScreenState extends State<SplashScreen> {
 
                   child: Image.asset(
                     'assets/appblue.png',
-                    width: 130.sp,
-                    height: 130.sp,
+                    width: 100.sp,
+                    height: 100.sp,
                   ),
                 ),
               ),

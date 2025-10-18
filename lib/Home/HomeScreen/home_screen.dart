@@ -185,7 +185,7 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
     }
 
     try {
-      final videoExtensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.3gp'];
+      final videoExtensions = ['.mp4', '.mkv', '.avi', '.mov', '.wmv', '.flv', '.3gp',];
       Map<String, List<File>> tempVideosByFolder = {};
 
       if (Platform.isAndroid) {
