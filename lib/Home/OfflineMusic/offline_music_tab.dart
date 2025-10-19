@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -43,27 +44,84 @@ class _DashBoardScreenState extends State<OfflineMusicTabScreen>
   }
 
   // Check audio permission for Android 14 (API 34)
-  Future<void> _checkPermissions() async {
-    bool audioPermission;
+  // Future<void> _checkPermissions() async {
+  //   bool audioPermission;
+  //
+  //   if (Platform.isAndroid || Platform.isIOS) {
+  //     audioPermission = await Permission.audio.isGranted;
+  //   } else {
+  //     audioPermission = false;
+  //   }
+  //
+  //   if (mounted) {
+  //     setState(() {
+  //       _hasPermissions = audioPermission;
+  //       _isLoading = false;
+  //     });
+  //
+  //     if (_hasPermissions) {
+  //       await _loadMusic(); // Load music data when permission is granted
+  //     }
+  //   }
+  // }
 
-    if (Platform.isAndroid || Platform.isIOS) {
-      audioPermission = await Permission.audio.isGranted;
+
+  Future<int> _getAndroidSdkInt() async {
+    if (Platform.isAndroid) {
+      final deviceInfo = DeviceInfoPlugin();
+      final androidInfo = await deviceInfo.androidInfo;
+      return androidInfo.version.sdkInt;
+    }
+    return 0; // Non-Android
+  }
+
+  Future<void> _checkPermissions() async {
+    bool hasAudioPermission = false;
+    int sdkInt = await _getAndroidSdkInt();
+
+    if (Platform.isAndroid) {
+      if (sdkInt >= 33) {
+        // Android 13+: Granular media permission
+        PermissionStatus status = await Permission.audio.status;
+        if (!status.isGranted) {
+          status = await Permission.audio.request();
+        }
+        hasAudioPermission = status.isGranted;
+      } else {
+        // Android 12 aur neeche: Storage permission
+        PermissionStatus status = await Permission.storage.status;
+        if (!status.isGranted) {
+          status = await Permission.storage.request();
+        }
+        hasAudioPermission = status.isGranted;
+      }
+    } else if (Platform.isIOS) {
+      // iOS: Media library for music files
+      PermissionStatus status = await Permission.mediaLibrary.status;
+      if (!status.isGranted) {
+        status = await Permission.mediaLibrary.request();
+      }
+      hasAudioPermission = status.isGranted;
     } else {
-      audioPermission = false;
+      hasAudioPermission = false;
     }
 
     if (mounted) {
       setState(() {
-        _hasPermissions = audioPermission;
+        _hasPermissions = hasAudioPermission;
         _isLoading = false;
       });
 
       if (_hasPermissions) {
-        await _loadMusic(); // Load music data when permission is granted
+        await _loadMusic(); // Load music if granted
+      } else {
+        // Optional: User ko alert dikhao ya settings open karo
+        print('Audio access denied');
+        // if (await Permission.audio.shouldShowRequestRationale) { /* Show rationale */ }
+        // await openAppSettings(); // Settings open karne ke liye
       }
     }
   }
-
   // Request audio permission for Android 14 (API 34)
   Future<void> _requestPermissions() async {
     final status = await Permission.audio.request();

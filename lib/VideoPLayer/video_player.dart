@@ -8,13 +8,14 @@ import 'package:gallery_saver_plus/gallery_saver.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:screen_brightness/screen_brightness.dart';
-import 'package:screenshot/screenshot.dart';
 import 'package:video_player/video_player.dart';
 import 'dart:io';
 import 'package:flutter/services.dart'; // For SystemChrome
 import '../RecentlyVideos/RecentlyPlayedManager/recently_played_manager.dart';
 import '../Utils/color.dart';
 import 'custom_video_appBar.dart';
+import 'package:screenshot/screenshot.dart';
+
 
 class VideoPlayerScreen extends StatefulWidget {
   final List<FileSystemEntity>?videos;
@@ -370,152 +371,188 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
       builder: (BuildContext context) {
         return StatefulBuilder(
           builder: (context, setDialogState) {
-            return AlertDialog(
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(20),
+            return Dialog(
+              backgroundColor: Colors.transparent, // keep transparent
+              insetPadding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 40,
               ),
-              title: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    "Adjust Speed",
-                    style: GoogleFonts.radioCanada(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.black,
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white, // semi-transparent bg
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.3),
+                      blurRadius: 15,
+                      offset: const Offset(0, 6),
                     ),
-                  ),
-                  IconButton(
-                    onPressed: () {
-                      setState(() {
-                        _playbackSpeed = originalSpeed;
-                        _videoPlayerController.setPlaybackSpeed(originalSpeed);
-                      });
-                      Navigator.pop(context);
-                    },
-                    icon: Icon(Icons.close, color: Colors.red[600]),
-                  ),
-                ],
-              ),
-              content: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  // Speed value display
-                  Text(
-                    "${newSpeed.toStringAsFixed(1)}x",
-                    style: GoogleFonts.radioCanada(
-                      fontSize: 20.sp,
-                      fontWeight: FontWeight.bold,
-                      color: ColorSelect.maineColor,
-                    ),
-                  ),
-                  SizedBox(height: 12.sp),
-                  // Linear Slider (like a progress bar for speed)
-                  Slider(
-                    value: newSpeed,
-                    min: 0.5,
-                    max: 3.0,
-                    divisions: 25,
-                    // For 0.5 to 3.0 in 0.1 steps
-                    activeColor: ColorSelect.maineColor,
-                    inactiveColor: Colors.grey[300],
-                    onChanged: (value) {
-                      setDialogState(() {
-                        newSpeed = value;
-                      });
-                      // Real-time update to player
-                      setState(() {
-                        _playbackSpeed = value;
-                      });
-                      _videoPlayerController.setPlaybackSpeed(value);
-                    },
-                  ),
-                  // Progress-like labels
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(
-                        "0.5x",
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12.sp,
-                        ),
-                      ),
-                      Text(
-                        "1.0x",
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12.sp,
-                        ),
-                      ),
-                      Text(
-                        "2.0x",
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12.sp,
-                        ),
-                      ),
-                      Text(
-                        "3.0x",
-                        style: TextStyle(
-                          color: Colors.grey[600],
-                          fontSize: 12.sp,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-              actions: [
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: ColorSelect.maineColor),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: () {
-                    setDialogState(() {
-                      newSpeed = 1.0; // Reset to 1.0x
-                    });
-                    // Immediately update player
-                    setState(() {
-                      _playbackSpeed = 1.0;
-                    });
-                    _videoPlayerController.setPlaybackSpeed(1.0);
-                  },
-                  child: Text(
-                    "Reset",
-                    style: TextStyle(
-                      color: ColorSelect.maineColor,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                  ],
                 ),
-                OutlinedButton(
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.red[400]!),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    // Header
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          "Adjust Speed",
+                          style: GoogleFonts.radioCanada(
+                            fontSize: 16.sp,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.black,
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            setState(() {
+                              _playbackSpeed = originalSpeed;
+                              _videoPlayerController.setPlaybackSpeed(originalSpeed);
+                            });
+                            Navigator.pop(context);
+                          },
+                          icon: Icon(Icons.close, color: Colors.red[600]),
+                        ),
+                      ],
                     ),
-                  ),
-                  onPressed: () {
-                    setState(() {
-                      _playbackSpeed = originalSpeed;
-                    });
-                    _videoPlayerController.setPlaybackSpeed(originalSpeed);
-                    Navigator.pop(context);
-                  },
-                  child: Text(
-                    "Cancel",
-                    style: TextStyle(
-                      color: Colors.red[700],
-                      fontWeight: FontWeight.w600,
+                     SizedBox(height: 8.sp),
+                    // Volume %
+                    Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Speed value display
+                        Text(
+                          "${newSpeed.toStringAsFixed(1)}x",
+                          style: GoogleFonts.radioCanada(
+                            fontSize: 20.sp,
+                            fontWeight: FontWeight.bold,
+                            color: ColorSelect.maineColor,
+                          ),
+                        ),
+                        SizedBox(height: 5.sp),
+                        // Linear Slider (like a progress bar for speed)
+                        Slider(
+                          value: newSpeed,
+                          min: 0.5,
+                          max: 3.0,
+                          divisions: 25,
+                          // For 0.5 to 3.0 in 0.1 steps
+                          activeColor: ColorSelect.maineColor,
+                          inactiveColor: Colors.grey[300],
+                          onChanged: (value) {
+                            setDialogState(() {
+                              newSpeed = value;
+                            });
+                            // Real-time update to player
+                            setState(() {
+                              _playbackSpeed = value;
+                            });
+                            _videoPlayerController.setPlaybackSpeed(value);
+                          },
+                        ),
+                        // Progress-like labels
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              "0.5x",
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12.sp,
+                              ),
+                            ),
+                            Text(
+                              "1.0x",
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12.sp,
+                              ),
+                            ),
+                            Text(
+                              "2.0x",
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12.sp,
+                              ),
+                            ),
+                            Text(
+                              "3.0x",
+                              style: TextStyle(
+                                color: Colors.grey[600],
+                                fontSize: 12.sp,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ),
-                  ),
+                     SizedBox(height: 15.sp),
+                    // Slider
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children:  [
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: ColorSelect.maineColor),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            setDialogState(() {
+                              newSpeed = 1.0; // Reset to 1.0x
+                            });
+                            // Immediately update player
+                            setState(() {
+                              _playbackSpeed = 1.0;
+                            });
+                            _videoPlayerController.setPlaybackSpeed(1.0);
+                          },
+                          child: Text(
+                            "Reset",
+                            style: TextStyle(
+                              color: ColorSelect.maineColor,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                        SizedBox(
+                          width: 10.sp,
+                        ),
+                        OutlinedButton(
+                          style: OutlinedButton.styleFrom(
+                            side: BorderSide(color: Colors.red[400]!),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                          ),
+                          onPressed: () {
+                            setState(() {
+                              _playbackSpeed = originalSpeed;
+                            });
+                            _videoPlayerController.setPlaybackSpeed(originalSpeed);
+                            Navigator.pop(context);
+                          },
+                          child: Text(
+                            "Cancel",
+                            style: TextStyle(
+                              color: Colors.red[700],
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
                 ),
-              ],
+              ),
             );
+
+
+
+
           },
         );
       },
