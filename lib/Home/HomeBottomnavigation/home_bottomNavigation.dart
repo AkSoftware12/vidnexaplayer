@@ -32,7 +32,7 @@ import '../../Utils/textSize.dart';
 import '../../VideoPLayer/AllVideo/all_videos.dart';
 import '../../app_store/app_store.dart';
 import '../../main.dart';
-import '../HomeScreen/home_screen.dart';
+import '../HomeScreen/home_screen.dart' hide navigatorKey;
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
 

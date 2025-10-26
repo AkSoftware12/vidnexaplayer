@@ -1,10 +1,13 @@
 import 'dart:io';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:videoplayer/Utils/color.dart';
 
 class CustomVideoAppBar extends StatelessWidget {
   final String title;
   final VoidCallback onBackPressed;
+  final bool isLandscape; // <-- add this
 
   final List<FileSystemEntity>? videos; // Video list
   final int currentIndex; // Currently playing video
@@ -17,13 +20,14 @@ class CustomVideoAppBar extends StatelessWidget {
     this.currentIndex = 0,
     this.onVideoSelected,
     super.key,
+    required this.isLandscape,
   });
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: 90.sp,
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 0),
+      // height: isLandscape ? 25.sp : null,
+      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
       decoration: BoxDecoration(
         gradient: LinearGradient(
           colors: [
@@ -58,7 +62,7 @@ class CustomVideoAppBar extends StatelessWidget {
                 title,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: 16.sp,
+                  fontSize: isLandscape ? 7.sp : 16.sp,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
                 ),
@@ -67,18 +71,18 @@ class CustomVideoAppBar extends StatelessWidget {
             ),
             SizedBox(width: 4.sp),
             // CC Button
-            _buildIconButton(
-              icon: Icons.closed_caption,
-              onPressed: () => print('CC toggled'),
-              tooltip: 'Toggle Captions',
-            ),
-            SizedBox(width: 4.sp),
-            // Music Button
-            _buildIconButton(
-              icon: Icons.music_note,
-              onPressed: () => print('Music toggled'),
-              tooltip: 'Toggle Music',
-            ),
+            // _buildIconButton(
+            //   icon: Icons.closed_caption,
+            //   onPressed: () => print('CC toggled'),
+            //   tooltip: 'Toggle Captions',
+            // ),
+            // SizedBox(width: 4.sp),
+            // // Music Button
+            // _buildIconButton(
+            //   icon: Icons.music_note,
+            //   onPressed: () => print('Music toggled'),
+            //   tooltip: 'Toggle Music',
+            // ),
             SizedBox(width: 4.sp),
             // Playlist Button
             _buildIconButton(
@@ -87,12 +91,12 @@ class CustomVideoAppBar extends StatelessWidget {
               tooltip: 'Playlist',
             ),
             SizedBox(width: 4.sp),
-            // Other Button (optional)
-            _buildIconButton(
-              icon: Icons.arrow_drop_down_circle_rounded,
-              onPressed: () => print('Other action'),
-              tooltip: 'Other',
-            ),
+            // // Other Button (optional)
+            // _buildIconButton(
+            //   icon: Icons.arrow_drop_down_circle_rounded,
+            //   onPressed: () => print('Other action'),
+            //   tooltip: 'Other',
+            // ),
           ],
         ),
       ),
@@ -127,29 +131,32 @@ class CustomVideoAppBar extends StatelessWidget {
   }
 
   // Modern playlist bottom sheet
+
   void _showVideoList(BuildContext context) {
     if (videos == null || videos!.isEmpty) return;
 
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.black87,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) {
-        return DraggableScrollableSheet(
-          expand: false,
-          initialChildSize: 0.4,
-          minChildSize: 0.2,
-          maxChildSize: 0.8,
-          builder: (context, scrollController) {
-            return Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.black87,
-                borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-              ),
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
+    Widget sheetContent(ScrollController? scrollController) {
+      return ClipRRect(
+        borderRadius: isLandscape
+            ? const BorderRadius.horizontal(left: Radius.circular(24))
+            : const BorderRadius.vertical(top: Radius.circular(24)),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+          child: Container(
+            height: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.5), // semi-transparent
+              borderRadius: isLandscape
+                  ? const BorderRadius.horizontal(left: Radius.circular(24))
+                  : const BorderRadius.vertical(top: Radius.circular(24)),
+            ),
+            child: SafeArea(
+              top: false,
+              bottom: false,
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -157,67 +164,128 @@ class CustomVideoAppBar extends StatelessWidget {
                     child: Container(
                       height: 4,
                       width: 40,
-                      margin: const EdgeInsets.only(bottom: 12),
+                      margin: const EdgeInsets.only(bottom: 16),
                       decoration: BoxDecoration(
-                        color: Colors.white30,
+                        color: Colors.white24,
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
                   ),
-                  Text(
-                    'Playlist',
+                  const Text(
+                    "Playlist",
                     style: TextStyle(
                       color: Colors.white,
-                      fontSize: 18.sp,
-                      fontWeight: FontWeight.bold,
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.8,
+                      decoration: TextDecoration.none,
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 14),
                   Expanded(
                     child: ListView.builder(
                       controller: scrollController,
+                      physics: const BouncingScrollPhysics(),
                       itemCount: videos!.length,
                       itemBuilder: (context, index) {
                         bool isPlaying = index == currentIndex;
                         String name = videos![index].path.split('/').last;
-                        return GestureDetector(
-                          onTap: () {
-                            Navigator.pop(context); // Close bottom sheet
-                            if (onVideoSelected != null) {
-                              onVideoSelected!(index); // Play selected video
-                            }
-                          },
-                          child: Container(
-                            margin: const EdgeInsets.symmetric(vertical: 6),
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                            decoration: BoxDecoration(
+
+                        return AnimatedContainer(
+                          duration: const Duration(milliseconds: 250),
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          decoration: BoxDecoration(
+                            color: isPlaying
+                                ? Colors.amber.withOpacity(0.15)
+                                : Colors.white.withOpacity(0.07),
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
                               color: isPlaying
-                                  ? Colors.amber.withOpacity(0.2)
-                                  : Colors.white.withOpacity(0.05),
-                              borderRadius: BorderRadius.circular(12),
-                              border: isPlaying
-                                  ? Border.all(color: Colors.amber, width: 1.5)
-                                  : null,
+                                  ? Colors.amberAccent.withOpacity(0.9)
+                                  : Colors.transparent,
+                              width: 1.5,
                             ),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  isPlaying ? Icons.play_circle_fill : Icons.videocam,
-                                  color: isPlaying ? Colors.amber : Colors.white,
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Text(
-                                    name,
-                                    style: TextStyle(
-                                      color: isPlaying ? Colors.amber : Colors.white,
-                                      fontWeight: isPlaying ? FontWeight.bold : FontWeight.normal,
-                                      fontSize: 14.sp,
+                          ),
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(14),
+                            onTap: () {
+                              Navigator.pop(context);
+                              if (onVideoSelected != null) {
+                                onVideoSelected!(index);
+                              }
+                            },
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 14, vertical: 12),
+                              child: Row(
+                                children: [
+                                  Container(
+                                    height: 42,
+                                    width: 42,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: isPlaying
+                                          ? const LinearGradient(
+                                        colors: [Colors.amber, Colors.orange],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      )
+                                          : const LinearGradient(
+                                        colors: [Colors.grey, Colors.white30],
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
                                     ),
-                                    overflow: TextOverflow.ellipsis,
+                                    child: Icon(
+                                      isPlaying
+                                          ? Icons.play_arrow_rounded
+                                          : Icons.videocam_rounded,
+                                      color: isPlaying
+                                          ? Colors.black
+                                          : Colors.white.withOpacity(0.9),
+                                      size: 26,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                  const SizedBox(width: 14),
+                                  Expanded(
+                                    child: Text(
+                                      name,
+                                      style: TextStyle(
+                                        color: isPlaying
+                                            ? Colors.amberAccent
+                                            : Colors.white70,
+                                        fontWeight: isPlaying
+                                            ? FontWeight.bold
+                                            : FontWeight.w500,
+                                        fontSize: 15,
+                                        decoration: TextDecoration.none,
+                                      ),
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  const SizedBox(width: 8),
+                                  if (isPlaying)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: Colors.amber.withOpacity(0.15),
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(
+                                            color: Colors.amberAccent, width: 1),
+                                      ),
+                                      child: const Text(
+                                        "Playing",
+                                        style: TextStyle(
+                                          color: Colors.amberAccent,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.w600,
+                                          decoration: TextDecoration.none,
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              ),
                             ),
                           ),
                         );
@@ -226,10 +294,59 @@ class CustomVideoAppBar extends StatelessWidget {
                   ),
                 ],
               ),
-            );
-          },
-        );
-      },
-    );
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (isLandscape) {
+      showGeneralDialog(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: '',
+        barrierColor: Colors.black38,
+        pageBuilder: (_, __, ___) {
+          return Align(
+            alignment: Alignment.centerRight,
+            child: FractionallySizedBox(
+              widthFactor: 0.35,
+              heightFactor: 1.0,
+              child: Material(
+                color: Colors.transparent,
+                child: sheetContent(ScrollController()),
+              ),
+            ),
+          );
+        },
+        transitionBuilder: (_, anim, __, child) {
+          final curvedAnim = CurvedAnimation(
+            parent: anim,
+            curve: Curves.easeOutCubic,
+          );
+          return SlideTransition(
+            position: Tween(begin: const Offset(1, 0), end: Offset.zero)
+                .animate(curvedAnim),
+            child: FadeTransition(opacity: curvedAnim, child: child),
+          );
+        },
+      );
+    } else {
+      showModalBottomSheet(
+        context: context,
+        backgroundColor: Colors.transparent,
+        isScrollControlled: true,
+        builder: (context) {
+          return DraggableScrollableSheet(
+            expand: false,
+            initialChildSize: 0.4,
+            minChildSize: 0.25,
+            maxChildSize: 0.9,
+            builder: (context, scrollController) =>
+                sheetContent(scrollController),
+          );
+        },
+      );
+    }
   }
 }

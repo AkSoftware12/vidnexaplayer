@@ -6,9 +6,11 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:video_player/video_player.dart';
 import 'package:video_thumbnail/video_thumbnail.dart';
+import '../../Home/HomeScreen/home_screen.dart';
 import '../../Utils/color.dart';
 import '../../VideoPLayer/video_player.dart';
 import '../RecentlyPlayedManager/recently_played_manager.dart';
@@ -475,6 +477,10 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                 child: FadeInAnimation(
                   child: GestureDetector(
                     onTap: () {
+
+                      // ✅ Video play करने पर recently played update करें
+                      Provider.of<VideoProvider>(context, listen: false)
+                          .addToRecentlyPlayed(videoPath);
                       Navigator.push(
                         context,
                         MaterialPageRoute(
