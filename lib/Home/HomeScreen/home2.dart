@@ -297,7 +297,8 @@ class _HomeScreenState extends State<DemoHomeScreen>
                   child: CircularProgressIndicator(color: Colors.blue),
                 ),
               )
-                  : _albums.isEmpty
+                  :
+              _albums.isEmpty
                   ? Center(
                 child: Padding(
                   padding: EdgeInsets.only(top: 50.sp),
