@@ -671,18 +671,18 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
                     Colors.blue,
                     onTap: () {
                       Navigator.pop(context);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => VideoFolderScreen(
-                            folderName: folderName,
-                            videos: videos,
-                          ),
-                        ),
-                      ).then((value) {
-                        _permissionsChecked = false;
-                        _checkPermissions();
-                      });
+                      // Navigator.push(
+                      //   context,
+                      //   MaterialPageRoute(
+                      //     builder: (context) => VideoFolderScreen(
+                      //       folderName: folderName,
+                      //       videos: videos,
+                      //     ),
+                      //   ),
+                      // ).then((value) {
+                      //   _permissionsChecked = false;
+                      //   _checkPermissions();
+                      // });
                     },
                   ),
                   _buildOptionCard(
@@ -1101,18 +1101,18 @@ class _HomeScreenState extends State<HomeScreen> with RouteAware, WidgetsBinding
 
                         return GestureDetector(
                           onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (context) => VideoFolderScreen(
-                                  folderName: folderName,
-                                  videos: videos,
-                                ),
-                              ),
-                            ).then((value) {
-                              _permissionsChecked = false;
-                              _checkPermissions();
-                            });
+                            // Navigator.push(
+                            //   context,
+                            //   MaterialPageRoute(
+                            //     builder: (context) => VideoFolderScreen(
+                            //       folderName: folderName,
+                            //       videos: videos,
+                            //     ),
+                            //   ),
+                            // ).then((value) {
+                            //   _permissionsChecked = false;
+                            //   _checkPermissions();
+                            // });
                           },
                           child: Container(
                             margin: EdgeInsets.symmetric(vertical: 5.sp, horizontal: 5.sp),

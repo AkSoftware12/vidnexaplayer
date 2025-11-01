@@ -32,6 +32,7 @@ import '../../Utils/textSize.dart';
 import '../../VideoPLayer/AllVideo/all_videos.dart';
 import '../../app_store/app_store.dart';
 import '../../main.dart';
+import '../HomeScreen/home2.dart' hide navigatorKey;
 import '../HomeScreen/home_screen.dart' hide navigatorKey;
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
@@ -437,7 +438,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   Widget _getPage(int page) {
     switch (page) {
       case 0:
-        return HomeScreen();
+        return DemoHomeScreen();
       case 1:
         return OfflineMusicTabScreen();
       case 2:
@@ -803,60 +804,60 @@ class SettingsScreen extends StatelessWidget {
                     Navigator.of(context).pop();
                   },
                 ),
-                SizedBox(height: 10.sp),
-                ListTile(
-                  leading: Container(
-                    height: 35.sp,
-                    width: 35.sp,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: LinearGradient(
-                        colors: [
-                          HexColor('#9A6324'),
-                          HexColor('#9A6324'),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    padding: EdgeInsets.all(10.sp),
-                    child: Image.asset('assets/videos_img.png'),
-                  ),
-                  title: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'All Videos',
-                        style: GoogleFonts.openSans(
-                          textStyle: TextStyle(
-                            color: Colors.black,
-                            fontSize: TextSizes.textmedium14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        'View counts and analytics',
-                        style: GoogleFonts.openSans(
-                          textStyle: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 9.sp,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AllVideosScreen(icon: 'AppBar',),
-                      ),
-                    );
-                  },
-                ),
+                // SizedBox(height: 10.sp),
+                // ListTile(
+                //   leading: Container(
+                //     height: 35.sp,
+                //     width: 35.sp,
+                //     decoration: BoxDecoration(
+                //       borderRadius: BorderRadius.circular(12),
+                //       gradient: LinearGradient(
+                //         colors: [
+                //           HexColor('#9A6324'),
+                //           HexColor('#9A6324'),
+                //         ],
+                //         begin: Alignment.topLeft,
+                //         end: Alignment.bottomRight,
+                //       ),
+                //     ),
+                //     padding: EdgeInsets.all(10.sp),
+                //     child: Image.asset('assets/videos_img.png'),
+                //   ),
+                //   title: Column(
+                //     mainAxisAlignment: MainAxisAlignment.start,
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Text(
+                //         'All Videos',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.black,
+                //             fontSize: TextSizes.textmedium14,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //       Text(
+                //         'View counts and analytics',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.grey,
+                //             fontSize: 9.sp,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                //   onTap: () {
+                //     Navigator.push(
+                //       context,
+                //       MaterialPageRoute(
+                //         builder: (context) => AllVideosScreen(icon: 'AppBar',),
+                //       ),
+                //     );
+                //   },
+                // ),
                 SizedBox(height: 10.sp),
                 ListTile(
                   leading: Container(
