@@ -5,6 +5,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
+import 'package:flutter/services.dart';
 
 
 // ============================================================
@@ -195,6 +196,8 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   bool _isLoading = true;
   bool _showLogo = false;
   String _selectedFilter = "normal";
+  Timer? _systemUiTimer;
+
 
   // Equalizer sliders
   double bassGain = 0.0;
@@ -221,6 +224,8 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
         }
       }
     });
+    WidgetsBinding.instance.addPostFrameCallback((_) => _hideBottomBar());
+
   }
 
   Future<void> _loadVideo() async {
@@ -359,9 +364,41 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     );
   }
 
+
+
+  void _hideBottomBar() {
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.top], // keep top visible
+    );
+  }
+
+  void _showBottomBarTemporarily() {
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: [SystemUiOverlay.top, SystemUiOverlay.bottom],
+    );
+    _systemUiTimer?.cancel();
+    _systemUiTimer = Timer(const Duration(seconds: 3), () {
+      _hideBottomBar();
+    });
+  }
+
+  void _onUserInteractionFromBottom(DragUpdateDetails details, BuildContext context) {
+    final screenHeight = MediaQuery.of(context).size.height;
+
+    // Trigger only if drag starts from bottom 10% of screen and direction is upward
+    if (details.localPosition.dy > screenHeight * 0.9 && details.delta.dy < -5) {
+      _showBottomBarTemporarily();
+    }
+  }
+
   @override
   void dispose() {
     _player.dispose();
+    _systemUiTimer?.cancel();
+    // Restore bars when leaving screen
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -369,110 +406,115 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   Widget build(BuildContext context) {
     final isLast = _currentIndex == widget.videos.length - 1;
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: AppBar(
+    return GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      // Only respond if swipe starts near bottom and moves upward
+      onVerticalDragUpdate: (details) => _onUserInteractionFromBottom(details, context),
+      child: Scaffold(
         backgroundColor: Colors.black,
-        title: Text(
-          '${_currentIndex + 1} / ${widget.videos.length}',
-          style: const TextStyle(color: Colors.white),
+        appBar: AppBar(
+          backgroundColor: Colors.black,
+          title: Text(
+            '${_currentIndex + 1} / ${widget.videos.length}',
+            style: const TextStyle(color: Colors.white),
+          ),
+          iconTheme: const IconThemeData(color: Colors.white),
         ),
-        iconTheme: const IconThemeData(color: Colors.white),
-      ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : Stack(
-        children: [
-          // 🎥 Video with color filter
-          Positioned.fill(
-            child: ColorFiltered(
-              colorFilter: ColorFilter.matrix(
-                _getColorMatrix(_selectedFilter),
-              ),
-              child: Video(controller: _controller, controls: null),
-            ),
-          ),
-
-          // 🎛 Controls
-          CustomVideoControls(
-            player: _player,
-            onNext: _playNext,
-            onPrevious: _playPrevious,
-          ),
-
-          // 🎨 Filters
-          Positioned(
-            bottom: 120,
-            right: 10,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.4),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              padding: const EdgeInsets.all(6),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildFilterButton("Normal", Colors.white, "normal"),
-                  _buildFilterButton("Dark", Colors.black87, "dark"),
-                  _buildFilterButton("Blue", HexColor('#0000FF'), "blue"),
-                  _buildFilterButton("Warm HDR", Colors.deepOrangeAccent, "warm"),
-                  _buildFilterButton("Sepia", Colors.redAccent, "sepia"),
-                  _buildFilterButton("Neon", Colors.purpleAccent, "neon"),
-                ],
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator(color: Colors.white))
+            : Stack(
+          children: [
+            // 🎥 Video with color filter
+            Positioned.fill(
+              child: ColorFiltered(
+                colorFilter: ColorFilter.matrix(
+                  _getColorMatrix(_selectedFilter),
+                ),
+                child: Video(controller: _controller, controls: null),
               ),
             ),
-          ),
 
-          // 🎚 Equalizer
-          Positioned(
-            bottom: 130,
-            left: 10,
-            child: Container(
-              width: 200,
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  _buildSlider("Bass (60Hz)", bassGain, (v) => setState(() => bassGain = v)),
-                  _buildSlider("Mid (1kHz)", midGain, (v) => setState(() => midGain = v)),
-                  _buildSlider("Treble (10kHz)", trebleGain, (v) => setState(() => trebleGain = v)),
-                ],
-              ),
+            // 🎛 Controls
+            CustomVideoControls(
+              player: _player,
+              onNext: _playNext,
+              onPrevious: _playPrevious,
             ),
-          ),
 
-          // 🖼 Logo overlay on last video
-          if (_showLogo && isLast)
-            AnimatedOpacity(
-              opacity: 1,
-              duration: const Duration(milliseconds: 600),
+            // 🎨 Filters
+            Positioned(
+              bottom: 120,
+              right: 10,
               child: Container(
-                color: Colors.black.withOpacity(0.7),
-                alignment: Alignment.center,
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.4),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                padding: const EdgeInsets.all(6),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
                   children: [
-                    Image.asset('assets/appblue.png', width: 120, height: 120),
-                    const SizedBox(height: 16),
-                    const Text(
-                      'Vidnexa Player',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.2,
-                      ),
-                    ),
+                    _buildFilterButton("Normal", Colors.white, "normal"),
+                    _buildFilterButton("Dark", Colors.black87, "dark"),
+                    _buildFilterButton("Blue", HexColor('#0000FF'), "blue"),
+                    _buildFilterButton("Warm HDR", Colors.deepOrangeAccent, "warm"),
+                    _buildFilterButton("Sepia", Colors.redAccent, "sepia"),
+                    _buildFilterButton("Neon", Colors.purpleAccent, "neon"),
                   ],
                 ),
               ),
             ),
-        ],
+
+            // 🎚 Equalizer
+            Positioned(
+              bottom: 130,
+              left: 10,
+              child: Container(
+                width: 200,
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _buildSlider("Bass (60Hz)", bassGain, (v) => setState(() => bassGain = v)),
+                    _buildSlider("Mid (1kHz)", midGain, (v) => setState(() => midGain = v)),
+                    _buildSlider("Treble (10kHz)", trebleGain, (v) => setState(() => trebleGain = v)),
+                  ],
+                ),
+              ),
+            ),
+
+            // 🖼 Logo overlay on last video
+            if (_showLogo && isLast)
+              AnimatedOpacity(
+                opacity: 1,
+                duration: const Duration(milliseconds: 600),
+                child: Container(
+                  color: Colors.black.withOpacity(0.7),
+                  alignment: Alignment.center,
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Image.asset('assets/appblue.png', width: 120, height: 120),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Vidnexa Player',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 1.2,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
       ),
     );
   }

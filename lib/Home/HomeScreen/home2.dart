@@ -118,10 +118,11 @@ class DemoHomeScreen extends StatefulWidget {
   State<DemoHomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<DemoHomeScreen>
-    with SingleTickerProviderStateMixin {
+class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   List<AssetPathEntity> _albums = [];
   bool _isLoading = true;
+  bool _hasPermission = false;
+
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
   bool _isListView = true;
@@ -130,6 +131,8 @@ class _HomeScreenState extends State<DemoHomeScreen>
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // 👈 observe app lifecycle
+
     _controller = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
@@ -138,43 +141,216 @@ class _HomeScreenState extends State<DemoHomeScreen>
     _requestPermissionAndLoadAlbums();
   }
 
+  // Future<void> _requestPermissionAndLoadAlbums() async {
+  //   final PermissionState ps = await PhotoManager.requestPermissionExtend();
+  //   if (ps.isAuth) {
+  //     final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
+  //       type: RequestType.video,
+  //     );
+  //     setState(() {
+  //       _albums = albums;
+  //       _isLoading = false;
+  //       _controller.forward();
+  //     });
+  //   } else {
+  //     setState(() {
+  //       _isLoading = false;
+  //     });
+  //     ScaffoldMessenger.of(context).showSnackBar(
+  //       SnackBar(
+  //         content: Text(
+  //           'Permission denied to access photos',
+  //           style: TextStyle(color: Colors.white),
+  //         ),
+  //         backgroundColor: Colors.red,
+  //         duration: Duration(seconds: 3),
+  //       ),
+  //     );
+  //   }
+  // }
+
+
+  Future<void> _checkPermissionStatus() async {
+    final ps = await PhotoManager.requestPermissionExtend();
+    if (ps.isAuth && !_hasPermission) {
+      setState(() {
+        _hasPermission = true;
+        _isLoading = true;
+      });
+      await _requestPermissionAndLoadAlbums();
+    }
+  }
+
   Future<void> _requestPermissionAndLoadAlbums() async {
+    setState(() => _isLoading = true);
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
     if (ps.isAuth) {
-      final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
+      _hasPermission = true;
+      final albums = await PhotoManager.getAssetPathList(
         type: RequestType.video,
       );
       setState(() {
         _albums = albums;
         _isLoading = false;
-        _controller.forward();
       });
+      _controller.forward();
     } else {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Permission denied to access photos',
-            style: TextStyle(color: Colors.white),
-          ),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
-        ),
-      );
+      _hasPermission = false;
+      setState(() => _isLoading = false);
     }
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this); // 👈 remove observer
+
     _controller.dispose();
     super.dispose();
   }
 
+  // 👇 detect when user returns from Settings
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // app came back from background or Settings
+      _checkPermissionStatus();
+    }
+  }
+
+  Widget _buildPermissionCard() {
+    return Center(
+      child: Padding(
+        padding: EdgeInsets.all(16.sp),
+        child: Card(
+          elevation: 4,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Padding(
+            padding: EdgeInsets.all(16.sp),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(
+                  Icons.lock_outline,
+                  color: Colors.red,
+                  size: 48.sp,
+                ),
+                SizedBox(height: 16.sp),
+                Text(
+                  'Permissions Required',
+                  style: GoogleFonts.poppins(
+                    textStyle: TextStyle(
+                      fontSize: 18.sp,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.black,
+                    ),
+                  ),
+                ),
+                SizedBox(height: 8.sp),
+                Text(
+                  'Please grant access to photos and videos to view your media content.',
+                  style: GoogleFonts.poppins(
+                    textStyle: TextStyle(
+                      fontSize: 14.sp,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+                SizedBox(height: 16.sp),
+
+
+                SizedBox(height: 16.sp),
+                ElevatedButton(
+                  onPressed: () async {
+                    await PhotoManager.openSetting();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Allow Permissions',
+                    style: GoogleFonts.poppins(
+                      textStyle: TextStyle(
+                        fontSize: 16.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
 
 
 
+      // Padding(
+      //   padding: EdgeInsets.symmetric(horizontal: 20.sp, vertical: 100.sp),
+      //   child: Container(
+      //     width: double.infinity,
+      //     padding: EdgeInsets.all(20.sp),
+      //     decoration: BoxDecoration(
+      //       color: Colors.blue.withOpacity(0.1),
+      //       borderRadius: BorderRadius.circular(12.sp),
+      //     ),
+      //     child: Column(
+      //       mainAxisSize: MainAxisSize.min,
+      //       children: [
+      //         Icon(Icons.lock_outline, color: Colors.blueAccent, size: 40.sp),
+      //         SizedBox(height: 12.sp),
+      //         Text(
+      //           'Permission Required',
+      //           style: GoogleFonts.poppins(
+      //             textStyle: TextStyle(
+      //               fontSize: 16.sp,
+      //               fontWeight: FontWeight.w600,
+      //               color: Colors.black87,
+      //             ),
+      //           ),
+      //         ),
+      //         SizedBox(height: 6.sp),
+      //         Text(
+      //           'To view your photos and videos, please allow access from settings.',
+      //           textAlign: TextAlign.center,
+      //           style: GoogleFonts.poppins(
+      //             textStyle: TextStyle(
+      //               fontSize: 13.sp,
+      //               color: Colors.black54,
+      //             ),
+      //           ),
+      //         ),
+      //         SizedBox(height: 16.sp),
+      //         ElevatedButton.icon(
+      //           style: ElevatedButton.styleFrom(
+      //             backgroundColor: Colors.blueAccent,
+      //             shape: RoundedRectangleBorder(
+      //               borderRadius: BorderRadius.circular(8.sp),
+      //             ),
+      //           ),
+      //           onPressed: () async {
+      //             await PhotoManager.openSetting();
+      //           },
+      //           icon: const Icon(Icons.settings, color: Colors.white),
+      //           label: const Text('Open Settings', style: TextStyle(color: Colors.white)),
+      //         ),
+      //         SizedBox(height: 8.sp),
+      //         TextButton(
+      //           onPressed: _requestPermissionAndLoadAlbums,
+      //           child: const Text('Try Again', style: TextStyle(color: Colors.blueAccent)),
+      //         ),
+      //       ],
+      //     ),
+      //   ),
+      // ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -193,190 +369,212 @@ class _HomeScreenState extends State<DemoHomeScreen>
             children: [
               SizedBox(height: 10.sp),
               BannerSlider(),
-              _albums.isNotEmpty
-                  ? HorizontalGridList(album: _albums[0], index: 0)
-                  : const SizedBox.shrink(),
-              Padding(
-                padding: EdgeInsets.symmetric(horizontal: 10.sp, vertical: 8.sp),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          padding: EdgeInsets.all(6.sp),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10.sp),
-                          ),
-                          child: Icon(
-                            Icons.folder_open_rounded,
-                            color: Colors.blueAccent,
-                            size: 18.sp,
-                          ),
-                        ),
-                        SizedBox(width: 8.sp),
-                        Text(
-                          'Folders',
-                          style: GoogleFonts.poppins(
-                            textStyle: TextStyle(
-                              color: Colors.black87,
-                              fontSize: 15.sp,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
 
-                    Row(
+            _isLoading ? SizedBox():
+
+
+
+
+          !_hasPermission
+              ? _buildPermissionCard()
+              : FadeTransition(
+            opacity: _fadeAnimation,
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+
+
+                  _albums.isNotEmpty
+                      ? HorizontalGridList(album: _albums[0], index: 0)
+                      : const SizedBox.shrink(),
+                  Padding(
+                    padding: EdgeInsets.symmetric(horizontal: 10.sp, vertical: 8.sp),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // IconButton(
-                        //   icon: Icon(Icons.refresh, color: Colors.black),
-                        //   onPressed: () async {
-                        //     await _requestPermissionAndLoadAlbums();
-                        //   },
-                        //   tooltip: 'Refresh Videos',
-                        // ),
-                        Container(
-                          height: 32.sp,
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(30),
-                          ),
-                          child: Row(
-                            children: [
-                              // 🔸 List View Button
-                              _buildToggleButton(
-                                icon: Icons.list,
-                                isActive: _isListView,
-                                onTap: () {
-                                  setState(() {
-                                    _isListView = true;
-                                    _isGridView = false;
-                                    _isCompactView = false;
-                                  });
-                                },
+                        Row(
+                          children: [
+                            Container(
+                              padding: EdgeInsets.all(6.sp),
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(10.sp),
                               ),
-                              // 🔸 Grid View Button
-                              _buildToggleButton(
-                                icon: Icons.grid_view_rounded,
-                                isActive: _isGridView,
-                                onTap: () {
-                                  setState(() {
-                                    _isListView = false;
-                                    _isGridView = true;
-                                    _isCompactView = false;
-                                  });
-                                },
+                              child: Icon(
+                                Icons.folder_open_rounded,
+                                color: Colors.blueAccent,
+                                size: 18.sp,
                               ),
-                              // 🔸 Compact View Button
-                              _buildToggleButton(
-                                icon: Icons.view_agenda_rounded,
-                                isActive: _isCompactView,
-                                onTap: () {
-                                  setState(() {
-                                    _isListView = false;
-                                    _isGridView = false;
-                                    _isCompactView = true;
-                                  });
-                                },
+                            ),
+                            SizedBox(width: 8.sp),
+                            Text(
+                              'Folders',
+                              style: GoogleFonts.poppins(
+                                textStyle: TextStyle(
+                                  color: Colors.black87,
+                                  fontSize: 15.sp,
+                                  fontWeight: FontWeight.w600,
+                                ),
                               ),
-                            ],
-                          ),
+                            ),
+                          ],
+                        ),
+
+                        Row(
+                          children: [
+                            // IconButton(
+                            //   icon: Icon(Icons.refresh, color: Colors.black),
+                            //   onPressed: () async {
+                            //     await _requestPermissionAndLoadAlbums();
+                            //   },
+                            //   tooltip: 'Refresh Videos',
+                            // ),
+                            Container(
+                              height: 32.sp,
+                              decoration: BoxDecoration(
+                                color: Colors.blue.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              child: Row(
+                                children: [
+                                  // 🔸 List View Button
+                                  _buildToggleButton(
+                                    icon: Icons.list,
+                                    isActive: _isListView,
+                                    onTap: () {
+                                      setState(() {
+                                        _isListView = true;
+                                        _isGridView = false;
+                                        _isCompactView = false;
+                                      });
+                                    },
+                                  ),
+                                  // 🔸 Grid View Button
+                                  _buildToggleButton(
+                                    icon: Icons.grid_view_rounded,
+                                    isActive: _isGridView,
+                                    onTap: () {
+                                      setState(() {
+                                        _isListView = false;
+                                        _isGridView = true;
+                                        _isCompactView = false;
+                                      });
+                                    },
+                                  ),
+                                  // 🔸 Compact View Button
+                                  _buildToggleButton(
+                                    icon: Icons.view_agenda_rounded,
+                                    isActive: _isCompactView,
+                                    onTap: () {
+                                      setState(() {
+                                        _isListView = false;
+                                        _isGridView = false;
+                                        _isCompactView = true;
+                                      });
+                                    },
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ],
                         ),
                       ],
-                    ),
-                  ],
-                ),
-              ),
-              _isLoading
-                  ? Center(
-                child: Padding(
-                  padding: EdgeInsets.all(20.sp),
-                  child: CircularProgressIndicator(color: Colors.blue),
-                ),
-              )
-                  :
-              _albums.isEmpty
-                  ? Center(
-                child: Padding(
-                  padding: EdgeInsets.only(top: 50.sp),
-                  child: Text(
-                    'No albums found',
-                    style: GoogleFonts.poppins(
-                      textStyle: TextStyle(
-                        color: Colors.black54,
-                        fontSize: 13.sp,
-                        fontWeight: FontWeight.w500,
-                      ),
                     ),
                   ),
-                ),
-              )
-                  : FadeTransition(
-                opacity: _fadeAnimation,
-                child: AnimatedSwitcher(
-                  duration: Duration(milliseconds: 000),
-                  switchInCurve: Curves.easeIn,
-                  switchOutCurve: Curves.easeIn,
-                  child:
-                  _isListView
-                      ? ListView.builder(
-                    key: ValueKey('listView'),
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    itemCount: _albums.length,
-                    itemBuilder: (context, index) {
-                      return AlbumTile(
-                        album: _albums[index],
-                        index: index,
-                      );
-                    },
-                  )
-                      : _isGridView
-                      ? GridView.builder(
-                    key: ValueKey('gridView'),
-                    padding: EdgeInsets.symmetric(
-                      horizontal: 3.sp,
-                      vertical: 0.sp,
+                  _isLoading
+                      ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.all(20.sp),
+                      child: CircularProgressIndicator(color: Colors.blue),
                     ),
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    itemCount: _albums.length,
-                    gridDelegate:
-                    SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      mainAxisSpacing: 2.sp,
-                      crossAxisSpacing: 2.sp,
-                      childAspectRatio: 2.5,
-                    ),
-                    itemBuilder: (context, index) {
-                      return AlbumGridTile(
-                        album: _albums[index],
-                        index: index,
-                      );
-                    },
                   )
-                      : GridView.builder(
-                    padding: EdgeInsets.all(8.w),
-                    itemCount: _albums.length,
-                    shrinkWrap: true,
-                    physics: NeverScrollableScrollPhysics(),
-                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 2.w,
-                      mainAxisSpacing: 2.h,
-                      childAspectRatio: 1,
+                      :
+                  _albums.isEmpty
+                      ? Center(
+                    child: Padding(
+                      padding: EdgeInsets.only(top: 50.sp),
+                      child: Text(
+                        'No albums found',
+                        style: GoogleFonts.poppins(
+                          textStyle: TextStyle(
+                            color: Colors.black54,
+                            fontSize: 13.sp,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
                     ),
-                    itemBuilder: (context, index) {
-                      return AlbumGridTile3(album: _albums[index], index: index);
-                    },
                   )
+                      : FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: AnimatedSwitcher(
+                        duration: Duration(milliseconds: 000),
+                        switchInCurve: Curves.easeIn,
+                        switchOutCurve: Curves.easeIn,
+                        child:
+                        _isListView
+                            ? ListView.builder(
+                          key: ValueKey('listView'),
+                          shrinkWrap: true,
+                          physics: NeverScrollableScrollPhysics(),
+                          itemCount: _albums.length,
+                          itemBuilder: (context, index) {
+                            return AlbumTile(
+                              album: _albums[index],
+                              index: index,
+                            );
+                          },
+                        )
+                            : _isGridView
+                            ? GridView.builder(
+                          key: ValueKey('gridView'),
+                          padding: EdgeInsets.symmetric(
+                            horizontal: 3.sp,
+                            vertical: 0.sp,
+                          ),
+                          shrinkWrap: true,
+                          physics: NeverScrollableScrollPhysics(),
+                          itemCount: _albums.length,
+                          gridDelegate:
+                          SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            mainAxisSpacing: 2.sp,
+                            crossAxisSpacing: 2.sp,
+                            childAspectRatio: 2.5,
+                          ),
+                          itemBuilder: (context, index) {
+                            return AlbumGridTile(
+                              album: _albums[index],
+                              index: index,
+                            );
+                          },
+                        )
+                            : GridView.builder(
+                          padding: EdgeInsets.all(8.w),
+                          itemCount: _albums.length,
+                          shrinkWrap: true,
+                          physics: NeverScrollableScrollPhysics(),
+                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 3,
+                            crossAxisSpacing: 2.w,
+                            mainAxisSpacing: 2.h,
+                            childAspectRatio: 1,
+                          ),
+                          itemBuilder: (context, index) {
+                            return AlbumGridTile3(album: _albums[index], index: index);
+                          },
+                        )
 
 
-                ),
+                    ),
+                  ),
+                ],
               ),
+            ),
+          ),
+
+
+
             ],
           ),
         ),
