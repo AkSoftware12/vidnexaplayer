@@ -84,7 +84,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (widget.url != null && widget.url!.isNotEmpty) {
       _initializePlayer(widget.url!, isNetwork: true);
     } else if (widget.videos != null && widget.videos!.isNotEmpty) {
-      // _initializePlayer(widget.videos![currentIndex].path, isNetwork: false);
+      _initializePlayer(widget.videos[currentIndex].file.toString(), isNetwork: false);
     } else {
       setState(() {
         _hasError = true;

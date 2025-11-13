@@ -141,35 +141,6 @@ class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderSt
     _requestPermissionAndLoadAlbums();
   }
 
-  // Future<void> _requestPermissionAndLoadAlbums() async {
-  //   final PermissionState ps = await PhotoManager.requestPermissionExtend();
-  //   if (ps.isAuth) {
-  //     final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
-  //       type: RequestType.video,
-  //     );
-  //     setState(() {
-  //       _albums = albums;
-  //       _isLoading = false;
-  //       _controller.forward();
-  //     });
-  //   } else {
-  //     setState(() {
-  //       _isLoading = false;
-  //     });
-  //     ScaffoldMessenger.of(context).showSnackBar(
-  //       SnackBar(
-  //         content: Text(
-  //           'Permission denied to access photos',
-  //           style: TextStyle(color: Colors.white),
-  //         ),
-  //         backgroundColor: Colors.red,
-  //         duration: Duration(seconds: 3),
-  //       ),
-  //     );
-  //   }
-  // }
-
-
   Future<void> _checkPermissionStatus() async {
     final ps = await PhotoManager.requestPermissionExtend();
     if (ps.isAuth && !_hasPermission) {
@@ -834,8 +805,11 @@ class AlbumGridTile extends StatelessWidget {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => PhotosScreen(album: album)),
+              MaterialPageRoute(
+                builder: (context) =>  VideoFolderScreen( folderName: album.name, videos: album,),
+              ),
             );
+
           },
           child:AnimatedScale(
             duration: Duration(milliseconds: 500),
@@ -1023,8 +997,11 @@ class AlbumGridTile3 extends StatelessWidget {
           onTap: () {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => PhotosScreen(album: album)),
+              MaterialPageRoute(
+                builder: (context) =>  VideoFolderScreen( folderName: album.name, videos: album,),
+              ),
             );
+
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
