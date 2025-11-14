@@ -2,390 +2,18 @@ import 'dart:async';
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:screen_brightness/screen_brightness.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
-
-/// ============================================================
-/// FloatingVideoManager: displays a draggable overlay that
-/// continues playing video across routes.
-/// ============================================================
-// ============================================================
-// 🔥 GLOBAL SYNC CLASS — (Play/Pause sync between windows)
-// ============================================================
-class PlayPauseSync extends ChangeNotifier {
-  bool isPlaying = false;
-
-  void update(bool value) {
-    isPlaying = value;
-    notifyListeners();
-  }
-}
+import '../../NotifyListeners/PlayPauseSync/play_pause.dart';
+import '../custom_video_appBar.dart';
+import 'CustomVideoControls/custom_video_controls.dart';
+import 'FlotingVideo/floting_video.dart';
 
 final globalPlayPause = PlayPauseSync();
 
-// ============================================================
-// 🟦 FLOATING VIDEO MANAGER
-// ============================================================
-class FloatingVideoManager {
-  static OverlayEntry? _entry;
-  static Player? _player;
-  static VideoController? _controller;
-  static List<AssetEntity>? _videos;
-  static int _currentIndex = 0;
-  static Offset _offset = const Offset(20, 100);
-
-  static StreamSubscription<bool>? _playingSub;
-  static bool _showControls = true;
-  static Timer? _hideTimer;
-
-  static void _showControlsTemporarily() {
-    _showControls = true;
-    _entry?.markNeedsBuild();
-    _hideTimer?.cancel();
-
-    _hideTimer = Timer(const Duration(seconds: 5), () {
-      _showControls = false;
-      _entry?.markNeedsBuild();
-    });
-  }
-
-  /// Show floating player
-  static void show(
-      BuildContext context,
-      Player player,
-      VideoController controller,
-      List<AssetEntity> videos,
-      int currentIndex,
-      ) {
-    if (_entry != null) return;
-
-    _player = player;
-    _controller = controller;
-    _videos = videos;
-    _currentIndex = currentIndex;
-
-    // LISTEN PLAY/PAUSE — GLOBAL SYNC
-    _playingSub?.cancel();
-    _playingSub = _player!.stream.playing.listen((playing) {
-      globalPlayPause.update(playing); // 🔥 SYNC state global
-      _entry?.markNeedsBuild();
-    });
-
-    _entry = OverlayEntry(builder: (overlayContext) {
-      return Positioned(
-        left: _offset.dx,
-        top: _offset.dy,
-        child: GestureDetector(
-          onTap: _showControlsTemporarily,
-          onPanUpdate: (details) {
-            _offset += details.delta;
-            _entry?.markNeedsBuild();
-          },
-          child: Material(
-            color: Colors.transparent,
-            child: Container(
-              width: 250.sp,
-              height: 140.sp,
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Stack(
-                children: [
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(15),
-                    child: AspectRatio(
-                      aspectRatio: 16 / 9,
-                      child: Video(controller: _controller!, controls: null),
-                    ),
-                  ),
-
-                  // ==============================
-                  // CONTROLS - AUTO HIDE
-                  // ==============================
-                  Align(
-                    alignment: Alignment.bottomCenter,
-                    child: AnimatedOpacity(
-                      opacity: _showControls ? 1.0 : 0.0,
-                      duration: const Duration(milliseconds: 300),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(15),
-                          color: Colors.black54,
-                        ),
-                        padding: const EdgeInsets.symmetric(horizontal: 4),
-                        height: 36.sp,
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceAround,
-                          children: [
-                            // ------------------------------------------------
-                            // 🔥 Play / Pause synced with FullScreen Player
-                            // ------------------------------------------------
-                            IconButton(
-                              icon: Icon(
-                                globalPlayPause.isPlaying
-                                    ? Icons.pause
-                                    : Icons.play_arrow,
-                                color: Colors.white,
-                                size: 20.sp,
-                              ),
-                              onPressed: () async {
-                                _showControlsTemporarily();
-
-                                if (globalPlayPause.isPlaying) {
-                                  await _player?.pause();
-                                } else {
-                                  await _player?.play();
-                                }
-                              },
-                            ),
-
-                            // FullScreen
-                            IconButton(
-                              icon: Icon(
-                                Icons.fullscreen,
-                                color: Colors.white,
-                                size: 20.sp,
-                              ),
-                              onPressed: () {
-                                _showControlsTemporarily();
-
-                                final ctx = overlayContext;
-                                hide();
-
-                                Navigator.of(ctx).push(
-                                  MaterialPageRoute(
-                                    builder: (_) => FullScreenVideoPlayer(
-                                      videos: _videos!,
-                                      initialIndex: _currentIndex,
-                                      externalPlayer: _player,
-                                      externalController: _controller,
-                                    ),
-                                  ),
-                                );
-                              },
-                            ),
-
-                            // Close
-                            IconButton(
-                              icon: Icon(
-                                Icons.close,
-                                color: Colors.white,
-                                size: 20.sp,
-                              ),
-                              onPressed: () {
-                                _showControlsTemporarily();
-                                hide();
-                                _player?.pause();
-                              },
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    });
-
-    Overlay.of(context)!.insert(_entry!);
-    _showControlsTemporarily();
-  }
-
-  static void hide() {
-    _playingSub?.cancel();
-    _hideTimer?.cancel();
-    _entry?.remove();
-    _entry = null;
-  }
-
-  static bool get isActive => _entry != null;
-}
-
-// ============================================================
-// 🎛 CustomVideoControls (unchanged)
-// ============================================================
-class CustomVideoControls extends StatefulWidget {
-  final Player player;
-  final VoidCallback? onNext;
-  final VoidCallback? onPrevious;
-
-  const CustomVideoControls({
-    super.key,
-    required this.player,
-    this.onNext,
-    this.onPrevious,
-  });
-
-  @override
-  State<CustomVideoControls> createState() => _CustomVideoControlsState();
-}
-
-class _CustomVideoControlsState extends State<CustomVideoControls> {
-  bool _visible = true;
-  double _progress = 0.0;
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  bool _isPlaying = false;
-
-  StreamSubscription<Duration>? _positionSub;
-  StreamSubscription<Duration>? _durationSub;
-  StreamSubscription<bool>? _playingSub;
-
-  @override
-  void initState() {
-    super.initState();
-    final p = widget.player;
-    _positionSub = p.stream.position.listen((pos) {
-      if (!mounted) return;
-      _position = pos;
-      final d = p.state.duration;
-      if (d.inMilliseconds > 0) {
-        _progress = pos.inMilliseconds / d.inMilliseconds;
-      }
-      setState(() {});
-    });
-    _durationSub = p.stream.duration.listen((d) {
-      _duration = d;
-    });
-    _playingSub = p.stream.playing.listen((playing) {
-      if (mounted) setState(() => _isPlaying = playing);
-    });
-    widget.player.stream.playing.listen((playing) {
-      globalPlayPause.update(playing);
-    });
-
-  }
-
-  Future<void> _togglePlayPause() async {
-    if (_isPlaying) {
-      await widget.player.pause();
-    } else {
-      await widget.player.play();
-    }
-  }
-
-  Future<void> _seekBy(Duration offset) async {
-    final pos = _position + offset;
-    await widget.player.seek(pos);
-  }
-
-  String _format(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
-  }
-
-  @override
-  void dispose() {
-    _positionSub?.cancel();
-    _durationSub?.cancel();
-    _playingSub?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () => setState(() => _visible = !_visible),
-      child: AnimatedOpacity(
-        opacity: _visible ? 1 : 0,
-        duration: const Duration(milliseconds: 200),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: SafeArea(
-                child: Container(
-                  color: Colors.black54,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Slider(
-                        value: _progress.clamp(0.0, 1.0),
-                        onChanged: (v) {
-                          final newPos = _duration * v;
-                          widget.player.seek(newPos);
-                        },
-                        activeColor: Colors.redAccent,
-                        inactiveColor: Colors.white24,
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Text(_format(_position),
-                              style: const TextStyle(color: Colors.white, fontSize: 12)),
-                          Text(_format(_duration),
-                              style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                        ],
-                      ),
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          IconButton(
-                              icon: const Icon(Icons.skip_previous_rounded),
-                              color: Colors.white,
-                              iconSize: 30,
-                              onPressed: widget.onPrevious),
-                          IconButton(
-                              icon: const Icon(Icons.replay_10),
-                              color: Colors.white,
-                              iconSize: 28,
-                              onPressed: () => _seekBy(const Duration(seconds: -10))),
-
-                          IconButton(
-                            icon: Icon(
-                              globalPlayPause.isPlaying
-                                  ? Icons.pause_circle_filled
-                                  : Icons.play_circle_fill,
-                              color: Colors.white,
-                              size: 50.sp,
-                            ),
-                            onPressed: () async {
-                              if (globalPlayPause.isPlaying) {
-                                await widget.player?.pause();
-                              } else {
-                                await widget.player?.play();
-                              }
-                            },
-                          ),
-
-                          IconButton(
-                              icon: const Icon(Icons.forward_10),
-                              color: Colors.white,
-                              iconSize: 28,
-                              onPressed: () => _seekBy(const Duration(seconds: 10))),
-                          IconButton(
-                              icon: const Icon(Icons.skip_next_rounded),
-                              color: Colors.white,
-                              iconSize: 30,
-                              onPressed: widget.onNext),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// ============================================================
-// 🎬 FullScreenVideoPlayer with global floating overlay support
-// ============================================================
 class FullScreenVideoPlayer extends StatefulWidget {
   final List<AssetEntity> videos;
   final int initialIndex;
@@ -408,6 +36,8 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   late int _currentIndex;
   late final Player _player;
   late final VideoController _controller;
+  double _volumePercent = 100; // 0–100 display slider
+  // double get _volume => _volumePercent / 100;
   bool _isLoading = true;
   bool _showLogo = false;
   String _selectedFilter = "normal";
@@ -417,6 +47,8 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   double bassGain = 0.0;
   double midGain = 0.0;
   double trebleGain = 0.0;
+
+
 
   // Additional state
   bool _isLocked = false;
@@ -439,10 +71,24 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   int _skipDirection = 0; // -1 for backward, 1 for forward
   Timer? _skipOverlayTimer;
 
+
+  // 🟦 Brightness / Volume gesture state
+  double _brightness = 0.5;
+  double _volume = 0.5;
+  bool _showBrightnessOverlay = false;
+  bool _showVolumeOverlay = false;
+  Timer? _brightnessTimer;
+  Timer? _volumeTimer;
+  bool _verticalDragLeft = false;
+  bool _verticalDragRight = false;
+
+
+
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
+
     if (widget.externalPlayer != null && widget.externalController != null) {
       // Use existing player from floating overlay
       _player = widget.externalPlayer!;
@@ -452,7 +98,19 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
       _player = Player();
       _controller = VideoController(_player);
       _loadVideo();
+
     }
+
+    // Initialize brightness
+    ScreenBrightness().current.then((value) {
+      _brightness = value;
+    });
+
+    // Initialize & track volume
+    _player.stream.volume.listen((v) {
+      _volume = v;
+    });
+
     _player.stream.completed.listen((completed) async {
       if (completed) {
         if (_currentIndex == widget.videos.length - 1) {
@@ -465,6 +123,7 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
         }
       }
     });
+
     WidgetsBinding.instance.addPostFrameCallback((_) => _hideBottomBar());
 
     // Default orientation is portrait
@@ -472,6 +131,7 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
+
   }
 
   Future<void> _loadVideo() async {
@@ -490,7 +150,8 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
 
   // Equalizer adjustment
   Future<void> _applyEqualizer() async {
-    final weightedGain = (bassGain * 0.6 + midGain * 0.3 + trebleGain * 0.1) / 15.0;
+    final weightedGain =
+        (bassGain * 0.6 + midGain * 0.3 + trebleGain * 0.1) / 15.0;
     final volume = (1.0 + weightedGain).clamp(0.5, 1.5);
     await _player.setVolume(volume);
   }
@@ -519,44 +180,44 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     switch (filter) {
       case "dark":
         return [
-          0.6, 0, 0, 0, 0,
-          0, 0.6, 0, 0, 0,
-          0, 0, 0.6, 0, 0,
+          0.6, 0, 0, 0, 0, //
+          0, 0.6, 0, 0, 0, //
+          0, 0, 0.6, 0, 0, //
           0, 0, 0, 1.0, 0,
         ];
       case "blue":
         return [
-          0.4, 0.2, 0.2, 0, 0,
-          0.2, 0.4, 0.2, 0, 0.05,
-          0.3, 0.3, 1.3, 0, 0.15,
+          0.4, 0.2, 0.2, 0, 0, //
+          0.2, 0.4, 0.2, 0, 0.05, //
+          0.3, 0.3, 1.3, 0, 0.15, //
           0, 0, 0, 1, 0,
         ];
       case "warm":
         return [
-          1.6, 0.3, 0.1, 0, -30,
-          0.2, 1.4, 0.1, 0, -30,
-          0.1, 0.2, 1.1, 0, -20,
+          1.6, 0.3, 0.1, 0, -30, //
+          0.2, 1.4, 0.1, 0, -30, //
+          0.1, 0.2, 1.1, 0, -20, //
           0, 0, 0, 1.0, 0,
         ];
       case "sepia":
         return [
-          0.5, 0.8, 0.2, 0, 0,
-          0.4, 0.7, 0.2, 0, 0,
-          0.2, 0.5, 0.1, 0, 0,
+          0.5, 0.8, 0.2, 0, 0, //
+          0.4, 0.7, 0.2, 0, 0, //
+          0.2, 0.5, 0.1, 0, 0, //
           0, 0, 0, 1, 0,
         ];
       case "neon":
         return [
-          1.2, 0.3, 0.8, 0, 0.1,
-          0.2, 0.7, 1.0, 0, 0.05,
-          0.8, 0.2, 1.4, 0, 0.1,
+          1.2, 0.3, 0.8, 0, 0.1, //
+          0.2, 0.7, 1.0, 0, 0.05, //
+          0.8, 0.2, 1.4, 0, 0.1, //
           0, 0, 0, 1, 0,
         ];
       default:
         return [
-          1, 0, 0, 0, 0,
-          0, 1, 0, 0, 0,
-          0, 0, 1, 0, 0,
+          1, 0, 0, 0, 0, //
+          0, 1, 0, 0, 0, //
+          0, 0, 1, 0, 0, //
           0, 0, 0, 1, 0,
         ];
     }
@@ -588,11 +249,14 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     );
   }
 
-  Widget _buildSlider(String label, double value, ValueChanged<double> onChanged) {
+  Widget _buildSlider(
+      String label, double value, ValueChanged<double> onChanged) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        Text(label,
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold)),
         Slider(
           value: value,
           min: -15,
@@ -615,10 +279,13 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
       _isLocked = !_isLocked;
     });
   }
+  @override
+
 
   Future<void> _takeScreenshot() async {
     try {
-      final Uint8List? data = await _player.screenshot(format: 'image/png');
+      final Uint8List? data =
+      await _player.screenshot(format: 'image/png');
       if (data != null) {
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -669,6 +336,12 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
         DeviceOrientation.portraitDown,
       ]);
     }
+
+    if (_isLandscapeMode) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
   }
 
   void _toggleEqualizer() {
@@ -697,9 +370,11 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     });
   }
 
-  void _onUserInteractionFromBottom(DragUpdateDetails details, BuildContext context) {
+  void _onUserInteractionFromBottom(
+      DragUpdateDetails details, BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
-    if (details.localPosition.dy > screenHeight * 0.9 && details.delta.dy < -5) {
+    if (details.localPosition.dy > screenHeight * 1 &&
+        details.delta.dy < -5) {
       _showBottomBarTemporarily();
     }
   }
@@ -731,6 +406,56 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     _isDragging = false;
   }
 
+  // 🟦 Vertical drag start: decide left/right for brightness/volume
+  void _onVerticalDragStart(DragStartDetails details) {
+    final width = MediaQuery.of(context).size.width;
+    final dx = details.localPosition.dx;
+
+    _verticalDragLeft = dx < width * 0.5;
+    _verticalDragRight = dx >= width * 0.5;
+  }
+
+  // 🟧 Vertical drag update: brightness (left) / volume (right)
+  Future<void> _onVerticalDragUpdate(DragUpdateDetails details) async {
+    _onUserInteractionFromBottom(details, context);
+    if (_isLocked) return;
+
+    final double delta = -details.delta.dy / 300; // smooth
+
+    if (_verticalDragLeft) {
+      // Brightness
+      _brightness = (_brightness + delta).clamp(0.0, 1.0);
+      try {
+        await ScreenBrightness().setScreenBrightness(_brightness);
+      } catch (_) {}
+
+      setState(() => _showBrightnessOverlay = true);
+      _brightnessTimer?.cancel();
+      _brightnessTimer = Timer(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          setState(() => _showBrightnessOverlay = false);
+        }
+      });
+    } else if (_verticalDragRight) {
+      // Volume
+      _volume = (_volume + delta).clamp(0.0, 1.0);
+      await _player.setVolume(_volume);
+
+      setState(() => _showVolumeOverlay = true);
+      _volumeTimer?.cancel();
+      _volumeTimer = Timer(const Duration(milliseconds: 800), () {
+        if (mounted) {
+          setState(() => _showVolumeOverlay = false);
+        }
+      });
+    }
+  }
+
+  void _onVerticalDragEnd(DragEndDetails details) {
+    _verticalDragLeft = false;
+    _verticalDragRight = false;
+  }
+
   void _onDoubleTapDown(TapDownDetails details) {
     if (_isLocked) return;
     final width = MediaQuery.of(context).size.width;
@@ -740,7 +465,8 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     if (duration.inMilliseconds <= 0) return;
     if (dx < width / 2) {
       // Left side: rewind 10 seconds
-      final newPositionMs = (position.inMilliseconds - 10000).clamp(0, duration.inMilliseconds);
+      final newPositionMs =
+      (position.inMilliseconds - 10000).clamp(0, duration.inMilliseconds);
       _player.seek(Duration(milliseconds: newPositionMs));
       setState(() {
         _skipDirection = -1;
@@ -748,7 +474,8 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
       });
     } else {
       // Right side: forward 10 seconds
-      final newPositionMs = (position.inMilliseconds + 10000).clamp(0, duration.inMilliseconds);
+      final newPositionMs =
+      (position.inMilliseconds + 10000).clamp(0, duration.inMilliseconds);
       _player.seek(Duration(milliseconds: newPositionMs));
       setState(() {
         _skipDirection = 1;
@@ -770,12 +497,12 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     }
     _systemUiTimer?.cancel();
     _skipOverlayTimer?.cancel();
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    _brightnessTimer?.cancel();
+    _volumeTimer?.cancel();
+
+
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
-      DeviceOrientation.portraitDown,
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
     ]);
     super.dispose();
   }
@@ -783,7 +510,8 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   @override
   Widget build(BuildContext context) {
     final isLast = _currentIndex == widget.videos.length - 1;
-    final bool isLandscape = MediaQuery.of(context).orientation == Orientation.landscape;
+    bool isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
 
     final double sideControlsTop = isLandscape
         ? MediaQuery.of(context).size.height * 0.15
@@ -811,7 +539,9 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
       },
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onVerticalDragUpdate: (details) => _onUserInteractionFromBottom(details, context),
+        onVerticalDragStart: _onVerticalDragStart,
+        onVerticalDragUpdate: _onVerticalDragUpdate,
+        onVerticalDragEnd: _onVerticalDragEnd,
         onHorizontalDragStart: _onHorizontalDragStart,
         onHorizontalDragUpdate: _onHorizontalDragUpdate,
         onHorizontalDragEnd: _onHorizontalDragEnd,
@@ -819,7 +549,9 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
         child: Scaffold(
           backgroundColor: Colors.black,
           body: _isLoading
-              ? const Center(child: CircularProgressIndicator(color: Colors.white))
+              ? const Center(
+            child: CircularProgressIndicator(color: Colors.white),
+          )
               : Stack(
             children: [
               Positioned.fill(child: videoWidget),
@@ -828,11 +560,95 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
               if (_showSkipOverlay)
                 Center(
                   child: Icon(
-                    _skipDirection == -1 ? Icons.replay_10 : Icons.forward_10,
+                    _skipDirection == -1
+                        ? Icons.replay_10
+                        : Icons.forward_10,
                     color: Colors.white,
                     size: 80,
                   ),
                 ),
+
+              if (_showBrightnessOverlay)
+                Positioned(
+                  left: 20,
+                  top: MediaQuery.of(context).size.height * 0.2,
+                  child: Container(
+                    width: 40,
+                    height: MediaQuery.of(context).size.height * 0.5,
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.brightness_6, color: Colors.yellow, size: 26),
+                        SizedBox(height: 10),
+                        Expanded(
+                          child: RotatedBox(
+                            quarterTurns: -1,
+                            child: Slider(
+                              value: _brightness,
+                              onChanged: (v) async {
+                                _brightness = v;
+                                await ScreenBrightness().setScreenBrightness(v);
+                                setState(() {});
+                              },
+                              activeColor: Colors.yellow,
+                              inactiveColor: Colors.white24,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+
+    if (_showVolumeOverlay)
+    Positioned(
+    right: 20,
+    top: MediaQuery.of(context).size.height * 0.2,
+    child: Container(
+    width: 40,
+    height: MediaQuery.of(context).size.height * 0.5,
+    decoration: BoxDecoration(
+    color: Colors.black54,
+    borderRadius: BorderRadius.circular(20),
+    ),
+    child: Column(
+    mainAxisAlignment: MainAxisAlignment.center,
+    children: [
+    Icon(
+    _volumePercent == 0 ? Icons.volume_off : Icons.volume_up,
+    color: Colors.greenAccent,
+    size: 26,
+    ),
+    SizedBox(height: 10),
+    Expanded(
+    child: RotatedBox(
+    quarterTurns: -1,
+    child: Slider(
+    value: _volumePercent,
+    min: 0,
+    max: 100,
+    onChanged: (value) async {
+    _volumePercent = value;
+
+    // convert 0–100 → 0–1
+    await _player.setVolume(_volumePercent / 100);
+
+    setState(() {});
+    },
+    activeColor: Colors.greenAccent,
+    inactiveColor: Colors.white24,
+    ),
+    ),
+    ),
+    ],
+    ),
+    ),
+    ),
 
               // Locked overlay
               if (_isLocked)
@@ -841,7 +657,7 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
                     onTap: _toggleLock,
                     child: Container(
                       padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
+                      decoration: const BoxDecoration(
                         color: Colors.black54,
                         shape: BoxShape.circle,
                       ),
@@ -854,18 +670,88 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
                   ),
                 ),
 
+
               // Controls
+              if (!_isLocked)
+                Positioned(
+                  top: 25,
+                  left: 0,
+                  right: 0,
+                  child: CustomVideoAppBar(
+                    title: widget.videos![_currentIndex].title.toString(),
+                    onBackPressed: () async {
+                      if (isLandscape) {
+                        // Switch back to portrait
+                        await SystemChrome.setPreferredOrientations([
+                          DeviceOrientation.portraitUp,
+                          DeviceOrientation.portraitDown,
+                        ]);
+
+                        SystemChrome.setEnabledSystemUIMode(
+                          SystemUiMode.manual,
+                          overlays: SystemUiOverlay.values, // dono bars visible
+                        );
+                      } else {
+                        await ScreenBrightness().resetScreenBrightness();
+                        Navigator.pop(context);
+                      }
+                      setState(() {
+                        isLandscape = !isLandscape;
+                      });
+                    },
+
+                    // videos: widget.videos,
+                    currentIndex: _currentIndex,
+                    onVideoSelected: (index) {
+                      setState(() {
+                        _currentIndex = index; // Update playing video
+                        // _initializePlayer(
+                        //   '',
+                        //   // widget.videos![index].path,
+                        //   isNetwork: false,
+                        // );
+                      });
+                    },
+                    isLandscape: isLandscape,
+                    videos: widget.videos,
+                  ),
+                ),
+
               if (!_isLocked)
                 CustomVideoControls(
                   player: _player,
                   onNext: _playNext,
                   onPrevious: _playPrevious,
+                  onToggleEqualizer: _toggleEqualizer,
+                  onToggleFilters: _toggleFilters,
+                  onToggleOrientation: _toggleOrientation,
+                  onToggleFloting: () {
+                    FloatingVideoManager.show(
+                                  context,
+                                  _player,
+                                  _controller,
+                                  widget.videos,
+                                  _currentIndex,
+                                );
+                                Navigator.pop(context);
+                  },
+                  onTakeScreenshot: _takeScreenshot,
+                  onToggleAudioOnly: _toggleAudioOnly,
+                  onToggleLock: _toggleLock,
+                  audioOnly: _audioOnly,
+                  onCyclePlaybackRate: _cyclePlaybackRate,
+                  PlaybackRate: _playbackRate.toString(),
+                  index: _currentIndex,
+                  videos:widget.videos,
+
+
+
                 ),
 
               // Filters overlay
               if (!_isLocked && _filtersVisible)
                 Positioned(
-                  bottom: filtersBottom,
+                  bottom: filtersBottom.toDouble(),
                   right: 10,
                   child: Container(
                     decoration: BoxDecoration(
@@ -876,12 +762,18 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildFilterButton("Normal", Colors.white, "normal"),
-                        _buildFilterButton("Dark", Colors.black87, "dark"),
-                        _buildFilterButton("Blue", HexColor('#0000FF'), "blue"),
-                        _buildFilterButton("Warm HDR", Colors.deepOrangeAccent, "warm"),
-                        _buildFilterButton("Sepia", Colors.redAccent, "sepia"),
-                        _buildFilterButton("Neon", Colors.purpleAccent, "neon"),
+                        _buildFilterButton(
+                            "Normal", Colors.white, "normal"),
+                        _buildFilterButton(
+                            "Dark", Colors.black87, "dark"),
+                        _buildFilterButton(
+                            "Blue", HexColor('#0000FF'), "blue"),
+                        _buildFilterButton("Warm HDR",
+                            Colors.deepOrangeAccent, "warm"),
+                        _buildFilterButton(
+                            "Sepia", Colors.redAccent, "sepia"),
+                        _buildFilterButton(
+                            "Neon", Colors.purpleAccent, "neon"),
                       ],
                     ),
                   ),
@@ -890,7 +782,7 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
               // Equalizer overlay
               if (!_isLocked && _equalizerVisible)
                 Positioned(
-                  bottom: equalizerBottom,
+                  bottom: equalizerBottom.toDouble(),
                   left: 10,
                   child: Container(
                     width: 200,
@@ -902,9 +794,12 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _buildSlider("Bass (60Hz)", bassGain, (v) => setState(() => bassGain = v)),
-                        _buildSlider("Mid (1kHz)", midGain, (v) => setState(() => midGain = v)),
-                        _buildSlider("Treble (10kHz)", trebleGain, (v) => setState(() => trebleGain = v)),
+                        _buildSlider("Bass (60Hz)", bassGain,
+                                (v) => setState(() => bassGain = v)),
+                        _buildSlider("Mid (1kHz)", midGain,
+                                (v) => setState(() => midGain = v)),
+                        _buildSlider("Treble (10kHz)", trebleGain,
+                                (v) => setState(() => trebleGain = v)),
                       ],
                     ),
                   ),
@@ -915,117 +810,37 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
                 AnimatedOpacity(
                   opacity: 1,
                   duration: const Duration(milliseconds: 600),
-                  child: Container(
-                    color: Colors.black.withOpacity(0.7),
-                    alignment: Alignment.center,
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Image.asset('assets/appblue.png', width: 120, height: 120),
-                        const SizedBox(height: 16),
-                        const Text(
-                          'Vidnexa Player',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.2,
+                  child: Center(
+                    child: Container(
+                      color: Colors.black.withOpacity(0.7),
+                      height: 200,
+                      width: 200,
+                      alignment: Alignment.center,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Image.asset(
+                            'assets/appblue.png',
+                            width: 120,
+                            height: 120,
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 16),
+                          const Text(
+                            'Vidnexa Player',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.2,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
 
-              // Left side controls
-              Positioned(
-                top: sideControlsTop,
-                left: 0,
-                child: Column(
-                  children: [
-                    IconButton(
-                      icon: Icon(_isLocked ? Icons.lock : Icons.lock_open),
-                      color: _isLocked ? Colors.green : Colors.white,
-                      iconSize: 32,
-                      onPressed: _toggleLock,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.camera_alt),
-                      color: Colors.white,
-                      iconSize: 28,
-                      onPressed: _isLocked ? null : _takeScreenshot,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.headphones),
-                      color: _audioOnly ? Colors.greenAccent : Colors.white,
-                      iconSize: 28,
-                      onPressed: _isLocked ? null : _toggleAudioOnly,
-                    ),
-                  ],
-                ),
-              ),
 
-              // Right side controls including PiP
-              Positioned(
-                top: sideControlsTop,
-                right: 0,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.equalizer),
-                      color: Colors.white,
-                      iconSize: 28,
-                      onPressed: _isLocked ? null : _toggleEqualizer,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.filter_alt),
-                      color: Colors.white,
-                      iconSize: 28,
-                      onPressed: _isLocked ? null : _toggleFilters,
-                    ),
-                    GestureDetector(
-                      onTap: _isLocked ? null : _cyclePlaybackRate,
-                      child: Container(
-                        margin: const EdgeInsets.only(top: 4),
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 4),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.4),
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Text(
-                          '${_playbackRate.toStringAsFixed(1)}x',
-                          style: const TextStyle(color: Colors.white, fontSize: 14),
-                        ),
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.screen_rotation),
-                      color: Colors.white,
-                      iconSize: 28,
-                      onPressed: _isLocked ? null : _toggleOrientation,
-                    ),
-                    // Picture-in-picture button: show overlay and close page
-                    IconButton(
-                      icon: const Icon(Icons.picture_in_picture_alt),
-                      color: Colors.white,
-                      iconSize: 28,
-                      onPressed: _isLocked
-                          ? null
-                          : () {
-                        FloatingVideoManager.show(
-                          context,
-                          _player,
-                          _controller,
-                          widget.videos,
-                          _currentIndex,
-                        );
-                        Navigator.pop(context);
-                      },
-                    ),
-                  ],
-                ),
-              ),
             ],
           ),
         ),

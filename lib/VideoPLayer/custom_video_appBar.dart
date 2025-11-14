@@ -9,7 +9,7 @@ class CustomVideoAppBar extends StatelessWidget {
   final String title;
   final VoidCallback onBackPressed;
   final bool isLandscape; // <-- add this
-  final AssetPathEntity? videos; // Video list
+  final List<AssetEntity> videos;
   final int currentIndex; // Currently playing video
   final ValueChanged<int>? onVideoSelected; // Callback to play selected video
 
@@ -186,7 +186,7 @@ class CustomVideoAppBar extends StatelessWidget {
                     child: ListView.builder(
                       controller: scrollController,
                       physics: const BouncingScrollPhysics(),
-                      itemCount: videos?.albumType,
+                      itemCount: videos.length,
                       itemBuilder: (context, index) {
                         bool isPlaying = index == currentIndex;
                         // String name = videos.path.split('/').last;
@@ -248,19 +248,24 @@ class CustomVideoAppBar extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 14),
                                   Expanded(
-                                    child: Text(
-                                      '',
-                                      style: TextStyle(
-                                        color: isPlaying
-                                            ? Colors.amberAccent
-                                            : Colors.white70,
-                                        fontWeight: isPlaying
-                                            ? FontWeight.bold
-                                            : FontWeight.w500,
-                                        fontSize: 15,
-                                        decoration: TextDecoration.none,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          videos[index].title.toString(),
+                                          style: TextStyle(
+                                            color: isPlaying
+                                                ? Colors.amberAccent
+                                                : Colors.white70,
+                                            fontWeight: isPlaying
+                                                ? FontWeight.bold
+                                                : FontWeight.w500,
+                                            fontSize: 15,
+                                            decoration: TextDecoration.none,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(width: 8),

@@ -1025,7 +1025,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       });
                     },
                     isLandscape: isLandscape,
-                    videos: null,
+                    videos: [],
                   ),
                 ),
 
