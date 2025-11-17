@@ -6,21 +6,38 @@ import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:screen_brightness/screen_brightness.dart';
+import 'package:videoplayer/Utils/color.dart';
+import 'package:volume_controller/volume_controller.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import '../../NotifyListeners/PlayPauseSync/play_pause.dart';
 import '../custom_video_appBar.dart';
 import 'CustomVideoControls/custom_video_controls.dart';
 import 'FlotingVideo/floting_video.dart';
+import 'PopupPlayer/Speed/speed.dart';
+import 'PopupPlayer/Volume/volume.dart';
 
+/// A variant of the full screen video player that ties the player's volume
+/// to the device (system) volume rather than controlling the internal
+/// media_kit volume directly.  This uses the volume_controller plugin to
+/// listen to and adjust the system volume.  When the user adjusts the
+/// volume slider or uses the vertical swipe gesture, the system volume
+/// changes, and hardware volume buttons will update the UI via the
+/// listener.  The player's internal volume is kept at 100% so that
 final globalPlayPause = PlayPauseSync();
+enum VideoResizeMode {
+  fit,
+  fill,
+  zoom,
+  stretch,
+}
 
-class FullScreenVideoPlayer extends StatefulWidget {
+class FullScreenVideoPlayerFixed extends StatefulWidget {
   final List<AssetEntity> videos;
   final int initialIndex;
   final Player? externalPlayer;
   final VideoController? externalController;
 
-  const FullScreenVideoPlayer({
+  const FullScreenVideoPlayerFixed({
     super.key,
     required this.videos,
     required this.initialIndex,
@@ -29,28 +46,32 @@ class FullScreenVideoPlayer extends StatefulWidget {
   });
 
   @override
-  State<FullScreenVideoPlayer> createState() => _FullScreenVideoPlayerState();
+  State<FullScreenVideoPlayerFixed> createState() =>
+      _FullScreenVideoPlayerSystemVolumeState();
 }
 
-class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
+class _FullScreenVideoPlayerSystemVolumeState
+    extends State<FullScreenVideoPlayerFixed> {
   late int _currentIndex;
   late final Player _player;
   late final VideoController _controller;
-  double _volumePercent = 100; // 0–100 display slider
-  // double get _volume => _volumePercent / 100;
+  VideoResizeMode _resizeMode = VideoResizeMode.fit;
+
+  // Track the system volume in 0–100 range.  This is updated via
+  // VolumeController.listener and used for UI controls.
+  double _systemVolume = 100.0;
+  StreamSubscription<double>? _volumeSubscription;
+
   bool _isLoading = true;
   bool _showLogo = false;
-  String _selectedFilter = "normal";
+  String _selectedFilter = 'normal';
   Timer? _systemUiTimer;
 
-  // Equalizer sliders
+  // Equalizer sliders (dB)
   double bassGain = 0.0;
   double midGain = 0.0;
   double trebleGain = 0.0;
 
-
-
-  // Additional state
   bool _isLocked = false;
   bool _equalizerVisible = false;
   bool _filtersVisible = false;
@@ -58,23 +79,17 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   double _playbackRate = 1.0;
   final List<double> _rateOptions = [0.5, 1.0, 1.5, 2.0];
 
-  // Orientation state: tracks whether we're forcing landscape.
   bool _isLandscapeMode = false;
 
-  // Variables for gesture seeking
   bool _isDragging = false;
   double _dragStartX = 0.0;
   Duration _dragStartPosition = Duration.zero;
 
-  // For skip overlay
   bool _showSkipOverlay = false;
-  int _skipDirection = 0; // -1 for backward, 1 for forward
+  int _skipDirection = 0;
   Timer? _skipOverlayTimer;
 
-
-  // 🟦 Brightness / Volume gesture state
   double _brightness = 0.5;
-  double _volume = 0.5;
   bool _showBrightnessOverlay = false;
   bool _showVolumeOverlay = false;
   Timer? _brightnessTimer;
@@ -82,15 +97,11 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   bool _verticalDragLeft = false;
   bool _verticalDragRight = false;
 
-
-
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
-
     if (widget.externalPlayer != null && widget.externalController != null) {
-      // Use existing player from floating overlay
       _player = widget.externalPlayer!;
       _controller = widget.externalController!;
       _isLoading = false;
@@ -98,18 +109,32 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
       _player = Player();
       _controller = VideoController(_player);
       _loadVideo();
-
     }
 
-    // Initialize brightness
-    ScreenBrightness().current.then((value) {
-      _brightness = value;
-    });
+    // Set player's internal volume to 100% so system volume controls the loudness.
+    _player.setVolume(100);
 
-    // Initialize & track volume
-    _player.stream.volume.listen((v) {
-      _volume = v;
+    // Initialise brightness
+    ScreenBrightness().current.then((value) => _brightness = value);
+
+    // Initialise system volume and listener
+    // Show the native operating system volume overlay when adjusting volume.  The
+    // volume_controller plugin provides a `showSystemUI` property.  Setting
+    // this to true ensures that both hardware button changes and programmatic
+    // adjustments (like swipes) display the familiar system volume UI【220829782297271†L84-L90】.
+    VolumeController.instance.showSystemUI = true;
+    VolumeController.instance.getVolume().then((v) {
+      setState(() {
+        _systemVolume = v * 100;
+      });
     });
+    _volumeSubscription = VolumeController.instance.addListener((
+      double volume,
+    ) {
+      setState(() {
+        _systemVolume = volume * 100;
+      });
+    }, fetchInitialVolume: false);
 
     _player.stream.completed.listen((completed) async {
       if (completed) {
@@ -126,12 +151,10 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _hideBottomBar());
 
-    // Default orientation is portrait
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
-
   }
 
   Future<void> _loadVideo() async {
@@ -148,12 +171,16 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     setState(() => _isLoading = false);
   }
 
-  // Equalizer adjustment
+  /// Equalizer adjustment.  This uses the same logic as before but keeps
+  /// the player's internal volume at full.  We adjust the player's
+  /// volume relative to 100 while leaving the system volume unchanged.
   Future<void> _applyEqualizer() async {
     final weightedGain =
         (bassGain * 0.6 + midGain * 0.3 + trebleGain * 0.1) / 15.0;
-    final volume = (1.0 + weightedGain).clamp(0.5, 1.5);
-    await _player.setVolume(volume);
+    final factor = (1.0 + weightedGain).clamp(0.5, 1.5);
+    // Set the player's internal volume based on the factor (0.5–1.5 of 100)
+    final newVolume = (factor * 100).clamp(0.0, 100.0);
+    await _player.setVolume(newVolume);
   }
 
   Future<void> _playNext() async {
@@ -175,51 +202,184 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   void _changeFilter(String filter) {
     setState(() => _selectedFilter = filter);
   }
+  void _toggleResizeMode() {
+    setState(() {
+      if (_resizeMode == VideoResizeMode.fit) {
+        _resizeMode = VideoResizeMode.fill;
+      } else if (_resizeMode == VideoResizeMode.fill) {
+        _resizeMode = VideoResizeMode.zoom;
+      } else if (_resizeMode == VideoResizeMode.zoom) {
+        _resizeMode = VideoResizeMode.stretch;
+      } else {
+        _resizeMode = VideoResizeMode.fit;
+      }
+    });
+
+    showCenterToast(context, "${_resizeMode.name.toUpperCase()}");
+
+  }
+  void showCenterToast(BuildContext context, String message) {
+    OverlayEntry entry = OverlayEntry(
+      builder: (context) => Center(
+        child: Material(
+          color: Colors.transparent,
+          child: AnimatedScale(
+            scale: 1,
+            duration: const Duration(milliseconds: 150),
+            child: Container(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 20),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 10,
+                  ),
+                ],
+              ),
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+
+    // Insert Overlay
+    Overlay.of(context).insert(entry);
+
+    // Auto remove
+    Future.delayed(const Duration(milliseconds: 900)).then((_) {
+      entry.remove();
+    });
+  }
 
   List<double> _getColorMatrix(String filter) {
     switch (filter) {
-      case "dark":
+      case 'dark':
         return [
-          0.6, 0, 0, 0, 0, //
-          0, 0.6, 0, 0, 0, //
-          0, 0, 0.6, 0, 0, //
-          0, 0, 0, 1.0, 0,
+          0.6,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.6,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0.6,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1.0,
+          0,
         ];
-      case "blue":
+      case 'blue':
         return [
-          0.4, 0.2, 0.2, 0, 0, //
-          0.2, 0.4, 0.2, 0, 0.05, //
-          0.3, 0.3, 1.3, 0, 0.15, //
-          0, 0, 0, 1, 0,
+          0.4,
+          0.2,
+          0.2,
+          0,
+          0,
+          0.2,
+          0.4,
+          0.2,
+          0,
+          0.05,
+          0.3,
+          0.3,
+          1.3,
+          0,
+          0.15,
+          0,
+          0,
+          0,
+          1,
+          0,
         ];
-      case "warm":
+      case 'warm':
         return [
-          1.6, 0.3, 0.1, 0, -30, //
-          0.2, 1.4, 0.1, 0, -30, //
-          0.1, 0.2, 1.1, 0, -20, //
-          0, 0, 0, 1.0, 0,
+          1.6,
+          0.3,
+          0.1,
+          0,
+          -30,
+          0.2,
+          1.4,
+          0.1,
+          0,
+          -30,
+          0.1,
+          0.2,
+          1.1,
+          0,
+          -20,
+          0,
+          0,
+          0,
+          1.0,
+          0,
         ];
-      case "sepia":
+      case 'sepia':
         return [
-          0.5, 0.8, 0.2, 0, 0, //
-          0.4, 0.7, 0.2, 0, 0, //
-          0.2, 0.5, 0.1, 0, 0, //
-          0, 0, 0, 1, 0,
+          0.5,
+          0.8,
+          0.2,
+          0,
+          0,
+          0.4,
+          0.7,
+          0.2,
+          0,
+          0,
+          0.2,
+          0.5,
+          0.1,
+          0,
+          0,
+          0,
+          0,
+          0,
+          1,
+          0,
         ];
-      case "neon":
+      case 'neon':
         return [
-          1.2, 0.3, 0.8, 0, 0.1, //
-          0.2, 0.7, 1.0, 0, 0.05, //
-          0.8, 0.2, 1.4, 0, 0.1, //
-          0, 0, 0, 1, 0,
+          1.2,
+          0.3,
+          0.8,
+          0,
+          0.1,
+          0.2,
+          0.7,
+          1.0,
+          0,
+          0.05,
+          0.8,
+          0.2,
+          1.4,
+          0,
+          0.1,
+          0,
+          0,
+          0,
+          1,
+          0,
         ];
       default:
-        return [
-          1, 0, 0, 0, 0, //
-          0, 1, 0, 0, 0, //
-          0, 0, 1, 0, 0, //
-          0, 0, 0, 1, 0,
-        ];
+        return [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
     }
   }
 
@@ -250,13 +410,20 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   }
 
   Widget _buildSlider(
-      String label, double value, ValueChanged<double> onChanged) {
+    String label,
+    double value,
+    ValueChanged<double> onChanged,
+  ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label,
-            style: const TextStyle(
-                color: Colors.white, fontWeight: FontWeight.bold)),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         Slider(
           value: value,
           min: -15,
@@ -264,7 +431,7 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
           divisions: 30,
           activeColor: Colors.deepPurpleAccent,
           inactiveColor: Colors.white24,
-          label: "${value.toStringAsFixed(1)} dB",
+          label: '${value.toStringAsFixed(1)} dB',
           onChanged: (v) {
             onChanged(v);
             _applyEqualizer();
@@ -275,37 +442,30 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   }
 
   void _toggleLock() {
-    setState(() {
-      _isLocked = !_isLocked;
-    });
+    setState(() => _isLocked = !_isLocked);
   }
-  @override
-
 
   Future<void> _takeScreenshot() async {
     try {
-      final Uint8List? data =
-      await _player.screenshot(format: 'image/png');
+      final Uint8List? data = await _player.screenshot(format: 'image/png');
       if (data != null) {
         if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Screenshot captured')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('Screenshot captured')));
         }
       }
     } catch (e) {
       if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Screenshot failed: $e')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Screenshot failed: $e')));
       }
     }
   }
 
   Future<void> _toggleAudioOnly() async {
-    setState(() {
-      _audioOnly = !_audioOnly;
-    });
+    setState(() => _audioOnly = !_audioOnly);
     try {
       if (_audioOnly) {
         await _player.setVideoTrack(VideoTrack.no());
@@ -315,12 +475,30 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     } catch (_) {}
   }
 
-  Future<void> _cyclePlaybackRate() async {
-    final currentIndex = _rateOptions.indexOf(_playbackRate);
-    final nextIndex = (currentIndex + 1) % _rateOptions.length;
-    final nextRate = _rateOptions[nextIndex];
-    setState(() => _playbackRate = nextRate);
-    await _player.setRate(nextRate);
+  void _openSpeedDialog() {
+    PlaybackSpeedDialog.show(
+      context,
+      currentSpeed: _playbackRate,
+      onSpeedChange: (speed) async {
+        setState(() => _playbackRate = speed);
+        await _player.setRate(speed);
+      },
+    );
+  }
+
+  void _openVolumeDialog() {
+    VolumeDialog.show(
+      context,
+      currentVolume: _systemVolume / 100.0,
+      onVolumeChange: (v) async {
+        // Clamp and set system volume.  The dialog returns 0–1.
+        final clamped = v.clamp(0.0, 1.0);
+        await VolumeController.instance.setVolume(clamped);
+        setState(() {
+          _systemVolume = clamped * 100;
+        });
+      },
+    );
   }
 
   void _toggleOrientation() {
@@ -330,16 +508,12 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } else {
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.portraitUp,
         DeviceOrientation.portraitDown,
       ]);
-    }
-
-    if (_isLandscapeMode) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } else {
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
   }
@@ -371,15 +545,15 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
   }
 
   void _onUserInteractionFromBottom(
-      DragUpdateDetails details, BuildContext context) {
+    DragUpdateDetails details,
+    BuildContext context,
+  ) {
     final screenHeight = MediaQuery.of(context).size.height;
-    if (details.localPosition.dy > screenHeight * 1 &&
-        details.delta.dy < -5) {
+    if (details.localPosition.dy > screenHeight * 1 && details.delta.dy < -5) {
       _showBottomBarTemporarily();
     }
   }
 
-  // Gesture handlers for horizontal drag seeking
   void _onHorizontalDragStart(DragStartDetails details) {
     if (_isLocked) return;
     final duration = _player.state.duration;
@@ -406,49 +580,53 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     _isDragging = false;
   }
 
-  // 🟦 Vertical drag start: decide left/right for brightness/volume
   void _onVerticalDragStart(DragStartDetails details) {
     final width = MediaQuery.of(context).size.width;
     final dx = details.localPosition.dx;
-
     _verticalDragLeft = dx < width * 0.5;
     _verticalDragRight = dx >= width * 0.5;
   }
 
-  // 🟧 Vertical drag update: brightness (left) / volume (right)
   Future<void> _onVerticalDragUpdate(DragUpdateDetails details) async {
     _onUserInteractionFromBottom(details, context);
     if (_isLocked) return;
-
-    final double delta = -details.delta.dy / 300; // smooth
-
     if (_verticalDragLeft) {
-      // Brightness
+      final delta = -details.delta.dy / 300;
       _brightness = (_brightness + delta).clamp(0.0, 1.0);
       try {
         await ScreenBrightness().setScreenBrightness(_brightness);
       } catch (_) {}
-
       setState(() => _showBrightnessOverlay = true);
       _brightnessTimer?.cancel();
       _brightnessTimer = Timer(const Duration(milliseconds: 800), () {
-        if (mounted) {
-          setState(() => _showBrightnessOverlay = false);
-        }
-      });
-    } else if (_verticalDragRight) {
-      // Volume
-      _volume = (_volume + delta).clamp(0.0, 1.0);
-      await _player.setVolume(_volume);
-
-      setState(() => _showVolumeOverlay = true);
-      _volumeTimer?.cancel();
-      _volumeTimer = Timer(const Duration(milliseconds: 800), () {
-        if (mounted) {
-          setState(() => _showVolumeOverlay = false);
-        }
+        if (mounted) setState(() => _showBrightnessOverlay = false);
       });
     }
+    else if (_verticalDragRight) {
+      final drag = -details.delta.dy;
+
+      // Perfect speed
+      final sensitivity = 0.75;
+
+      double newVolume = _systemVolume + drag * sensitivity;
+
+      newVolume = newVolume.clamp(0.0, 100.0);
+
+      // Apply to system
+      await VolumeController.instance.setVolume(newVolume / 100);
+
+      setState(() {
+        _systemVolume = newVolume;
+        _showVolumeOverlay = true;
+      });
+
+      _volumeTimer?.cancel();
+      _volumeTimer = Timer(const Duration(milliseconds: 800), () {
+        if (mounted) setState(() => _showVolumeOverlay = false);
+      });
+    }
+
+
   }
 
   void _onVerticalDragEnd(DragEndDetails details) {
@@ -464,25 +642,26 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     final duration = _player.state.duration;
     if (duration.inMilliseconds <= 0) return;
     if (dx < width / 2) {
-      // Left side: rewind 10 seconds
-      final newPositionMs =
-      (position.inMilliseconds - 10000).clamp(0, duration.inMilliseconds);
+      final newPositionMs = (position.inMilliseconds - 10000).clamp(
+        0,
+        duration.inMilliseconds,
+      );
       _player.seek(Duration(milliseconds: newPositionMs));
       setState(() {
         _skipDirection = -1;
         _showSkipOverlay = true;
       });
     } else {
-      // Right side: forward 10 seconds
-      final newPositionMs =
-      (position.inMilliseconds + 10000).clamp(0, duration.inMilliseconds);
+      final newPositionMs = (position.inMilliseconds + 10000).clamp(
+        0,
+        duration.inMilliseconds,
+      );
       _player.seek(Duration(milliseconds: newPositionMs));
       setState(() {
         _skipDirection = 1;
         _showSkipOverlay = true;
       });
     }
-    // Hide overlay after a short delay
     _skipOverlayTimer?.cancel();
     _skipOverlayTimer = Timer(const Duration(milliseconds: 600), () {
       if (mounted) setState(() => _showSkipOverlay = false);
@@ -491,7 +670,6 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
 
   @override
   void dispose() {
-    // Dispose player only if no floating overlay is active.
     if (!FloatingVideoManager.isActive) {
       _player.dispose();
     }
@@ -499,11 +677,9 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     _skipOverlayTimer?.cancel();
     _brightnessTimer?.cancel();
     _volumeTimer?.cancel();
-
-
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-    ]);
+    _volumeSubscription?.cancel();
+    VolumeController.instance.removeListener();
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
   }
 
@@ -512,22 +688,26 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
     final isLast = _currentIndex == widget.videos.length - 1;
     bool isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
-
-    final double sideControlsTop = isLandscape
-        ? MediaQuery.of(context).size.height * 0.15
-        : MediaQuery.of(context).size.height * 0.25;
     final double filtersBottom = isLandscape ? 60 : 120;
     final double equalizerBottom = isLandscape ? 70 : 130;
-
-    // Video widget
     final videoWidget = ColorFiltered(
       colorFilter: ColorFilter.matrix(_getColorMatrix(_selectedFilter)),
-      child: Video(controller: _controller, controls: null),
-    );
+      child: Video(
+        controller: _controller,
+        fit: _resizeMode == VideoResizeMode.fit
+            ? BoxFit.contain
+            : _resizeMode == VideoResizeMode.fill
+            ? BoxFit.cover
+            : _resizeMode == VideoResizeMode.zoom
+            ? BoxFit.fill
+            : BoxFit.none,
+          controls: null
+      ),
 
+      // Video(controller: _controller, controls: null),
+    );
     return WillPopScope(
       onWillPop: () async {
-        // If leaving this page, show floating overlay.
         FloatingVideoManager.show(
           context,
           _player,
@@ -535,7 +715,7 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
           widget.videos,
           _currentIndex,
         );
-        return true; // allow pop
+        return true;
       },
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
@@ -548,301 +728,369 @@ class _FullScreenVideoPlayerState extends State<FullScreenVideoPlayer> {
         onDoubleTapDown: _onDoubleTapDown,
         child: Scaffold(
           backgroundColor: Colors.black,
-          body: _isLoading
-              ? const Center(
-            child: CircularProgressIndicator(color: Colors.white),
-          )
-              : Stack(
-            children: [
-              Positioned.fill(child: videoWidget),
+          body:
+              _isLoading
+                  ? const Center(
+                    child: CircularProgressIndicator(color: Colors.white),
+                  )
+                  : Stack(
+                    children: [
+                      Positioned.fill(child: videoWidget),
+                      if (_showSkipOverlay)
+                        Center(
+                          child: Icon(
+                            _skipDirection == -1
+                                ? Icons.replay_10
+                                : Icons.forward_10,
+                            color: Colors.white,
+                            size: 80,
+                          ),
+                        ),
+                      if (_showBrightnessOverlay)
+                        Builder(
+                          builder: (context) {
+                            final screenHeight =
+                                MediaQuery.of(context).size.height;
+                            final barHeight = screenHeight * 0.4;
+                            final brightnessValue = (_brightness * 100).round();
 
-              // Show skip overlay when double tapped
-              if (_showSkipOverlay)
-                Center(
-                  child: Icon(
-                    _skipDirection == -1
-                        ? Icons.replay_10
-                        : Icons.forward_10,
-                    color: Colors.white,
-                    size: 80,
-                  ),
-                ),
+                            return Positioned(
+                              left: 20,
+                              top: screenHeight / 2 - barHeight / 2,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Vertical brightness bar
+                                  Container(
+                                    width: 40,
+                                    height: barHeight,
+                                    decoration: BoxDecoration(
+                                      color: Colors.white,
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Align(
+                                      alignment: Alignment.bottomCenter,
+                                      child: Container(
+                                        width: double.infinity,
+                                        height: barHeight * _brightness,
+                                        decoration: BoxDecoration(
+                                          color: ColorSelect.maineColor2,
 
-              if (_showBrightnessOverlay)
-                Positioned(
-                  left: 20,
-                  top: MediaQuery.of(context).size.height * 0.2,
-                  child: Container(
-                    width: 40,
-                    height: MediaQuery.of(context).size.height * 0.5,
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.brightness_6, color: Colors.yellow, size: 26),
-                        SizedBox(height: 10),
-                        Expanded(
-                          child: RotatedBox(
-                            quarterTurns: -1,
-                            child: Slider(
-                              value: _brightness,
-                              onChanged: (v) async {
-                                _brightness = v;
-                                await ScreenBrightness().setScreenBrightness(v);
-                                setState(() {});
-                              },
-                              activeColor: Colors.yellow,
-                              inactiveColor: Colors.white24,
+                                          // 🔥 FIX: Top round hide when brightness is full
+                                          borderRadius: BorderRadius.vertical(
+                                            top: Radius.circular(
+                                              _brightness >= 0.99 ? 20 : 20,
+                                            ),
+                                            bottom: const Radius.circular(20),
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+
+                                  const SizedBox(width: 8),
+
+                                  // Icon + brightness value
+                                  Row(
+                                    children: [
+                                      const Icon(
+                                        Icons.brightness_6,
+                                        color: Colors.white,
+                                        size: 32,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        brightnessValue.toString(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      if (_showVolumeOverlay)
+                        Builder(
+                          builder: (context) {
+                            final screenHeight =
+                                MediaQuery.of(context).size.height;
+                            final barHeight = screenHeight * 0.4;
+                            final volValue = _systemVolume.round();
+
+                            return Positioned(
+                              right: 20,
+                              top: screenHeight / 2 - barHeight / 2,
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.center,
+                                children: [
+                                  // Icon + Number
+                                  Row(
+                                    children: [
+                                      Icon(
+                                        _systemVolume <= 0
+                                            ? Icons.volume_off
+                                            : Icons.volume_up,
+                                        color: Colors.white,
+                                        size: 32,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        volValue.toString(),
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 28,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+
+                                  const SizedBox(width: 8),
+
+                                  // ⭐ SMOOTH ANIMATED BAR
+                                  TweenAnimationBuilder<double>(
+                                    tween: Tween<double>(
+                                      begin: 0,
+                                      end: _systemVolume / 100,
+                                    ),
+                                    duration: const Duration(milliseconds: 120),
+                                    curve: Curves.easeOut,
+                                    builder: (context, animValue, child) {
+                                      return Container(
+                                        width: 40,
+                                        height: barHeight,
+                                        decoration: BoxDecoration(
+                                          color: Colors.black54,
+                                          borderRadius: BorderRadius.circular(
+                                            12,
+                                          ),
+                                        ),
+                                        child: Align(
+                                          alignment: Alignment.bottomCenter,
+                                          child: Container(
+                                            width: double.infinity,
+                                            height: barHeight * animValue,
+                                            decoration: const BoxDecoration(
+                                              color: Colors.green,
+                                              borderRadius:
+                                                  BorderRadius.vertical(
+                                                    bottom: Radius.circular(12),
+                                                  ),
+                                            ),
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                      if (_isLocked)
+                        Center(
+                          child: GestureDetector(
+                            onTap: _toggleLock,
+                            child: Container(
+                              padding: const EdgeInsets.all(12),
+                              decoration: const BoxDecoration(
+                                color: Colors.black54,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.lock,
+                                color: Colors.green,
+                                size: 60,
+                              ),
                             ),
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                ),
-
-
-    if (_showVolumeOverlay)
-    Positioned(
-    right: 20,
-    top: MediaQuery.of(context).size.height * 0.2,
-    child: Container(
-    width: 40,
-    height: MediaQuery.of(context).size.height * 0.5,
-    decoration: BoxDecoration(
-    color: Colors.black54,
-    borderRadius: BorderRadius.circular(20),
-    ),
-    child: Column(
-    mainAxisAlignment: MainAxisAlignment.center,
-    children: [
-    Icon(
-    _volumePercent == 0 ? Icons.volume_off : Icons.volume_up,
-    color: Colors.greenAccent,
-    size: 26,
-    ),
-    SizedBox(height: 10),
-    Expanded(
-    child: RotatedBox(
-    quarterTurns: -1,
-    child: Slider(
-    value: _volumePercent,
-    min: 0,
-    max: 100,
-    onChanged: (value) async {
-    _volumePercent = value;
-
-    // convert 0–100 → 0–1
-    await _player.setVolume(_volumePercent / 100);
-
-    setState(() {});
-    },
-    activeColor: Colors.greenAccent,
-    inactiveColor: Colors.white24,
-    ),
-    ),
-    ),
-    ],
-    ),
-    ),
-    ),
-
-              // Locked overlay
-              if (_isLocked)
-                Center(
-                  child: GestureDetector(
-                    onTap: _toggleLock,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(
-                        color: Colors.black54,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.lock,
-                        color: Colors.green,
-                        size: 60,
-                      ),
-                    ),
-                  ),
-                ),
-
-
-              // Controls
-              if (!_isLocked)
-                Positioned(
-                  top: 25,
-                  left: 0,
-                  right: 0,
-                  child: CustomVideoAppBar(
-                    title: widget.videos![_currentIndex].title.toString(),
-                    onBackPressed: () async {
-                      if (isLandscape) {
-                        // Switch back to portrait
-                        await SystemChrome.setPreferredOrientations([
-                          DeviceOrientation.portraitUp,
-                          DeviceOrientation.portraitDown,
-                        ]);
-
-                        SystemChrome.setEnabledSystemUIMode(
-                          SystemUiMode.manual,
-                          overlays: SystemUiOverlay.values, // dono bars visible
-                        );
-                      } else {
-                        await ScreenBrightness().resetScreenBrightness();
-                        Navigator.pop(context);
-                      }
-                      setState(() {
-                        isLandscape = !isLandscape;
-                      });
-                    },
-
-                    // videos: widget.videos,
-                    currentIndex: _currentIndex,
-                    onVideoSelected: (index) {
-                      setState(() {
-                        _currentIndex = index; // Update playing video
-                        // _initializePlayer(
-                        //   '',
-                        //   // widget.videos![index].path,
-                        //   isNetwork: false,
-                        // );
-                      });
-                    },
-                    isLandscape: isLandscape,
-                    videos: widget.videos,
-                  ),
-                ),
-
-              if (!_isLocked)
-                CustomVideoControls(
-                  player: _player,
-                  onNext: _playNext,
-                  onPrevious: _playPrevious,
-                  onToggleEqualizer: _toggleEqualizer,
-                  onToggleFilters: _toggleFilters,
-                  onToggleOrientation: _toggleOrientation,
-                  onToggleFloting: () {
-                    FloatingVideoManager.show(
-                                  context,
-                                  _player,
-                                  _controller,
-                                  widget.videos,
-                                  _currentIndex,
+                      if (!_isLocked)
+                        Positioned(
+                          top: 25,
+                          left: 0,
+                          right: 0,
+                          child: CustomVideoAppBar(
+                            title:
+                                widget.videos![_currentIndex].title.toString(),
+                            onBackPressed: () async {
+                              if (isLandscape) {
+                                await SystemChrome.setPreferredOrientations([
+                                  DeviceOrientation.portraitUp,
+                                  DeviceOrientation.portraitDown,
+                                ]);
+                                SystemChrome.setEnabledSystemUIMode(
+                                  SystemUiMode.manual,
+                                  overlays: SystemUiOverlay.values,
                                 );
+                              } else {
+                                await ScreenBrightness()
+                                    .resetScreenBrightness();
                                 Navigator.pop(context);
-                  },
-                  onTakeScreenshot: _takeScreenshot,
-                  onToggleAudioOnly: _toggleAudioOnly,
-                  onToggleLock: _toggleLock,
-                  audioOnly: _audioOnly,
-                  onCyclePlaybackRate: _cyclePlaybackRate,
-                  PlaybackRate: _playbackRate.toString(),
-                  index: _currentIndex,
-                  videos:widget.videos,
-
-
-
-                ),
-
-              // Filters overlay
-              if (!_isLocked && _filtersVisible)
-                Positioned(
-                  bottom: filtersBottom.toDouble(),
-                  right: 10,
-                  child: Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.4),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    padding: const EdgeInsets.all(6),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildFilterButton(
-                            "Normal", Colors.white, "normal"),
-                        _buildFilterButton(
-                            "Dark", Colors.black87, "dark"),
-                        _buildFilterButton(
-                            "Blue", HexColor('#0000FF'), "blue"),
-                        _buildFilterButton("Warm HDR",
-                            Colors.deepOrangeAccent, "warm"),
-                        _buildFilterButton(
-                            "Sepia", Colors.redAccent, "sepia"),
-                        _buildFilterButton(
-                            "Neon", Colors.purpleAccent, "neon"),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // Equalizer overlay
-              if (!_isLocked && _equalizerVisible)
-                Positioned(
-                  bottom: equalizerBottom.toDouble(),
-                  left: 10,
-                  child: Container(
-                    width: 200,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildSlider("Bass (60Hz)", bassGain,
-                                (v) => setState(() => bassGain = v)),
-                        _buildSlider("Mid (1kHz)", midGain,
-                                (v) => setState(() => midGain = v)),
-                        _buildSlider("Treble (10kHz)", trebleGain,
-                                (v) => setState(() => trebleGain = v)),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // Logo overlay at end
-              if (_showLogo && isLast)
-                AnimatedOpacity(
-                  opacity: 1,
-                  duration: const Duration(milliseconds: 600),
-                  child: Center(
-                    child: Container(
-                      color: Colors.black.withOpacity(0.7),
-                      height: 200,
-                      width: 200,
-                      alignment: Alignment.center,
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Image.asset(
-                            'assets/appblue.png',
-                            width: 120,
-                            height: 120,
+                              }
+                              setState(() {
+                                isLandscape = !isLandscape;
+                              });
+                            },
+                            currentIndex: _currentIndex,
+                            onVideoSelected: (index) {
+                              setState(() {
+                                _currentIndex = index;
+                              });
+                            },
+                            isLandscape: isLandscape,
+                            videos: widget.videos,
                           ),
-                          const SizedBox(height: 16),
-                          const Text(
-                            'Vidnexa Player',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 1.2,
+                        ),
+                      if (!_isLocked)
+                        CustomVideoControls(
+                          player: _player,
+                          onNext: _playNext,
+                          onPrevious: _playPrevious,
+                          onToggleEqualizer: _toggleEqualizer,
+                          onToggleFilters: _toggleFilters,
+                          onToggleOrientation: _toggleOrientation,
+                          onToggleFloting: () {
+                            FloatingVideoManager.show(
+                              context,
+                              _player,
+                              _controller,
+                              widget.videos,
+                              _currentIndex,
+                            );
+                            Navigator.pop(context);
+                          },
+                          onTakeScreenshot: _takeScreenshot,
+                          onToggleAudioOnly: _toggleAudioOnly,
+                          onToggleLock: _toggleLock,
+                          audioOnly: _audioOnly,
+                          onCyclePlaybackRate: _openSpeedDialog,
+                          onVolume: _openVolumeDialog,
+                          index: _currentIndex,
+                          videos: widget.videos,
+                          resizeMode: _resizeMode,
+                          onToggleResizeMode: _toggleResizeMode,
+                        ),
+                      if (!_isLocked && _filtersVisible)
+                        Positioned(
+                          bottom: filtersBottom.toDouble(),
+                          right: 10,
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.4),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            padding: const EdgeInsets.all(6),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildFilterButton(
+                                  'Normal',
+                                  Colors.white,
+                                  'normal',
+                                ),
+                                _buildFilterButton(
+                                  'Dark',
+                                  Colors.black87,
+                                  'dark',
+                                ),
+                                _buildFilterButton(
+                                  'Blue',
+                                  HexColor('#0000FF'),
+                                  'blue',
+                                ),
+                                _buildFilterButton(
+                                  'Warm HDR',
+                                  Colors.deepOrangeAccent,
+                                  'warm',
+                                ),
+                                _buildFilterButton(
+                                  'Sepia',
+                                  Colors.redAccent,
+                                  'sepia',
+                                ),
+                                _buildFilterButton(
+                                  'Neon',
+                                  Colors.purpleAccent,
+                                  'neon',
+                                ),
+                              ],
                             ),
                           ),
-                        ],
-                      ),
-                    ),
+                        ),
+                      if (!_isLocked && _equalizerVisible)
+                        Positioned(
+                          bottom: equalizerBottom.toDouble(),
+                          left: 10,
+                          child: Container(
+                            width: 200,
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.black.withOpacity(0.5),
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                _buildSlider(
+                                  'Bass (60Hz)',
+                                  bassGain,
+                                  (v) => setState(() => bassGain = v),
+                                ),
+                                _buildSlider(
+                                  'Mid (1kHz)',
+                                  midGain,
+                                  (v) => setState(() => midGain = v),
+                                ),
+                                _buildSlider(
+                                  'Treble (10kHz)',
+                                  trebleGain,
+                                  (v) => setState(() => trebleGain = v),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      if (_showLogo && isLast)
+                        AnimatedOpacity(
+                          opacity: 1,
+                          duration: const Duration(milliseconds: 600),
+                          child: Center(
+                            child: Container(
+                              color: Colors.black.withOpacity(0.7),
+                              height: 200,
+                              width: 200,
+                              alignment: Alignment.center,
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Image.asset(
+                                    'assets/appblue.png',
+                                    width: 120,
+                                    height: 120,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  const Text(
+                                    'Vidnexa Player',
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                      letterSpacing: 1.2,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                ),
-
-
-            ],
-          ),
         ),
       ),
     );

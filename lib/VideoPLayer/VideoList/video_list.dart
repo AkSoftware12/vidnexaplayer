@@ -547,7 +547,7 @@ class PhotoTile extends StatelessWidget {
           context,
           MaterialPageRoute(
             builder:
-                (context) =>  FullScreenVideoPlayer(
+                (context) =>  FullScreenVideoPlayerFixed(
                   videos: photos,
                   initialIndex: initialIndex,
                 ),

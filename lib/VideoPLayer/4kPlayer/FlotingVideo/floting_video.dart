@@ -136,7 +136,7 @@ class FloatingVideoManager {
 
                                 Navigator.of(ctx).push(
                                   MaterialPageRoute(
-                                    builder: (_) => FullScreenVideoPlayer(
+                                    builder: (_) => FullScreenVideoPlayerFixed(
                                       videos: _videos!,
                                       initialIndex: _currentIndex,
                                       externalPlayer: _player,

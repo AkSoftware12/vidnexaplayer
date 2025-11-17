@@ -25,9 +25,12 @@ class CustomVideoControls extends StatefulWidget {
   final VoidCallback? onCyclePlaybackRate;
   final VoidCallback? onBackPressed;
   final bool? audioOnly;
-  final String? PlaybackRate;
+  final VoidCallback? onVolume;
   final int index;
   final List<AssetEntity> videos;
+  final VideoResizeMode resizeMode;
+  final VoidCallback onToggleResizeMode;
+
 
 
   const CustomVideoControls({
@@ -44,10 +47,10 @@ class CustomVideoControls extends StatefulWidget {
     this.onToggleAudioOnly,
     this.audioOnly,
     this.onCyclePlaybackRate,
-    this.PlaybackRate,
+    this.onVolume,
      required this.index,
     required this.videos,
-    this.onBackPressed,
+    this.onBackPressed, required this.resizeMode, required this.onToggleResizeMode,
   });
 
   @override
@@ -268,29 +271,39 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                               IconButton(
                                 icon: const Icon(Icons.equalizer),
                                 color: Colors.white,
-                                iconSize: 28,
+                                iconSize: 24,
                                 onPressed: widget.onToggleEqualizer,
                               ),
                               IconButton(
                                 icon: const Icon(Icons.lock_open),
                                 color: Colors.white,
-                                iconSize: 32,
+                                iconSize: 24,
                                 onPressed: widget.onToggleLock,
                               ),
                               IconButton(
                                 icon: const Icon(Icons.camera_alt),
                                 color: Colors.white,
-                                iconSize: 28,
+                                iconSize: 24,
                                 onPressed: widget.onTakeScreenshot,
                               ),
+
                               IconButton(
-                                icon: const Icon(Icons.headphones),
-                                color:
-                                widget.audioOnly == true
-                                    ? Colors.greenAccent
-                                    : Colors.white,
-                                iconSize: 28,
-                                onPressed: widget.onToggleAudioOnly,
+                                icon: const Icon(Icons.screen_rotation),
+                                color: Colors.white,
+                                iconSize: 24,
+                                onPressed: widget.onToggleOrientation,
+                              ),
+                              Padding(
+                                padding:  EdgeInsets.only(bottom: 12.0),
+                                child: IconButton(
+                                  icon: const Icon(Icons.headphones),
+                                  color:
+                                  widget.audioOnly == true
+                                      ? Colors.greenAccent
+                                      : Colors.white,
+                                  iconSize: 24,
+                                  onPressed: widget.onToggleAudioOnly,
+                                ),
                               ),
                             ],
                           ),
@@ -309,54 +322,41 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                                 IconButton(
                                   icon: const Icon(Icons.filter_alt),
                                   color: Colors.white,
-                                  iconSize: 28,
+                                  iconSize: 24,
                                   onPressed: widget.onToggleFilters,
                                 ),
-                                GestureDetector(
-                                  onTap: widget.onCyclePlaybackRate,
-                                  child: Container(
-                                    margin: const EdgeInsets.only(top: 4),
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 6,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color: Colors.black.withOpacity(0.4),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: Row(
-                                      children: [
-                                        Text(
-                                          '${widget.PlaybackRate?.toString()}x',
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 14,
-                                          ),
-                                        ),
-                                        // IconButton(
-                                        //   icon: const Icon(Icons.speed),
-                                        //   color: Colors.white,
-                                        //   iconSize: 28,
-                                        //   onPressed:  widget.onCyclePlaybackRate,
-                                        // ),
-                                      ],
-                                    ),
+                                IconButton(
+                                  icon: Icon(
+                                    Icons.volume_up,
+                                    color: Colors.white,
                                   ),
+                                  onPressed: widget.onVolume,
+                                  iconSize: 24,
+
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.speed),
+                                  color: Colors.white,
+                                  iconSize: 24,
+                                  onPressed:  widget.onCyclePlaybackRate,
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.screen_rotation),
                                   color: Colors.white,
-                                  iconSize: 28,
+                                  iconSize: 24,
                                   onPressed: widget.onToggleOrientation,
                                 ),
                                 // Picture-in-picture button: show overlay and close page
-                                IconButton(
-                                  icon: const Icon(
-                                    Icons.picture_in_picture_alt,
+                                Padding(
+                                  padding:  EdgeInsets.only(bottom: 12.0),
+                                  child: IconButton(
+                                    icon: const Icon(
+                                      Icons.picture_in_picture_alt,
+                                    ),
+                                    color: Colors.white,
+                                    iconSize: 24,
+                                    onPressed: widget.onToggleFloting,
                                   ),
-                                  color: Colors.white,
-                                  iconSize: 28,
-                                  onPressed: widget.onToggleFloting,
                                 ),
                               ],
                             ),
@@ -414,6 +414,13 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
                         IconButton(
+                          icon: const Icon(Icons.lock_open),
+                          color: Colors.white,
+                          iconSize: 24,
+                          onPressed: widget.onToggleLock,
+                        ),
+                        Spacer(),
+                        IconButton(
                           padding: EdgeInsets.zero,
                           constraints: const BoxConstraints(),
                           icon: const Icon(Icons.skip_previous_rounded),
@@ -422,7 +429,7 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                           // ICONS CHOTE
                           onPressed: widget.onPrevious,
                         ),
-                        SizedBox(width: 20),
+                        SizedBox(width: 10),
 
                         IconButton(
                           padding: EdgeInsets.zero,
@@ -433,7 +440,7 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                           onPressed:
                               () => _seekBy(const Duration(seconds: -10)),
                         ),
-                        SizedBox(width: 20),
+                        SizedBox(width:10),
 
                         IconButton(
                           padding: EdgeInsets.zero,
@@ -447,7 +454,7 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                           ),
                           onPressed: _togglePlayPause,
                         ),
-                        SizedBox(width: 20),
+                        SizedBox(width: 10),
 
                         IconButton(
                           padding: EdgeInsets.zero,
@@ -458,7 +465,7 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                           onPressed:
                               () => _seekBy(const Duration(seconds: 10)),
                         ),
-                        SizedBox(width: 20),
+                        SizedBox(width: 10),
 
                         IconButton(
                           padding: EdgeInsets.zero,
@@ -468,6 +475,23 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                           iconSize: sideSize + 4,
                           onPressed: widget.onNext,
                         ),
+                        Spacer(),
+                        IconButton(
+                          icon: Icon(
+                            widget.resizeMode == VideoResizeMode.fit
+                                ? Icons.fit_screen
+                                : widget.resizeMode == VideoResizeMode.fill
+                                ? Icons.crop
+                                : widget.resizeMode == VideoResizeMode.zoom
+                                ? Icons.zoom_in_map
+                                : Icons.open_in_full,
+                            color: Colors.white,
+                          ),
+                          iconSize: 24,
+                          onPressed: widget.onToggleResizeMode,
+                        ),
+
+
                       ],
                     ),
                     SizedBox(height: bottom),
@@ -481,4 +505,89 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
       ),
     );
   }
+  Future<void> showVolumeDialog(BuildContext context,
+      {required double initialVolume,
+        required Function(double) onVolumeChange}) async {
+    double newVolume = initialVolume;
+
+    await showGeneralDialog(
+      context: context,
+      barrierDismissible: true,
+      barrierColor: Colors.black45,
+      transitionDuration: const Duration(milliseconds: 200),
+      pageBuilder: (_, __, ___) {
+        return StatefulBuilder(
+          builder: (context, setState) {
+            return Center(
+              child: Material(
+                color: Colors.transparent,
+                child: Container(
+                  width: MediaQuery.of(context).size.width * 0.75,
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: Colors.white12,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white24, width: 1),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Text(
+                        "Volume",
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 25),
+
+                      // Slider
+                      Slider(
+                        value: newVolume,
+                        min: 0,
+                        max: 1,
+                        divisions: 10,
+                        activeColor: Colors.blueAccent,
+                        onChanged: (value) {
+                          setState(() => newVolume = value);
+                          onVolumeChange(value);
+                        },
+                      ),
+
+                      const SizedBox(height: 10),
+
+                      // Buttons
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        children: [
+                          TextButton(
+                            onPressed: () {
+                              newVolume = 1.0;
+                              onVolumeChange(1.0);
+                              setState(() {});
+                            },
+                            child: const Text("Max",
+                                style: TextStyle(color: Colors.white)),
+                          ),
+                          const SizedBox(width: 10),
+                          TextButton(
+                            onPressed: () {
+                              Navigator.pop(context);
+                            },
+                            child: const Text("Close",
+                                style: TextStyle(color: Colors.red)),
+                          ),
+                        ],
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
 }
