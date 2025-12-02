@@ -501,9 +501,9 @@ class CustomBottomBarState extends State<CustomBottomBar> {
         });
         widget.onTabChangedListener(index);
       },
-      backgroundColor: Colors.white,
-      selectedItemColor: ColorSelect.maineColor,
-      unselectedItemColor: Colors.black,
+      backgroundColor: ColorSelect.maineColor2,
+      selectedItemColor: ColorSelect.textcolor,
+      unselectedItemColor: Colors.grey,
       showUnselectedLabels: true,
       type: BottomNavigationBarType.fixed,
       selectedLabelStyle: GoogleFonts.openSans(
@@ -522,10 +522,11 @@ class CustomBottomBarState extends State<CustomBottomBar> {
       ),
       items: [
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/home.svg'),
+          icon: SvgPicture.asset('assets/home.svg',color: Colors.grey,),
           label: 'Home',
+
           activeIcon: Container(
-            padding: EdgeInsets.all(3.sp),
+            padding: EdgeInsets.all(5.sp),
             decoration: BoxDecoration(
               color: ColorSelect.maineColor,
               // Grey background for selected icon
@@ -540,7 +541,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/music.svg'),
+          icon: SvgPicture.asset('assets/music.svg',color: Colors.grey,),
           label: 'Music',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -555,7 +556,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/video_svg.svg'),
+          icon: SvgPicture.asset('assets/video_svg.svg',color: Colors.grey,),
           label: 'Video',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -571,7 +572,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/account.svg'),
+          icon: SvgPicture.asset('assets/account.svg',color: Colors.grey,),
           label: 'Profile',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),

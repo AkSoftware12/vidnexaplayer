@@ -131,7 +131,7 @@ class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderSt
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addObserver(this); // 👈 observe app lifecycle
+    WidgetsBinding.instance.addObserver(this);
 
     _controller = AnimationController(
       duration: Duration(milliseconds: 800),
@@ -173,17 +173,15 @@ class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderSt
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this); // 👈 remove observer
+    WidgetsBinding.instance.removeObserver(this);
 
     _controller.dispose();
     super.dispose();
   }
 
-  // 👇 detect when user returns from Settings
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
-      // app came back from background or Settings
       _checkPermissionStatus();
     }
   }
@@ -260,66 +258,6 @@ class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderSt
         ),
       ),
 
-
-
-      // Padding(
-      //   padding: EdgeInsets.symmetric(horizontal: 20.sp, vertical: 100.sp),
-      //   child: Container(
-      //     width: double.infinity,
-      //     padding: EdgeInsets.all(20.sp),
-      //     decoration: BoxDecoration(
-      //       color: Colors.blue.withOpacity(0.1),
-      //       borderRadius: BorderRadius.circular(12.sp),
-      //     ),
-      //     child: Column(
-      //       mainAxisSize: MainAxisSize.min,
-      //       children: [
-      //         Icon(Icons.lock_outline, color: Colors.blueAccent, size: 40.sp),
-      //         SizedBox(height: 12.sp),
-      //         Text(
-      //           'Permission Required',
-      //           style: GoogleFonts.poppins(
-      //             textStyle: TextStyle(
-      //               fontSize: 16.sp,
-      //               fontWeight: FontWeight.w600,
-      //               color: Colors.black87,
-      //             ),
-      //           ),
-      //         ),
-      //         SizedBox(height: 6.sp),
-      //         Text(
-      //           'To view your photos and videos, please allow access from settings.',
-      //           textAlign: TextAlign.center,
-      //           style: GoogleFonts.poppins(
-      //             textStyle: TextStyle(
-      //               fontSize: 13.sp,
-      //               color: Colors.black54,
-      //             ),
-      //           ),
-      //         ),
-      //         SizedBox(height: 16.sp),
-      //         ElevatedButton.icon(
-      //           style: ElevatedButton.styleFrom(
-      //             backgroundColor: Colors.blueAccent,
-      //             shape: RoundedRectangleBorder(
-      //               borderRadius: BorderRadius.circular(8.sp),
-      //             ),
-      //           ),
-      //           onPressed: () async {
-      //             await PhotoManager.openSetting();
-      //           },
-      //           icon: const Icon(Icons.settings, color: Colors.white),
-      //           label: const Text('Open Settings', style: TextStyle(color: Colors.white)),
-      //         ),
-      //         SizedBox(height: 8.sp),
-      //         TextButton(
-      //           onPressed: _requestPermissionAndLoadAlbums,
-      //           child: const Text('Try Again', style: TextStyle(color: Colors.blueAccent)),
-      //         ),
-      //       ],
-      //     ),
-      //   ),
-      // ),
     );
   }
 
@@ -335,7 +273,7 @@ class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderSt
           ).loadRecentlyPlayed();
         },
         child: SingleChildScrollView(
-          physics: AlwaysScrollableScrollPhysics(),
+          physics: const AlwaysScrollableScrollPhysics(),
           child: Column(
             children: [
               SizedBox(height: 10.sp),
@@ -580,7 +518,7 @@ class AlbumTile extends StatelessWidget {
   final AssetPathEntity album;
   final int index;
 
-  AlbumTile({required this.album, required this.index});
+  const AlbumTile({super.key, required this.album, required this.index});
 
   @override
   Widget build(BuildContext context) {
@@ -766,7 +704,7 @@ class AlbumGridTile extends StatelessWidget {
   final AssetPathEntity album;
   final int index;
 
-  const AlbumGridTile({required this.album, required this.index});
+  const AlbumGridTile({super.key, required this.album, required this.index});
 
   @override
   Widget build(BuildContext context) {
@@ -947,7 +885,7 @@ class AlbumGridTile3 extends StatelessWidget {
   final AssetPathEntity album;
   final int index;
 
-  const AlbumGridTile3({required this.album, required this.index});
+  const AlbumGridTile3({super.key, required this.album, required this.index});
 
   @override
   Widget build(BuildContext context) {

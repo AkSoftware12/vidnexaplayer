@@ -94,76 +94,73 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding:  EdgeInsets.only(bottom:50.sp),
-      child: Scaffold(
-        backgroundColor: Colors.grey[100],
-        appBar: AppBar(
-          title: Text(
-            '${widget.folderName} ${'(${_photos.length.toString()})'}',
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.black,
+    return Scaffold(
+      backgroundColor: Colors.grey[100],
+      appBar: AppBar(
+        title: Text(
+          '${widget.folderName} ${'(${_photos.length.toString()})'}',
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+        backgroundColor: Colors.white,
+        elevation: 2,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.all(8.0),
+            child: Row(
+              children: [
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isGridView = true;
+                    });
+                  },
+                  child: Container(
+                    padding: EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: _isGridView ? ColorSelect.maineColor2 : Colors.grey.shade200,
+                      borderRadius: BorderRadius.only(
+                        topLeft: Radius.circular(10),
+                        bottomLeft: Radius.circular(10),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.grid_view,
+                      color: _isGridView ? Colors.white : Colors.black87,
+                      size: 20,
+                    ),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _isGridView = false;
+                    });
+                  },
+                  child: Container(
+                    padding: EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: !_isGridView ? ColorSelect.maineColor2 : Colors.grey.shade200,
+                      borderRadius: BorderRadius.only(
+                        topRight: Radius.circular(10),
+                        bottomRight: Radius.circular(10),
+                      ),
+                    ),
+                    child: Icon(
+                      Icons.list,
+                      color: !_isGridView ? Colors.white : Colors.black87,
+                      size: 20,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
-          backgroundColor: Colors.white,
-          elevation: 2,
-          actions: [
-            Padding(
-              padding: const EdgeInsets.all(8.0),
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isGridView = true;
-                      });
-                    },
-                    child: Container(
-                      padding: EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: _isGridView ? ColorSelect.maineColor2 : Colors.grey.shade200,
-                        borderRadius: BorderRadius.only(
-                          topLeft: Radius.circular(10),
-                          bottomLeft: Radius.circular(10),
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.grid_view,
-                        color: _isGridView ? Colors.white : Colors.black87,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  GestureDetector(
-                    onTap: () {
-                      setState(() {
-                        _isGridView = false;
-                      });
-                    },
-                    child: Container(
-                      padding: EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: !_isGridView ? ColorSelect.maineColor2 : Colors.grey.shade200,
-                        borderRadius: BorderRadius.only(
-                          topRight: Radius.circular(10),
-                          bottomRight: Radius.circular(10),
-                        ),
-                      ),
-                      child: Icon(
-                        Icons.list,
-                        color: !_isGridView ? Colors.white : Colors.black87,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-        body: _isGridView ? _buildGridView() : _buildListView(),
+        ],
       ),
+      body: _isGridView ? _buildGridView() : _buildListView(),
     );
   }
 
