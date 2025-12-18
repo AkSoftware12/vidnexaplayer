@@ -95,6 +95,10 @@ dependencies:
   media_kit_video: ^2.0.0
   media_kit_libs_video: ^1.0.7
   volume_controller: ^3.4.0
+  open_filex: ^4.4.0
+  disk_space_plus: ^0.2.6
+  rxdart: ^0.27.7
+
 
 
 

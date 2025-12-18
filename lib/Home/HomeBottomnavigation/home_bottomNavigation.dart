@@ -22,11 +22,13 @@ import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
 import '../../DeviceSpace/device_space.dart';
 import '../../Docouments/docouments.dart';
+import '../../LocalMusic/MiniPlayer/mini_player.dart';
 import '../../NetWork Stream/stream_video.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/AppBar/colorList.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
+import '../../Pdf/pdf_screen.dart';
 import '../../SplashScreen/splash_screen.dart';
 import '../../Utils/textSize.dart';
 import '../../VideoPLayer/AllVideo/all_videos.dart';
@@ -336,7 +338,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => AllDevicePdfsScreen(),
+                              builder: (context) => NotificationScreen(),
                             ),
                           );
                         },
@@ -406,11 +408,17 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
           ),
         ),
 
-        body:Container(
-          decoration: BoxDecoration(color: Colors.white),
-          child: Center(
-            child: _getPage(currentPage),
-          ),
+        body:Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(color: Colors.white),
+              child: Center(
+                child: _getPage(currentPage),
+              ),
+            ),
+
+            const MiniPlayer(),   // 👈 YAHI ADD KARNA HAI
+          ],
         ),
         bottomNavigationBar: CustomBottomBar(
           initialSelection: widget.bottomIndex,
@@ -458,13 +466,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     });
   }
 
-  void _getUserimage() async {
-    AppStore appStore = AppStore();
-    String image = await appStore.getUserImage();
-    setState(() {
-      userImage = image;
-    });
-  }
+
 }
 
 class CustomBottomBar extends StatefulWidget {

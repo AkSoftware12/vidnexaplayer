@@ -1,7 +1,9 @@
 import 'dart:async';
 import 'dart:typed_data';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:fluttertoast/fluttertoast.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -13,16 +15,10 @@ import '../../NotifyListeners/PlayPauseSync/play_pause.dart';
 import '../custom_video_appBar.dart';
 import 'CustomVideoControls/custom_video_controls.dart';
 import 'FlotingVideo/floting_video.dart';
+import 'HDR/hdr.dart';
 import 'PopupPlayer/Speed/speed.dart';
 import 'PopupPlayer/Volume/volume.dart';
 
-/// A variant of the full screen video player that ties the player's volume
-/// to the device (system) volume rather than controlling the internal
-/// media_kit volume directly.  This uses the volume_controller plugin to
-/// listen to and adjust the system volume.  When the user adjusts the
-/// volume slider or uses the vertical swipe gesture, the system volume
-/// changes, and hardware volume buttons will update the UI via the
-/// listener.  The player's internal volume is kept at 100% so that
 final globalPlayPause = PlayPauseSync();
 enum VideoResizeMode {
   fit,
@@ -61,11 +57,19 @@ class _FullScreenVideoPlayerSystemVolumeState
   // VolumeController.listener and used for UI controls.
   double _systemVolume = 100.0;
   StreamSubscription<double>? _volumeSubscription;
+  bool get isLandscape =>
+      MediaQuery.of(context).orientation == Orientation.landscape;
+
+  bool _controlsVisible = true;
+  Timer? _hideTimer;
 
   bool _isLoading = true;
   bool _showLogo = false;
   String _selectedFilter = 'normal';
   Timer? _systemUiTimer;
+
+
+
 
   // Equalizer sliders (dB)
   double bassGain = 0.0;
@@ -148,14 +152,37 @@ class _FullScreenVideoPlayerSystemVolumeState
         }
       }
     });
-
-    WidgetsBinding.instance.addPostFrameCallback((_) => _hideBottomBar());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _startHideTimer();
+      _hideBottomBar();
+    });
 
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
   }
+  void _startHideTimer() {
+    _hideTimer?.cancel();
+
+    final duration = isLandscape
+        ? const Duration(seconds: 5)   // ya 4
+        : const Duration(seconds: 5);
+
+    _hideTimer = Timer(duration, () {
+      if (mounted && !_isLocked) {
+        setState(() => _controlsVisible = false);
+      }
+    });
+  }
+
+  void _onScreenTap() {
+    if (_isLocked) return;
+
+    setState(() => _controlsVisible = true);
+    _startHideTimer();
+  }
+
 
   Future<void> _loadVideo() async {
     setState(() {
@@ -171,9 +198,6 @@ class _FullScreenVideoPlayerSystemVolumeState
     setState(() => _isLoading = false);
   }
 
-  /// Equalizer adjustment.  This uses the same logic as before but keeps
-  /// the player's internal volume at full.  We adjust the player's
-  /// volume relative to 100 while leaving the system volume unchanged.
   Future<void> _applyEqualizer() async {
     final weightedGain =
         (bassGain * 0.6 + midGain * 0.3 + trebleGain * 0.1) / 15.0;
@@ -199,9 +223,7 @@ class _FullScreenVideoPlayerSystemVolumeState
     }
   }
 
-  void _changeFilter(String filter) {
-    setState(() => _selectedFilter = filter);
-  }
+
   void _toggleResizeMode() {
     setState(() {
       if (_resizeMode == VideoResizeMode.fit) {
@@ -383,31 +405,6 @@ class _FullScreenVideoPlayerSystemVolumeState
     }
   }
 
-  Widget _buildFilterButton(String label, Color color, String filter) {
-    final isSelected = _selectedFilter == filter;
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 4),
-      child: GestureDetector(
-        onTap: () => _changeFilter(filter),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-          decoration: BoxDecoration(
-            color: isSelected ? color.withOpacity(0.8) : Colors.transparent,
-            borderRadius: BorderRadius.circular(8),
-            border: Border.all(color: color, width: 1),
-          ),
-          child: Text(
-            label,
-            style: TextStyle(
-              color: isSelected ? Colors.black : color,
-              fontWeight: FontWeight.bold,
-              fontSize: 12,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildSlider(
     String label,
@@ -450,9 +447,16 @@ class _FullScreenVideoPlayerSystemVolumeState
       final Uint8List? data = await _player.screenshot(format: 'image/png');
       if (data != null) {
         if (context.mounted) {
-          ScaffoldMessenger.of(
-            context,
-          ).showSnackBar(const SnackBar(content: Text('Screenshot captured')));
+          Fluttertoast.showToast(
+            msg: "Screenshot captured",
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.CENTER,
+            backgroundColor: Colors.green,
+            textColor: Colors.white,
+            fontSize: 14,
+          );
+
+
         }
       }
     } catch (e) {
@@ -522,9 +526,6 @@ class _FullScreenVideoPlayerSystemVolumeState
     setState(() => _equalizerVisible = !_equalizerVisible);
   }
 
-  void _toggleFilters() {
-    setState(() => _filtersVisible = !_filtersVisible);
-  }
 
   void _hideBottomBar() {
     SystemChrome.setEnabledSystemUIMode(
@@ -682,13 +683,23 @@ class _FullScreenVideoPlayerSystemVolumeState
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     super.dispose();
   }
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+
+    // Always restart hide timer on orientation change
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_isLocked) {
+        setState(() => _controlsVisible = true);
+        _startHideTimer();
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    final isLast = _currentIndex == widget.videos.length - 1;
     bool isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
-    final double filtersBottom = isLandscape ? 60 : 120;
     final double equalizerBottom = isLandscape ? 70 : 130;
     final videoWidget = ColorFiltered(
       colorFilter: ColorFilter.matrix(_getColorMatrix(_selectedFilter)),
@@ -726,13 +737,18 @@ class _FullScreenVideoPlayerSystemVolumeState
         onHorizontalDragUpdate: _onHorizontalDragUpdate,
         onHorizontalDragEnd: _onHorizontalDragEnd,
         onDoubleTapDown: _onDoubleTapDown,
+        onTap: _onScreenTap,
+
         child: Scaffold(
           backgroundColor: Colors.black,
           body:
               _isLoading
-                  ? const Center(
-                    child: CircularProgressIndicator(color: Colors.white),
-                  )
+                  ? Center(
+                  child: CupertinoActivityIndicator(
+                    radius: 25,
+                    color: Colors.white,
+                    animating: true,
+                  ))
                   : Stack(
                     children: [
                       Positioned.fill(child: videoWidget),
@@ -910,50 +926,24 @@ class _FullScreenVideoPlayerSystemVolumeState
                             ),
                           ),
                         ),
-                      if (!_isLocked)
-                        Positioned(
-                          top: 25,
-                          left: 0,
-                          right: 0,
-                          child: CustomVideoAppBar(
-                            title:
-                                widget.videos![_currentIndex].title.toString(),
-                            onBackPressed: () async {
-                              if (isLandscape) {
-                                await SystemChrome.setPreferredOrientations([
-                                  DeviceOrientation.portraitUp,
-                                  DeviceOrientation.portraitDown,
-                                ]);
-                                SystemChrome.setEnabledSystemUIMode(
-                                  SystemUiMode.manual,
-                                  overlays: SystemUiOverlay.values,
-                                );
-                              } else {
-                                await ScreenBrightness()
-                                    .resetScreenBrightness();
-                                Navigator.pop(context);
-                              }
-                              setState(() {
-                                isLandscape = !isLandscape;
-                              });
-                            },
-                            currentIndex: _currentIndex,
-                            onVideoSelected: (index) {
-                              setState(() {
-                                _currentIndex = index;
-                              });
-                            },
-                            isLandscape: isLandscape,
-                            videos: widget.videos,
-                          ),
-                        ),
-                      if (!_isLocked)
+                      if (!_isLocked && _controlsVisible)
                         CustomVideoControls(
                           player: _player,
                           onNext: _playNext,
                           onPrevious: _playPrevious,
                           onToggleEqualizer: _toggleEqualizer,
-                          onToggleFilters: _toggleFilters,
+                          // onToggleFilters: _toggleFilters,
+                          onToggleFilters: (){
+
+                            FilterPopup.show(
+                              context,
+                              selectedKey: _selectedFilter,
+                              onSelected: (key) {
+                                setState(() => _selectedFilter = key);
+                              },
+                            );
+
+                          },
                           onToggleOrientation: _toggleOrientation,
                           onToggleFloting: () {
                             FloatingVideoManager.show(
@@ -975,54 +965,12 @@ class _FullScreenVideoPlayerSystemVolumeState
                           videos: widget.videos,
                           resizeMode: _resizeMode,
                           onToggleResizeMode: _toggleResizeMode,
+                          // onBackPressed: () async {
+                          //
+                          // },
+
                         ),
-                      if (!_isLocked && _filtersVisible)
-                        Positioned(
-                          bottom: filtersBottom.toDouble(),
-                          right: 10,
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.4),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            padding: const EdgeInsets.all(6),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                _buildFilterButton(
-                                  'Normal',
-                                  Colors.white,
-                                  'normal',
-                                ),
-                                _buildFilterButton(
-                                  'Dark',
-                                  Colors.black87,
-                                  'dark',
-                                ),
-                                _buildFilterButton(
-                                  'Blue',
-                                  HexColor('#0000FF'),
-                                  'blue',
-                                ),
-                                _buildFilterButton(
-                                  'Warm HDR',
-                                  Colors.deepOrangeAccent,
-                                  'warm',
-                                ),
-                                _buildFilterButton(
-                                  'Sepia',
-                                  Colors.redAccent,
-                                  'sepia',
-                                ),
-                                _buildFilterButton(
-                                  'Neon',
-                                  Colors.purpleAccent,
-                                  'neon',
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+
                       if (!_isLocked && _equalizerVisible)
                         Positioned(
                           bottom: equalizerBottom.toDouble(),
@@ -1056,39 +1004,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                             ),
                           ),
                         ),
-                      if (_showLogo && isLast)
-                        AnimatedOpacity(
-                          opacity: 1,
-                          duration: const Duration(milliseconds: 600),
-                          child: Center(
-                            child: Container(
-                              color: Colors.black.withOpacity(0.7),
-                              height: 200,
-                              width: 200,
-                              alignment: Alignment.center,
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Image.asset(
-                                    'assets/appblue.png',
-                                    width: 120,
-                                    height: 120,
-                                  ),
-                                  const SizedBox(height: 16),
-                                  const Text(
-                                    'Vidnexa Player',
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 18,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 1.2,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ),
+
                     ],
                   ),
         ),

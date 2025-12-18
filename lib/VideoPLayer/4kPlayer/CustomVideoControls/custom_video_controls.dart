@@ -31,8 +31,6 @@ class CustomVideoControls extends StatefulWidget {
   final VideoResizeMode resizeMode;
   final VoidCallback onToggleResizeMode;
 
-
-
   const CustomVideoControls({
     super.key,
     required this.player,
@@ -48,9 +46,11 @@ class CustomVideoControls extends StatefulWidget {
     this.audioOnly,
     this.onCyclePlaybackRate,
     this.onVolume,
-     required this.index,
+    required this.index,
     required this.videos,
-    this.onBackPressed, required this.resizeMode, required this.onToggleResizeMode,
+    this.onBackPressed,
+    required this.resizeMode,
+    required this.onToggleResizeMode,
   });
 
   @override
@@ -138,36 +138,31 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
           fit: StackFit.expand,
           children: [
             Positioned(
-              top: 25,
+              top: isLandscape?3:40,
               left: 0,
               right: 0,
               child: CustomVideoAppBar(
                 title: widget.videos[widget.index].title.toString(),
-                onBackPressed: ()=> widget.onBackPressed,
+                onBackPressed: () {
+                  if (isLandscape) {
+                    // Switch back to portrait
+                     SystemChrome.setPreferredOrientations([
+                      DeviceOrientation.portraitUp,
+                      DeviceOrientation.portraitDown,
+                    ]);
 
-
-                //     () async {
-                //   if (isLandscape) {
-                //     // Switch back to portrait
-                //     await SystemChrome.setPreferredOrientations([
-                //       DeviceOrientation.portraitUp,
-                //       DeviceOrientation.portraitDown,
-                //     ]);
-                //
-                //     SystemChrome.setEnabledSystemUIMode(
-                //       SystemUiMode.manual,
-                //       overlays: SystemUiOverlay.values, // dono bars visible
-                //     );
-                //   } else {
-                //     await ScreenBrightness().resetScreenBrightness();
-                //     Navigator.pop(context);
-                //   }
-                //   setState(() {
-                //     isLandscape = !isLandscape;
-                //   });
-                // },
-
-                // videos: widget.videos,
+                    SystemChrome.setEnabledSystemUIMode(
+                      SystemUiMode.manual,
+                      overlays: SystemUiOverlay.values, // dono bars visible
+                    );
+                  } else {
+                     ScreenBrightness().resetScreenBrightness();
+                    Navigator.pop(context);
+                  }
+                  setState(() {
+                    isLandscape = !isLandscape;
+                  });
+                },
                 currentIndex: widget.index,
                 onVideoSelected: (index) {
                   setState(() {
@@ -184,78 +179,10 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
               ),
             ),
 
-
-
-            // Align(
-            //   alignment: Alignment.topCenter,
-            //   child: SizedBox(
-            //     height: appBar,
-            //     child: Padding(
-            //       padding: const EdgeInsets.all(0.0),
-            //       child: Row(
-            //         children: [
-            //           IconButton(
-            //             onPressed: () async {
-            //               // 🔒 Lock app to Portrait only
-            //               await SystemChrome.setPreferredOrientations([
-            //                 DeviceOrientation.portraitUp,
-            //               ]);
-            //               if (Navigator.canPop(context)) {
-            //                 Navigator.pop(context);
-            //               }
-            //             },
-            //             icon: Icon(
-            //               Icons.arrow_back,
-            //               color: Colors.white,
-            //               size: sideSize - 10,
-            //             ),
-            //           ),
-            //
-            //           SizedBox(width: 10),
-            //           Expanded(
-            //             child: Text(
-            //               '${widget.title}',
-            //               maxLines: 1,
-            //               style: const TextStyle(
-            //                 color: Colors.white,
-            //                 fontSize: 18,
-            //                 fontWeight: FontWeight.w600,
-            //               ),
-            //             ),
-            //           ),
-            //           IconButton(
-            //             onPressed: () {
-            //
-            //             },
-            //             icon: Icon(
-            //               Icons.list,
-            //               color: Colors.white,
-            //               size: sideSize - 10,
-            //             ),
-            //           ),
-            //           Padding(
-            //             padding:  EdgeInsets.only(right:isLandscape ? 15.sp : 0.sp),
-            //             child: IconButton(
-            //               onPressed: () {
-            //
-            //               },
-            //               icon: Icon(
-            //                 Icons.playlist_play_outlined,
-            //                 color: Colors.white,
-            //                 size: sideSize - 10,
-            //               ),
-            //             ),
-            //           ),
-            //
-            //         ],
-            //       ),
-            //     ),
-            //   ),
-            // ),
             Align(
               alignment: Alignment.bottomCenter,
               child: Container(
-                color: Colors.black54,
+                color: Colors.black12,
                 padding: EdgeInsets.symmetric(horizontal: 0.sp, vertical: 0),
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
@@ -268,18 +195,18 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                           bottom: 0,
                           child: Column(
                             children: [
-                              IconButton(
-                                icon: const Icon(Icons.equalizer),
-                                color: Colors.white,
-                                iconSize: 24,
-                                onPressed: widget.onToggleEqualizer,
+                              // GestureDetector(
+                              //   onTap: widget.onToggleEqualizer,
+                              //   child: Image.asset(
+                              //     'assets/equalizer.png',
+                              //     height: 35,
+                              //     width: 35,
+                              //   ),
+                              // ),
+                              SizedBox(
+                                height: 5,
                               ),
-                              IconButton(
-                                icon: const Icon(Icons.lock_open),
-                                color: Colors.white,
-                                iconSize: 24,
-                                onPressed: widget.onToggleLock,
-                              ),
+
                               IconButton(
                                 icon: const Icon(Icons.camera_alt),
                                 color: Colors.white,
@@ -294,13 +221,13 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                                 onPressed: widget.onToggleOrientation,
                               ),
                               Padding(
-                                padding:  EdgeInsets.only(bottom: 12.0),
+                                padding: EdgeInsets.only(bottom: 12.0),
                                 child: IconButton(
                                   icon: const Icon(Icons.headphones),
                                   color:
-                                  widget.audioOnly == true
-                                      ? Colors.greenAccent
-                                      : Colors.white,
+                                      widget.audioOnly == true
+                                          ? Colors.greenAccent
+                                          : Colors.white,
                                   iconSize: 24,
                                   onPressed: widget.onToggleAudioOnly,
                                 ),
@@ -315,16 +242,23 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                           bottom: 0,
 
                           child: Padding(
-                            padding:  EdgeInsets.only(right:isLandscape ? 15.sp : 0.sp),
+                            padding: EdgeInsets.only(
+                              right: isLandscape ? 15.sp : 0.sp,
+                            ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.center,
                               children: [
-                                IconButton(
-                                  icon: const Icon(Icons.filter_alt),
-                                  color: Colors.white,
-                                  iconSize: 24,
-                                  onPressed: widget.onToggleFilters,
+                                GestureDetector(
+                                  onTap: widget.onToggleFilters,
+                                  child: Image.asset(
+                                    'assets/hdr.png',
+                                    height: 35,
+                                    width: 35,
+                                    color: Colors.pink,
+                                  ),
                                 ),
+
+                                //
                                 IconButton(
                                   icon: Icon(
                                     Icons.volume_up,
@@ -332,23 +266,16 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                                   ),
                                   onPressed: widget.onVolume,
                                   iconSize: 24,
-
                                 ),
                                 IconButton(
                                   icon: const Icon(Icons.speed),
                                   color: Colors.white,
                                   iconSize: 24,
-                                  onPressed:  widget.onCyclePlaybackRate,
+                                  onPressed: widget.onCyclePlaybackRate,
                                 ),
-                                IconButton(
-                                  icon: const Icon(Icons.screen_rotation),
-                                  color: Colors.white,
-                                  iconSize: 24,
-                                  onPressed: widget.onToggleOrientation,
-                                ),
-                                // Picture-in-picture button: show overlay and close page
+
                                 Padding(
-                                  padding:  EdgeInsets.only(bottom: 12.0),
+                                  padding: EdgeInsets.only(bottom: 12.0),
                                   child: IconButton(
                                     icon: const Icon(
                                       Icons.picture_in_picture_alt,
@@ -440,7 +367,7 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                           onPressed:
                               () => _seekBy(const Duration(seconds: -10)),
                         ),
-                        SizedBox(width:10),
+                        SizedBox(width: 10),
 
                         IconButton(
                           padding: EdgeInsets.zero,
@@ -462,8 +389,7 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                           icon: const Icon(Icons.forward_10),
                           color: Colors.white,
                           iconSize: sideSize + 4,
-                          onPressed:
-                              () => _seekBy(const Duration(seconds: 10)),
+                          onPressed: () => _seekBy(const Duration(seconds: 10)),
                         ),
                         SizedBox(width: 10),
 
@@ -490,12 +416,9 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                           iconSize: 24,
                           onPressed: widget.onToggleResizeMode,
                         ),
-
-
                       ],
                     ),
                     SizedBox(height: bottom),
-
                   ],
                 ),
               ),
@@ -505,9 +428,12 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
       ),
     );
   }
-  Future<void> showVolumeDialog(BuildContext context,
-      {required double initialVolume,
-        required Function(double) onVolumeChange}) async {
+
+  Future<void> showVolumeDialog(
+    BuildContext context, {
+    required double initialVolume,
+    required Function(double) onVolumeChange,
+  }) async {
     double newVolume = initialVolume;
 
     await showGeneralDialog(
@@ -535,9 +461,10 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                       const Text(
                         "Volume",
                         style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold),
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 25),
 
@@ -566,19 +493,23 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
                               onVolumeChange(1.0);
                               setState(() {});
                             },
-                            child: const Text("Max",
-                                style: TextStyle(color: Colors.white)),
+                            child: const Text(
+                              "Max",
+                              style: TextStyle(color: Colors.white),
+                            ),
                           ),
                           const SizedBox(width: 10),
                           TextButton(
                             onPressed: () {
                               Navigator.pop(context);
                             },
-                            child: const Text("Close",
-                                style: TextStyle(color: Colors.red)),
+                            child: const Text(
+                              "Close",
+                              style: TextStyle(color: Colors.red),
+                            ),
                           ),
                         ],
-                      )
+                      ),
                     ],
                   ),
                 ),
@@ -589,5 +520,4 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
       },
     );
   }
-
 }

@@ -847,6 +847,16 @@ class AlbumGridTile extends StatelessWidget {
                     ),
                     GestureDetector(
                       onTap: () {
+
+                        FolderBottomSheet.show(
+                          context,
+                          folderName:  album.name,
+                          videos: album,
+                          formattedSize: '2.5 GB',
+                          location: '/storage/emulated/0/Movies',
+                          date: 'Oct 31, 2025',
+                        );
+
                         // showEnhancedDogBehaviorSheet(
                         //   context,
                         //   folderName,
@@ -856,6 +866,7 @@ class AlbumGridTile extends StatelessWidget {
                         //   lastModified,
                         // );
                       },
+
                       child: Container(
                         height: 40.sp,
                         width: 20.sp,
@@ -1035,6 +1046,16 @@ class AlbumGridTile3 extends StatelessWidget {
                         ),
                         GestureDetector(
                           onTap: () {
+
+                            FolderBottomSheet.show(
+                              context,
+                              folderName:  album.name,
+                              videos: album,
+                              formattedSize: '2.5 GB',
+                              location: '/storage/emulated/0/Movies',
+                              date: 'Oct 31, 2025',
+                            );
+
                             // showEnhancedDogBehaviorSheet(
                             //   context,
                             //   folderName,
@@ -1044,6 +1065,7 @@ class AlbumGridTile3 extends StatelessWidget {
                             //   lastModified,
                             // );
                           },
+
                           child: Container(
                             height: 40.sp,
                             width: 10.sp,

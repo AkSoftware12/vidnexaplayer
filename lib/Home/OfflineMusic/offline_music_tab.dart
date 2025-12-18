@@ -43,29 +43,6 @@ class _DashBoardScreenState extends State<OfflineMusicTabScreen>
     }
   }
 
-  // Check audio permission for Android 14 (API 34)
-  // Future<void> _checkPermissions() async {
-  //   bool audioPermission;
-  //
-  //   if (Platform.isAndroid || Platform.isIOS) {
-  //     audioPermission = await Permission.audio.isGranted;
-  //   } else {
-  //     audioPermission = false;
-  //   }
-  //
-  //   if (mounted) {
-  //     setState(() {
-  //       _hasPermissions = audioPermission;
-  //       _isLoading = false;
-  //     });
-  //
-  //     if (_hasPermissions) {
-  //       await _loadMusic(); // Load music data when permission is granted
-  //     }
-  //   }
-  // }
-
-
   Future<int> _getAndroidSdkInt() async {
     if (Platform.isAndroid) {
       final deviceInfo = DeviceInfoPlugin();
@@ -151,17 +128,6 @@ class _DashBoardScreenState extends State<OfflineMusicTabScreen>
           _isLoading = true; // Show loading indicator while fetching songs
         });
       }
-
-      // Placeholder for loading music data
-      // Example: Use on_audio_query to fetch songs
-      // final OnAudioQuery audioQuery = OnAudioQuery();
-      // List<SongModel> songs = await audioQuery.querySongs();
-      // Update your state or provider with the songs
-      print('Loading music data...');
-      // Example: Update a provider or state management solution
-      // Provider.of<MusicProvider>(context, listen: false).setSongs(songs);
-
-      // Simulate a delay to mimic song loading
       await Future.delayed(const Duration(seconds: 2));
 
       if (mounted) {

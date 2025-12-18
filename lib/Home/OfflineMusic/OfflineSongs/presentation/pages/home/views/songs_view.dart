@@ -5,6 +5,7 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import '../../../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
 import '../../../../../../../Mp3Player/mp3_player.dart';
 
 
@@ -25,6 +26,9 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
   final audioPlayer = AudioPlayer();
 
   List<SongModel> items = [];
+
+  final audio = GlobalAudioController();
+
 
   bool isLoading = true;
   // List<SongModel> filteredItems = [];
@@ -178,19 +182,9 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
                           transitionType: ContainerTransitionType.fadeThrough,
                           closedColor: Theme.of(context).cardColor,
                           closedElevation: 0.0,
-                          openElevation: 4.0,
-                          transitionDuration: Duration(milliseconds: 1000),
-                          openBuilder: (BuildContext context, VoidCallback _) =>
-                          // PlayerScreen(
-                          //   songs: songs,
-                          //   initialIndex: index,
-                          // ),
-
-                          Mp3Player(
-                            songs: songs,
-                            initialIndex: index,
-                            audioPlayer: audioPlayer,
-                          ),
+                          openElevation: 0.0,
+                          transitionDuration: Duration(milliseconds: 800),
+                          openBuilder: (BuildContext context, VoidCallback _) =>SizedBox(),
                           closedBuilder: (BuildContext _, VoidCallback openContainer) {
                             return  ListTile(
                               title: Text(
@@ -244,19 +238,12 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
                                     height: 50,
                                   ),
                                 ),
-                              ),                      // onTap: () async {
-                              //
-                              //   Navigator.push(
-                              //     context,
-                              //     MaterialPageRoute(
-                              //       builder: (context) => PlayerScreen(
-                              //         songs: songs,
-                              //         initialIndex: index,
-                              //       ),
-                              //     ),
-                              //   );
-                              //
-                              // },
+                              ),
+
+                              onTap: (){
+                                audio.playSongs(songs, index);
+
+                              },
                             );
                           },
                         ),
