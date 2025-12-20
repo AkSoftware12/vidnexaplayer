@@ -31,6 +31,12 @@ class GlobalAudioController {
   /// 🎧 AUDIO PLAYER
   final AudioPlayer player = AudioPlayer();
 
+  /// 🔥 CURRENT PLAYLIST + INDEX
+  final ValueNotifier<List<SongModel>> currentSongs =
+  ValueNotifier<List<SongModel>>([]);
+
+  final ValueNotifier<int> currentIndex = ValueNotifier<int>(0);
+
   /// 🔥 MINI PLAYER VISIBILITY FLAG
   final ValueNotifier<bool> hasPlayedOnce = ValueNotifier(false);
 
@@ -46,7 +52,8 @@ class GlobalAudioController {
   // ---------------------------------------------------------------------------
   Future<void> playSongs(List<SongModel> songs, int index) async {
     if (songs.isEmpty) return;
-
+    currentSongs.value = songs;
+    currentIndex.value = index;
     final playlist = ConcatenatingAudioSource(
       children: songs.map((song) {
         return AudioSource.uri(
