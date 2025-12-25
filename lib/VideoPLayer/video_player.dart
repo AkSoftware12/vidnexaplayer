@@ -14,17 +14,19 @@ import 'package:video_player/video_player.dart';
 import 'dart:io';
 import 'package:flutter/services.dart'; // For SystemChrome
 import '../Home/HomeScreen/home_screen.dart';
-import '../RecentlyVideos/RecentlyPlayedManager/recently_played_manager.dart';
 import '../Utils/color.dart';
 import 'custom_video_appBar.dart';
 import 'package:screenshot/screenshot.dart';
+import 'package:photo_manager/photo_manager.dart';
+
+
 
 class VideoPlayerScreen extends StatefulWidget {
-  final List<FileSystemEntity>? videos;
+  final List<AssetEntity> videos;
   final int initialIndex;
   final String? url;
 
-  const VideoPlayerScreen({this.videos, this.initialIndex = 0, this.url});
+  const VideoPlayerScreen({required this.videos, required this.initialIndex, this.url});
 
   @override
   _VideoPlayerScreenState createState() => _VideoPlayerScreenState();
@@ -82,7 +84,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (widget.url != null && widget.url!.isNotEmpty) {
       _initializePlayer(widget.url!, isNetwork: true);
     } else if (widget.videos != null && widget.videos!.isNotEmpty) {
-      _initializePlayer(widget.videos![currentIndex].path, isNetwork: false);
+      _initializePlayer(widget.videos[currentIndex].file.toString(), isNetwork: false);
     } else {
       setState(() {
         _hasError = true;
@@ -177,7 +179,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (widget.videos != null && currentIndex < widget.videos!.length - 1) {
       setState(() {
         currentIndex++;
-        _initializePlayer(widget.videos![currentIndex].path, isNetwork: false);
+        // _initializePlayer(widget.videos![currentIndex].path, isNetwork: false);
       });
     }
   }
@@ -186,7 +188,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
     if (widget.videos != null && currentIndex > 0) {
       setState(() {
         currentIndex--;
-        _initializePlayer(widget.videos![currentIndex].path, isNetwork: false);
+        // _initializePlayer(widget.videos![currentIndex].path, isNetwork: false);
       });
     }
   }
@@ -987,9 +989,7 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                     widget.url != null
                         ? widget.url!.split('/').last
                         : widget.videos != null
-                        ? widget.videos![currentIndex].path
-                        .split('/')
-                        .last
+                        ? widget.videos![currentIndex].title.toString()
                         : 'Video',
                     onBackPressed: () async {
                       if (_isLandscape) {
@@ -1012,18 +1012,20 @@ class _VideoPlayerScreenState extends State<VideoPlayerScreen> {
                       });
                     },
 
-                    videos: widget.videos,
+                    // videos: widget.videos,
                     currentIndex: currentIndex,
                     onVideoSelected: (index) {
                       setState(() {
                         currentIndex = index; // Update playing video
                         _initializePlayer(
-                          widget.videos![index].path,
+                          '',
+                          // widget.videos![index].path,
                           isNetwork: false,
                         );
                       });
                     },
                     isLandscape: isLandscape,
+                    videos: [],
                   ),
                 ),
 

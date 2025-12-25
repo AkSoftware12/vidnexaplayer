@@ -22,16 +22,19 @@ import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
 import '../../DeviceSpace/device_space.dart';
 import '../../Docouments/docouments.dart';
+import '../../LocalMusic/MiniPlayer/mini_player.dart';
 import '../../NetWork Stream/stream_video.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/AppBar/colorList.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
+import '../../Pdf/pdf_screen.dart';
 import '../../SplashScreen/splash_screen.dart';
 import '../../Utils/textSize.dart';
 import '../../VideoPLayer/AllVideo/all_videos.dart';
 import '../../app_store/app_store.dart';
 import '../../main.dart';
+import '../HomeScreen/home2.dart' hide navigatorKey;
 import '../HomeScreen/home_screen.dart' hide navigatorKey;
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
@@ -52,6 +55,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int currentPage = 0;
   String currentVersion = '';
+  String release = "";
   String? userName;
   String userImage = "";
 
@@ -65,7 +69,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   }
 
 
-  String release = "";
+
   @override
   void initState() {
     super.initState();
@@ -74,13 +78,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     _getUsername();
     currentPage = widget.bottomIndex;
 
-    // Instantiate NewVersion manager object (Using GCP Console app as example)
     final newVersion = NewVersionPlus(
       iOSId: 'com.vidnexa.videoplayer', androidId: 'com.vidnexa.videoplayer', androidPlayStoreCountry: "es_ES", androidHtmlReleaseNotes: true, //support country code
     );
-
-    // You can let the plugin handle fetching the status and showing a dialog,
-    // or you can fetch the status and display your own dialog, or no dialog.
     final ver = VersionStatus(
       appStoreLink: '',
       localVersion: '',
@@ -88,15 +88,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       releaseNotes: '',
       originalStoreVersion: '',
     );
-    print(ver);
-    const simpleBehavior = true;
-
-    // if (simpleBehavior) {
-    // basicStatusCheck(newVersion);
-    // }
-    // else {
     advancedStatusCheck(newVersion);
-    // }
+
   }
 
 
@@ -133,14 +126,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       }
     }
   }
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   _getUsername();
-  //   currentPage = widget.bottomIndex;
-  //   checkForVersion(context);
-  // }
-
   Future<void> checkForVersion(BuildContext context) async {
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
     currentVersion = packageInfo.version;
@@ -335,7 +320,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => AllDevicePdfsScreen(),
+                              builder: (context) => NotificationScreen(),
                             ),
                           );
                         },
@@ -349,16 +334,16 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                               color: Colors.black),
                         ),
                       ),
-                      Positioned(
-                        top: 0, // 👈 ye line badli
-                        right: 0,
-                        child: badges.Badge(
-                          label: const Text(
-                            '15',
-                            style: TextStyle(color: Colors.white, fontSize: 10),
-                          ),
-                        ),
-                      )
+                      // Positioned(
+                      //   top: 0, // 👈 ye line badli
+                      //   right: 0,
+                      //   child: badges.Badge(
+                      //     label: const Text(
+                      //       '15',
+                      //       style: TextStyle(color: Colors.white, fontSize: 10),
+                      //     ),
+                      //   ),
+                      // )
                     ],
                   ),
 
@@ -405,11 +390,17 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
           ),
         ),
 
-        body:Container(
-          decoration: BoxDecoration(color: Colors.white),
-          child: Center(
-            child: _getPage(currentPage),
-          ),
+        body:Stack(
+          children: [
+            Container(
+              decoration: BoxDecoration(color: Colors.white),
+              child: Center(
+                child: _getPage(currentPage),
+              ),
+            ),
+
+            const MiniPlayer(),   // 👈 YAHI ADD KARNA HAI
+          ],
         ),
         bottomNavigationBar: CustomBottomBar(
           initialSelection: widget.bottomIndex,
@@ -437,7 +428,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   Widget _getPage(int page) {
     switch (page) {
       case 0:
-        return HomeScreen();
+        return DemoHomeScreen();
       case 1:
         return OfflineMusicTabScreen();
       case 2:
@@ -457,13 +448,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     });
   }
 
-  void _getUserimage() async {
-    AppStore appStore = AppStore();
-    String image = await appStore.getUserImage();
-    setState(() {
-      userImage = image;
-    });
-  }
+
 }
 
 class CustomBottomBar extends StatefulWidget {
@@ -500,9 +485,9 @@ class CustomBottomBarState extends State<CustomBottomBar> {
         });
         widget.onTabChangedListener(index);
       },
-      backgroundColor: Colors.white,
-      selectedItemColor: ColorSelect.maineColor,
-      unselectedItemColor: Colors.black,
+      backgroundColor: ColorSelect.maineColor2,
+      selectedItemColor: ColorSelect.textcolor,
+      unselectedItemColor: Colors.grey,
       showUnselectedLabels: true,
       type: BottomNavigationBarType.fixed,
       selectedLabelStyle: GoogleFonts.openSans(
@@ -521,10 +506,11 @@ class CustomBottomBarState extends State<CustomBottomBar> {
       ),
       items: [
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/home.svg'),
+          icon: SvgPicture.asset('assets/home.svg',color: Colors.grey,),
           label: 'Home',
+
           activeIcon: Container(
-            padding: EdgeInsets.all(3.sp),
+            padding: EdgeInsets.all(5.sp),
             decoration: BoxDecoration(
               color: ColorSelect.maineColor,
               // Grey background for selected icon
@@ -539,7 +525,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/music.svg'),
+          icon: SvgPicture.asset('assets/music.svg',color: Colors.grey,),
           label: 'Music',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -554,7 +540,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/video_svg.svg'),
+          icon: SvgPicture.asset('assets/video_svg.svg',color: Colors.grey,),
           label: 'Video',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -570,7 +556,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/account.svg'),
+          icon: SvgPicture.asset('assets/account.svg',color: Colors.grey,),
           label: 'Profile',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -803,60 +789,60 @@ class SettingsScreen extends StatelessWidget {
                     Navigator.of(context).pop();
                   },
                 ),
-                SizedBox(height: 10.sp),
-                ListTile(
-                  leading: Container(
-                    height: 35.sp,
-                    width: 35.sp,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(12),
-                      gradient: LinearGradient(
-                        colors: [
-                          HexColor('#9A6324'),
-                          HexColor('#9A6324'),
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                    ),
-                    padding: EdgeInsets.all(10.sp),
-                    child: Image.asset('assets/videos_img.png'),
-                  ),
-                  title: Column(
-                    mainAxisAlignment: MainAxisAlignment.start,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        'All Videos',
-                        style: GoogleFonts.openSans(
-                          textStyle: TextStyle(
-                            color: Colors.black,
-                            fontSize: TextSizes.textmedium14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        'View counts and analytics',
-                        style: GoogleFonts.openSans(
-                          textStyle: TextStyle(
-                            color: Colors.grey,
-                            fontSize: 9.sp,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => AllVideosScreen(icon: 'AppBar',),
-                      ),
-                    );
-                  },
-                ),
+                // SizedBox(height: 10.sp),
+                // ListTile(
+                //   leading: Container(
+                //     height: 35.sp,
+                //     width: 35.sp,
+                //     decoration: BoxDecoration(
+                //       borderRadius: BorderRadius.circular(12),
+                //       gradient: LinearGradient(
+                //         colors: [
+                //           HexColor('#9A6324'),
+                //           HexColor('#9A6324'),
+                //         ],
+                //         begin: Alignment.topLeft,
+                //         end: Alignment.bottomRight,
+                //       ),
+                //     ),
+                //     padding: EdgeInsets.all(10.sp),
+                //     child: Image.asset('assets/videos_img.png'),
+                //   ),
+                //   title: Column(
+                //     mainAxisAlignment: MainAxisAlignment.start,
+                //     crossAxisAlignment: CrossAxisAlignment.start,
+                //     children: [
+                //       Text(
+                //         'All Videos',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.black,
+                //             fontSize: TextSizes.textmedium14,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //       Text(
+                //         'View counts and analytics',
+                //         style: GoogleFonts.openSans(
+                //           textStyle: TextStyle(
+                //             color: Colors.grey,
+                //             fontSize: 9.sp,
+                //             fontWeight: FontWeight.bold,
+                //           ),
+                //         ),
+                //       ),
+                //     ],
+                //   ),
+                //   onTap: () {
+                //     Navigator.push(
+                //       context,
+                //       MaterialPageRoute(
+                //         builder: (context) => AllVideosScreen(icon: 'AppBar',),
+                //       ),
+                //     );
+                //   },
+                // ),
                 SizedBox(height: 10.sp),
                 ListTile(
                   leading: Container(

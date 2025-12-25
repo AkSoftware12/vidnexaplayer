@@ -1,10 +1,11 @@
 import 'dart:io';
 import 'package:file_manager/file_manager.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:videoplayer/Utils/color.dart';
+import 'package:photo_manager/photo_manager.dart';
+import '../Photo/image_album.dart';
+import '../VideoPLayer/4kPlayer/4k_player.dart';
 
 class DirectoryFolder extends StatelessWidget {
   final FileManagerController controller = FileManagerController();
@@ -15,33 +16,25 @@ class DirectoryFolder extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        // actions: [
-        //   IconButton(
-        //     onPressed: () => createFolder(context),
-        //     icon: Icon(Icons.create_new_folder_outlined),
-        //   ),
-        //   IconButton(
-        //     onPressed: () => sort(context),
-        //     icon: Icon(Icons.sort_rounded),
-        //   ),
-        //   IconButton(
-        //     onPressed: () => selectStorage(context),
-        //     icon: Icon(Icons.sd_storage_rounded),
-        //   )
-        // ],
         title: ValueListenableBuilder<String>(
           valueListenable: controller.titleNotifier,
-          builder: (context, title, _) => Text(title,style: TextStyle(fontWeight: FontWeight.bold),),
+          builder: (context, title, _) =>
+              Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
         ),
-        leading: Column(
-          children: [
-            IconButton(
-              icon: Icon(Icons.arrow_back),
-              onPressed: () async {
-                await controller.goToParentDirectory();
-              },
-            ),
-          ],
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () async {
+            // 🔥 Root check
+            final isRoot = await controller.isRootDirectory();
+
+            if (isRoot) {
+              // ⬅️ Screen back
+              Navigator.pop(context);
+            } else {
+              // 📁 Folder back
+              await controller.goToParentDirectory();
+            }
+          },
         ),
       ),
       body: FileManager(
@@ -49,76 +42,87 @@ class DirectoryFolder extends StatelessWidget {
         builder: (context, snapshot) {
           final List<FileSystemEntity> entities = snapshot;
           return ListView.builder(
-            padding: EdgeInsets.symmetric(horizontal: 2, vertical: 0),
             itemCount: entities.length,
             itemBuilder: (context, index) {
-              FileSystemEntity entity = entities[index];
-              return   Container(
-                child: Column(
-                  children: [
-                    ListTile(
-                      leading: Container(
-                        height: 50.sp,
-                        width: 50.sp,
-                        decoration: BoxDecoration(
-                          color: ColorSelect.maineColor,
-                          borderRadius: BorderRadius.circular(15.0),
-                        ),
-                        child: FileManager.isFile(entity)
-                            ? Icon(Icons.feed_outlined,color: Colors.white,)
-                            : Icon(Icons.folder_open_outlined,color: Colors.white,),
+              final entity = entities[index];
+              return Column(
+                children: [
+                  ListTile(
+                    leading: Container(
+                      height: 50.sp,
+                      width: 50.sp,
+                      decoration: BoxDecoration(
+                        color: Colors.deepPurple,
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      title:  Text(FileManager.basename(
-                        entity,
-                        showFileExtension: true,
-                      ),style: TextStyle(fontWeight: FontWeight.bold),
-
+                      child: Icon(
+                        FileManager.isFile(entity)
+                            ? Icons.play_arrow_rounded
+                            : Icons.folder_open_rounded,
+                        color: Colors.white,
                       ),
-                      subtitle: subtitle(entity),
-                      onTap: () async {
-                        if (FileManager.isDirectory(entity)) {
-                          // open the folder
-                          controller.openDirectory(entity);
-
-                          // delete a folder
-                          // await entity.delete(recursive: true);
-
-                          // rename a folder
-                          // await entity.rename("newPath");
-
-                          // Check weather folder exists
-                          // entity.exists();
-
-                          // get date of file
-                          // DateTime date = (await entity.stat()).modified;
-                        } else {
-                          // delete a file
-                          // await entity.delete();
-
-                          // rename a file
-                          // await entity.rename("newPath");
-
-                          // Check weather file exists
-                          // entity.exists();
-
-                          // get date of file
-                          // DateTime date = (await entity.stat()).modified;
-
-                          // get the size of the file
-                          // int size = (await entity.stat()).size;
-                        }
-                      },
-
                     ),
-                    Divider(
-                      height: 5,
-                      color: Colors.grey.shade300,
-                    )
-                  ],
-                ),
+                    title: Text(
+                      FileManager.basename(entity,
+                          showFileExtension: true),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    subtitle: _subtitle(entity),
+                    onTap: () async {
+                      if (FileManager.isDirectory(entity)) {
+                        controller.openDirectory(entity);
+                        return;
+                      }
+
+                      final path = entity.path.toLowerCase();
+
+                      final isVideo = path.endsWith('.mp4') ||
+                          path.endsWith('.mkv') ||
+                          path.endsWith('.avi') ||
+                          path.endsWith('.mov');
+
+                      final isImage = path.endsWith('.png') ||
+                          path.endsWith('.jpg') ||
+                          path.endsWith('.webp') ||
+                          path.endsWith('.jpeg');
+
+                      if (!isVideo && !isImage) return;
+
+                      // 🖼 IMAGE → direct open (NO AssetEntity)
+                      if (isImage) {
+                        if (!context.mounted) return;
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FullScreenImageViewer(
+                              imagePath: entity.path,
+                            ),
+                          ),
+                        );
+                        return;
+                      }
+
+                      // 🎥 VIDEO → AssetEntity required
+                      if (isVideo) {
+                        final asset = await _getAssetFromPath(entity.path);
+                        if (asset == null || !context.mounted) return;
+
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => FullScreenVideoPlayerFixed(
+                              videos: [asset],
+                              initialIndex: 0,
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                  ),
+                  Divider(height: 1, color: Colors.grey.shade300),
+                ],
               );
-
-
             },
           );
         },
@@ -126,180 +130,124 @@ class DirectoryFolder extends StatelessWidget {
     );
   }
 
-  // AppBar appBar(BuildContext context) {
-  //   return AppBar(
-  //     // actions: [
-  //     //   IconButton(
-  //     //     onPressed: () => createFolder(context),
-  //     //     icon: Icon(Icons.create_new_folder_outlined),
-  //     //   ),
-  //     //   IconButton(
-  //     //     onPressed: () => sort(context),
-  //     //     icon: Icon(Icons.sort_rounded),
-  //     //   ),
-  //     //   IconButton(
-  //     //     onPressed: () => selectStorage(context),
-  //     //     icon: Icon(Icons.sd_storage_rounded),
-  //     //   )
-  //     // ],
-  //     title: ValueListenableBuilder<String>(
-  //       valueListenable: controller.titleNotifier,
-  //       builder: (context, title, _) => Text(title),
-  //     ),
-  //     leading: IconButton(
-  //       icon: Icon(Icons.arrow_back),
-  //       onPressed: () async {
-  //         await controller.goToParentDirectory();
-  //       },
-  //     ),
-  //   );
-  // }
-
-  Widget subtitle(FileSystemEntity entity) {
+  // ---------------- SUBTITLE ----------------
+  Widget _subtitle(FileSystemEntity entity) {
     return FutureBuilder<FileStat>(
       future: entity.stat(),
-      builder: (context, snapshot) {
-        if (snapshot.hasData) {
-          if (FileManager.isFile(entity)) {
-            int size = snapshot.data!.size;
-            return Text("${FileManager.formatBytes(size)}");
-          } else if (FileManager.isDirectory(entity)) {
-            return FutureBuilder<List<FileSystemEntity>>(
-              future: _listDirectoryContents(entity),
-              builder: (context, dirSnapshot) {
-                if (dirSnapshot.hasData) {
-                  int fileCount = dirSnapshot.data!.where((e) => FileManager.isFile(e)).length;
-                  int folderCount = dirSnapshot.data!.where((e) => FileManager.isDirectory(e)).length;
-                  return Text("${folderCount} Folders, ${fileCount} Files");
-                } else {
-                  return Text("Loading...");
-                }
-              },
-            );
-          }
-          return Text("");
-        } else {
-          return Text("");
+      builder: (_, snap) {
+        if (!snap.hasData) return const SizedBox();
+        if (FileManager.isFile(entity)) {
+          return Text(FileManager.formatBytes(snap.data!.size));
         }
+        return const Text("Folder");
       },
     );
   }
 
-  Future<List<FileSystemEntity>> _listDirectoryContents(FileSystemEntity directory) async {
-    return Directory(directory.path).list().toList();
-  }
+  // ---------------- FILE PATH → ASSET ----------------
+  Future<AssetEntity?> _getAssetFromPath(String path) async {
+    final permission = await PhotoManager.requestPermissionExtend();
+    if (!permission.isAuth) return null;
 
-  Future<void> selectStorage(BuildContext context) async {
-    return showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        child: FutureBuilder<List<Directory>>(
-          future: FileManager.getStorageList(),
-          builder: (context, snapshot) {
-            if (snapshot.hasData) {
-              final List<FileSystemEntity> storageList = snapshot.data!;
-              return Padding(
-                padding: const EdgeInsets.all(10.0),
-                child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: storageList
-                        .map((e) => ListTile(
-                      title: Text(
-                        "${FileManager.basename(e)}",
-                      ),
-                      onTap: () {
-                        controller.openDirectory(e);
-                        Navigator.pop(context);
-                      },
-                    ))
-                        .toList()),
-              );
-            }
-            return Dialog(
-              child: CircularProgressIndicator(),
-            );
-          },
-        ),
-      ),
+    final albums = await PhotoManager.getAssetPathList(
+      type: RequestType.video,
+      hasAll: true,
     );
-  }
 
-  sort(BuildContext context) async {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        child: Container(
-          padding: EdgeInsets.all(10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                  title: Text("Name"),
-                  onTap: () {
-                    controller.sortBy(SortBy.name);
-                    Navigator.pop(context);
-                  }),
-              ListTile(
-                  title: Text("Size"),
-                  onTap: () {
-                    controller.sortBy(SortBy.size);
-                    Navigator.pop(context);
-                  }),
-              ListTile(
-                  title: Text("Date"),
-                  onTap: () {
-                    controller.sortBy(SortBy.date);
-                    Navigator.pop(context);
-                  }),
-              ListTile(
-                  title: Text("type"),
-                  onTap: () {
-                    controller.sortBy(SortBy.type);
-                    Navigator.pop(context);
-                  }),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
+    for (final album in albums) {
+      final count = await album.assetCountAsync;
+      final assets = await album.getAssetListRange(
+        start: 0,
+        end: count,
+      );
 
-  createFolder(BuildContext context) async {
-    showDialog(
-      context: context,
-      builder: (context) {
-        TextEditingController folderName = TextEditingController();
-        return Dialog(
-          child: Container(
-            padding: EdgeInsets.all(10),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                ListTile(
-                  title: TextField(
-                    controller: folderName,
+      for (final asset in assets) {
+        final file = await asset.file;
+        if (file?.path == path) {
+          return asset;
+        }
+      }
+    }
+    return null;
+  }
+}
+
+
+
+
+
+
+
+class FullScreenImageViewer extends StatefulWidget {
+  final String imagePath;
+
+  const FullScreenImageViewer({
+    super.key,
+    required this.imagePath,
+  });
+
+  @override
+  State<FullScreenImageViewer> createState() => _FullScreenImageViewerState();
+}
+
+class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
+  bool _showUI = true;
+
+  @override
+  Widget build(BuildContext context) {
+    final file = File(widget.imagePath);
+
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // 🖼 FULL SCREEN IMAGE
+          Positioned.fill(
+            child: file.existsSync()
+                ? GestureDetector(
+              onTap: () => setState(() => _showUI = !_showUI),
+              child: InteractiveViewer(
+                minScale: 1.0,
+                maxScale: 4.0,
+                child: SizedBox(
+                  width: double.infinity,
+                  height: double.infinity,
+                  child: Image.file(
+                    file,
+                    fit: BoxFit.cover, // 🔥 gallery style
                   ),
                 ),
-                ElevatedButton(
-                  onPressed: () async {
-                    try {
-                      // Create Folder
-                      await FileManager.createFolder(
-                          controller.getCurrentPath, folderName.text);
-                      // Open Created Folder
-                      controller.setCurrentPath =
-                          controller.getCurrentPath + "/" + folderName.text;
-                    } catch (e) {}
-
-                    Navigator.pop(context);
-                  },
-                  child: Text('Create Folder'),
-                )
-              ],
+              ),
+            )
+                : const Center(
+              child: Text(
+                'Image not found',
+                style: TextStyle(color: Colors.white),
+              ),
             ),
           ),
-        );
-      },
+
+
+          AnimatedPositioned(
+            duration: const Duration(milliseconds: 200),
+            top: _showUI ? 40 : -60,
+            left: 16,
+            child: SafeArea(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(30),
+                child: Container(
+                  color: Colors.black.withOpacity(0.55),
+                  child: IconButton(
+                    icon: const Icon(Icons.arrow_back, color: Colors.white),
+                    onPressed: () => Navigator.pop(context),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
+

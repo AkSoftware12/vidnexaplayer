@@ -2,21 +2,21 @@ import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:photo_manager/photo_manager.dart';
 import 'package:videoplayer/Utils/color.dart';
 
 class CustomVideoAppBar extends StatelessWidget {
   final String title;
   final VoidCallback onBackPressed;
   final bool isLandscape; // <-- add this
-
-  final List<FileSystemEntity>? videos; // Video list
+  final List<AssetEntity> videos;
   final int currentIndex; // Currently playing video
   final ValueChanged<int>? onVideoSelected; // Callback to play selected video
 
   const CustomVideoAppBar({
     required this.title,
     required this.onBackPressed,
-    this.videos,
+    required this.videos,
     this.currentIndex = 0,
     this.onVideoSelected,
     super.key,
@@ -62,7 +62,7 @@ class CustomVideoAppBar extends StatelessWidget {
                 title,
                 style: TextStyle(
                   color: Colors.white,
-                  fontSize: isLandscape ? 7.sp : 16.sp,
+                  fontSize: isLandscape ? 7.sp : 14.sp,
                   fontWeight: FontWeight.w600,
                   letterSpacing: 0.5,
                 ),
@@ -70,19 +70,7 @@ class CustomVideoAppBar extends StatelessWidget {
               ),
             ),
             SizedBox(width: 4.sp),
-            // CC Button
-            // _buildIconButton(
-            //   icon: Icons.closed_caption,
-            //   onPressed: () => print('CC toggled'),
-            //   tooltip: 'Toggle Captions',
-            // ),
-            // SizedBox(width: 4.sp),
-            // // Music Button
-            // _buildIconButton(
-            //   icon: Icons.music_note,
-            //   onPressed: () => print('Music toggled'),
-            //   tooltip: 'Toggle Music',
-            // ),
+
             SizedBox(width: 4.sp),
             // Playlist Button
             _buildIconButton(
@@ -133,7 +121,7 @@ class CustomVideoAppBar extends StatelessWidget {
   // Modern playlist bottom sheet
 
   void _showVideoList(BuildContext context) {
-    if (videos == null || videos!.isEmpty) return;
+    if (videos == null) return;
 
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
@@ -186,10 +174,10 @@ class CustomVideoAppBar extends StatelessWidget {
                     child: ListView.builder(
                       controller: scrollController,
                       physics: const BouncingScrollPhysics(),
-                      itemCount: videos!.length,
+                      itemCount: videos.length,
                       itemBuilder: (context, index) {
                         bool isPlaying = index == currentIndex;
-                        String name = videos![index].path.split('/').last;
+                        // String name = videos.path.split('/').last;
 
                         return AnimatedContainer(
                           duration: const Duration(milliseconds: 250),
@@ -248,19 +236,24 @@ class CustomVideoAppBar extends StatelessWidget {
                                   ),
                                   const SizedBox(width: 14),
                                   Expanded(
-                                    child: Text(
-                                      name,
-                                      style: TextStyle(
-                                        color: isPlaying
-                                            ? Colors.amberAccent
-                                            : Colors.white70,
-                                        fontWeight: isPlaying
-                                            ? FontWeight.bold
-                                            : FontWeight.w500,
-                                        fontSize: 15,
-                                        decoration: TextDecoration.none,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
+                                    child: Column(
+                                      children: [
+                                        Text(
+                                          videos[index].title.toString(),
+                                          style: TextStyle(
+                                            color: isPlaying
+                                                ? Colors.amberAccent
+                                                : Colors.white70,
+                                            fontWeight: isPlaying
+                                                ? FontWeight.bold
+                                                : FontWeight.w500,
+                                            fontSize: 15,
+                                            decoration: TextDecoration.none,
+                                          ),
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+
+                                      ],
                                     ),
                                   ),
                                   const SizedBox(width: 8),

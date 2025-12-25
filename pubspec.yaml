@@ -2,7 +2,7 @@ name: videoplayer
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.12+12
+version: 1.0.13+13
 
 environment:
   sdk: ^3.7.0
@@ -88,6 +88,23 @@ dependencies:
   animate_do: ^4.2.0
   lottie: ^3.3.1
   path: ^1.9.0
+  
+
+
+
+
+  media_kit: ^1.2.2
+  media_kit_video: ^2.0.0
+  media_kit_libs_video: ^1.0.7
+  volume_controller: ^3.4.0
+  open_filex: ^4.4.0
+  disk_space_plus: ^0.2.6
+  rxdart: ^0.27.7
+
+
+
+
+
 
 
 

@@ -256,15 +256,15 @@ class _VideoFolderScreenState extends State<AllVideos> {
               child: FadeInAnimation(
                 child: GestureDetector(
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => VideoPlayerScreen(
-                          videos: widget.videos,
-                          initialIndex: index,
-                        ),
-                      ),
-                    );
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(
+                    //     builder: (context) => VideoPlayerScreen(
+                    //       videos: widget.videos,
+                    //       initialIndex: index,
+                    //     ),
+                    //   ),
+                    // );
                   },
                   child: Card(
                     elevation: 2,
@@ -446,15 +446,15 @@ class _VideoFolderScreenState extends State<AllVideos> {
                                     } else if (value == "info") {
                                       _showVideoInfo(video.path);
                                     } else if (value == "Play") {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => VideoPlayerScreen(
-                                            videos: widget.videos,
-                                            initialIndex: index,
-                                          ),
-                                        ),
-                                      );
+                                      // Navigator.push(
+                                      //   context,
+                                      //   MaterialPageRoute(
+                                      //     builder: (context) => VideoPlayerScreen(
+                                      //       videos: widget.videos,
+                                      //       initialIndex: index,
+                                      //     ),
+                                      //   ),
+                                      // );
                                     }
                                   });
                                 },
@@ -508,15 +508,15 @@ class _VideoFolderScreenState extends State<AllVideos> {
               child: FadeInAnimation(
                 child: GestureDetector(
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => VideoPlayerScreen(
-                          videos: widget.videos,
-                          initialIndex: index,
-                        ),
-                      ),
-                    );
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(
+                    //     builder: (context) => VideoPlayerScreen(
+                    //       videos: widget.videos,
+                    //       initialIndex: index,
+                    //     ),
+                    //   ),
+                    // );
                   },
                   child: Card(
                     elevation: 2,
@@ -692,15 +692,15 @@ class _VideoFolderScreenState extends State<AllVideos> {
                                     } else if (value == "info") {
                                       _showVideoInfo(video.path);
                                     } else if (value == "Play") {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => VideoPlayerScreen(
-                                            videos: widget.videos,
-                                            initialIndex: index,
-                                          ),
-                                        ),
-                                      );
+                                      // Navigator.push(
+                                      //   context,
+                                      //   MaterialPageRoute(
+                                      //     builder: (context) => VideoPlayerScreen(
+                                      //       videos: widget.videos,
+                                      //       initialIndex: index,
+                                      //     ),
+                                      //   ),
+                                      // );
                                     }
                                   });
                                 },

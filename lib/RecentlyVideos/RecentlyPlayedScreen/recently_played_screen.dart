@@ -481,18 +481,18 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                       // ✅ Video play करने पर recently played update करें
                       Provider.of<VideoProvider>(context, listen: false)
                           .addToRecentlyPlayed(videoPath);
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (context) => VideoPlayerScreen(
-                            videos: widget.videos
-                                .where((path) => !path.startsWith('http'))
-                                .map((path) => File(path))
-                                .toList(),
-                            initialIndex: index,
-                          ),
-                        ),
-                      );
+                      // Navigator.push(
+                      //   context,
+                      //   MaterialPageRoute(
+                      //     builder: (context) => VideoPlayerScreen(
+                      //       videos: widget.videos
+                      //           .where((path) => !path.startsWith('http'))
+                      //           .map((path) => File(path))
+                      //           .toList(),
+                      //       initialIndex: index,
+                      //     ),
+                      //   ),
+                      // );
                     },
                     child: Container(
                       width: MediaQuery.of(context).size.width * 0.4,
@@ -651,18 +651,18 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                         } else if (value == "info") {
                                           _showVideoInfo(videoPath);
                                         } else if (value == "Play") {
-                                          Navigator.push(
-                                            context,
-                                            MaterialPageRoute(
-                                              builder: (context) => VideoPlayerScreen(
-                                                videos: widget.videos
-                                                    .where((path) => !path.startsWith('http'))
-                                                    .map((path) => File(path))
-                                                    .toList(),
-                                                initialIndex: index,
-                                              ),
-                                            ),
-                                          );
+                                          // Navigator.push(
+                                          //   context,
+                                          //   MaterialPageRoute(
+                                          //     builder: (context) => VideoPlayerScreen(
+                                          //       videos: widget.videos
+                                          //           .where((path) => !path.startsWith('http'))
+                                          //           .map((path) => File(path))
+                                          //           .toList(),
+                                          //       initialIndex: index,
+                                          //     ),
+                                          //   ),
+                                          // );
                                         }
                                       });
                                     },
@@ -714,18 +714,18 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
               child: FadeInAnimation(
                 child: GestureDetector(
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => VideoPlayerScreen(
-                          videos: widget.videos
-                              .where((path) => !path.startsWith('http'))
-                              .map((path) => File(path))
-                              .toList(),
-                          initialIndex: index,
-                        ),
-                      ),
-                    );
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(
+                    //     builder: (context) => VideoPlayerScreen(
+                    //       videos: widget.videos
+                    //           .where((path) => !path.startsWith('http'))
+                    //           .map((path) => File(path))
+                    //           .toList(),
+                    //       initialIndex: index,
+                    //     ),
+                    //   ),
+                    // );
                   },
                   child: Card(
                     elevation: 2,
@@ -899,18 +899,18 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                     } else if (value == "info") {
                                       _showVideoInfo(videoPath);
                                     } else if (value == "Play") {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => VideoPlayerScreen(
-                                            videos: widget.videos
-                                                .where((path) => !path.startsWith('http'))
-                                                .map((path) => File(path))
-                                                .toList(),
-                                            initialIndex: index,
-                                          ),
-                                        ),
-                                      );
+                                      // Navigator.push(
+                                      //   context,
+                                      //   MaterialPageRoute(
+                                      //     builder: (context) => VideoPlayerScreen(
+                                      //       videos: widget.videos
+                                      //           .where((path) => !path.startsWith('http'))
+                                      //           .map((path) => File(path))
+                                      //           .toList(),
+                                      //       initialIndex: index,
+                                      //     ),
+                                      //   ),
+                                      // );
                                     }
                                   });
                                 },
@@ -965,18 +965,18 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
               child: FadeInAnimation(
                 child: GestureDetector(
                   onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => VideoPlayerScreen(
-                          videos: widget.videos
-                              .where((path) => !path.startsWith('http'))
-                              .map((path) => File(path))
-                              .toList(),
-                          initialIndex: index,
-                        ),
-                      ),
-                    );
+                    // Navigator.push(
+                    //   context,
+                    //   MaterialPageRoute(
+                    //     builder: (context) => VideoPlayerScreen(
+                    //       videos: widget.videos
+                    //           .where((path) => !path.startsWith('http'))
+                    //           .map((path) => File(path))
+                    //           .toList(),
+                    //       initialIndex: index,
+                    //     ),
+                    //   ),
+                    // );
                   },
                   child: Card(
                     elevation: 2,
@@ -1151,18 +1151,18 @@ class _RecentlyPlayedVideosState extends State<RecentlyPlayedVideos> {
                                     } else if (value == "info") {
                                       _showVideoInfo(videoPath);
                                     } else if (value == "Play") {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (context) => VideoPlayerScreen(
-                                            videos: widget.videos
-                                                .where((path) => !path.startsWith('http'))
-                                                .map((path) => File(path))
-                                                .toList(),
-                                            initialIndex: index,
-                                          ),
-                                        ),
-                                      );
+                                      // Navigator.push(
+                                      //   context,
+                                      //   MaterialPageRoute(
+                                      //     builder: (context) => VideoPlayerScreen(
+                                      //       videos: widget.videos
+                                      //           .where((path) => !path.startsWith('http'))
+                                      //           .map((path) => File(path))
+                                      //           .toList(),
+                                      //       initialIndex: index,
+                                      //     ),
+                                      //   ),
+                                      // );
                                     }
                                   });
                                 },
