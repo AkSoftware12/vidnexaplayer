@@ -55,6 +55,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int currentPage = 0;
   String currentVersion = '';
+  String release = "";
   String? userName;
   String userImage = "";
 
@@ -68,7 +69,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   }
 
 
-  String release = "";
+
   @override
   void initState() {
     super.initState();
@@ -77,13 +78,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     _getUsername();
     currentPage = widget.bottomIndex;
 
-    // Instantiate NewVersion manager object (Using GCP Console app as example)
     final newVersion = NewVersionPlus(
       iOSId: 'com.vidnexa.videoplayer', androidId: 'com.vidnexa.videoplayer', androidPlayStoreCountry: "es_ES", androidHtmlReleaseNotes: true, //support country code
     );
-
-    // You can let the plugin handle fetching the status and showing a dialog,
-    // or you can fetch the status and display your own dialog, or no dialog.
     final ver = VersionStatus(
       appStoreLink: '',
       localVersion: '',
@@ -91,15 +88,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       releaseNotes: '',
       originalStoreVersion: '',
     );
-    print(ver);
-    const simpleBehavior = true;
-
-    // if (simpleBehavior) {
-    // basicStatusCheck(newVersion);
-    // }
-    // else {
     advancedStatusCheck(newVersion);
-    // }
+
   }
 
 
@@ -136,14 +126,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       }
     }
   }
-  // @override
-  // void initState() {
-  //   super.initState();
-  //   _getUsername();
-  //   currentPage = widget.bottomIndex;
-  //   checkForVersion(context);
-  // }
-
   Future<void> checkForVersion(BuildContext context) async {
     PackageInfo packageInfo = await PackageInfo.fromPlatform();
     currentVersion = packageInfo.version;

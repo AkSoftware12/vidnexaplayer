@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
@@ -9,8 +10,6 @@ import 'package:rxdart/rxdart.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:videoplayer/Utils/color.dart';
-
-import '../../HexColorCode/HexColor.dart';
 import '../../TextScroll/text_scroll.dart';
 import '../../Utils/common.dart';
 import '../../Utils/textSize.dart';
@@ -31,7 +30,19 @@ class FullPlayerScreen extends StatefulWidget {
 }
 
 class _FullPlayerScreenState extends State<FullPlayerScreen> {
-
+  Duration? selectedTimer;
+  final List<Duration> timerOptions = [
+    Duration(minutes: 10),
+    Duration(minutes: 30),
+    Duration(minutes: 60),
+    Duration(minutes: 120),
+  ];
+  Color currentColor = ColorSelect.maineColor2;
+  List<Color> currentColors = [Colors.yellow, Colors.green];
+  bool _enableAlpha2 = false;
+  bool _displayThumbColor2 = true;
+  void changeColor(Color color) => setState(() => currentColor = color);
+  void changeColors(List<Color> colors) => setState(() => currentColors = colors);
 
   Future<void> _launchYoutubeSearch(String query) async {
     final Uri url = Uri.parse('https://www.youtube.com/search?q=$query');
@@ -50,6 +61,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
       throw 'Could not launch $url';
     }
   }
+
   @override
   Widget build(BuildContext context) {
     final audio = GlobalAudioController();
@@ -64,17 +76,15 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
             sequenceState.currentSource == null) {
           return const Scaffold(
             backgroundColor: Colors.black,
-            body: Center(
-              child: CircularProgressIndicator(color: Colors.white),
-            ),
+            body: Center(child: CircularProgressIndicator(color: Colors.white)),
           );
         }
 
-        final mediaItem =
-        sequenceState.currentSource!.tag as MediaItem;
+        final mediaItem = sequenceState.currentSource!.tag as MediaItem;
 
         return Scaffold(
-          backgroundColor: ColorSelect.maineColor2,
+          backgroundColor:currentColor,
+          // backgroundColor: ColorSelect.maineColor2,
           body: Stack(
             children: [
               /// 🔥 BACKGROUND ART
@@ -83,16 +93,13 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                 type: ArtworkType.AUDIO,
                 artworkFit: BoxFit.cover,
                 size: 1000,
-                nullArtworkWidget:
-                Container(color: Colors.black),
+                nullArtworkWidget: Container(color: Colors.black),
               ),
 
               /// 🔥 BLUR
               BackdropFilter(
                 filter: ImageFilter.blur(sigmaX: 30, sigmaY: 30),
-                child: Container(
-                  color: Colors.black.withOpacity(.75),
-                ),
+                child: Container(color: Colors.black.withOpacity(.75)),
               ),
 
               SafeArea(
@@ -109,12 +116,66 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                               color: Colors.white,
                               size: 30,
                             ),
-                            onPressed: () =>
-                                Navigator.pop(context),
+                            onPressed: () => Navigator.pop(context),
                           ),
                           const Spacer(),
-                          const Icon(Icons.more_vert,
-                              color: Colors.white),
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: GestureDetector(
+                              onTap: () {
+                                showDialog(
+                                  context: context,
+                                  builder: (BuildContext context) {
+                                    return AlertDialog(
+                                      titlePadding: const EdgeInsets.all(0),
+                                      contentPadding: const EdgeInsets.all(0),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: MediaQuery.of(context).orientation == Orientation.portrait
+                                            ? const BorderRadius.vertical(
+                                          top: Radius.circular(500),
+                                          bottom: Radius.circular(100),
+                                        )
+                                            : const BorderRadius.horizontal(right: Radius.circular(500)),
+                                      ),
+                                      content: SingleChildScrollView(
+                                        child: HueRingPicker(
+                                          pickerColor: currentColor,
+                                          onColorChanged: changeColor,
+                                          enableAlpha: _enableAlpha2,
+                                          displayThumbColor: _displayThumbColor2,
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                );
+                              },
+                              child: Icon(
+                                Icons.color_lens,
+                                color: Colors.white,
+                                size: 20.sp,
+                              ),
+                            ),
+                          ),
+                          Padding(
+                            padding: const EdgeInsets.all(8.0),
+                            child: GestureDetector(
+                              onTap: () {
+                                Share.share(
+                                  '${mediaItem.title}\n${mediaItem.artist}\n ${mediaItem.artUri.toString()}',
+                                  subject: '${mediaItem.title}',
+                                  sharePositionOrigin: Rect.fromCircle(
+                                    center: Offset(0, 0),
+                                    radius: 100,
+                                  ),
+                                );
+                              },
+                              child: Icon(
+                                Icons.share,
+                                color: Colors.white,
+                                size: 20.sp,
+                              ),
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -130,12 +191,14 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           id: int.tryParse(mediaItem.id) ?? 0,
                           type: ArtworkType.AUDIO,
                           artworkFit: BoxFit.cover,
-                          quality: 100, // 👈 max quality (0–100)
-                          artworkHeight: MediaQuery.of(context).size.height*.35,
+                          quality: 100,
+                          // 👈 max quality (0–100)
+                          artworkHeight:
+                              MediaQuery.of(context).size.height * .35,
                           artworkWidth: MediaQuery.of(context).size.width,
                           artworkBorder: BorderRadius.circular(15),
                           nullArtworkWidget: Container(
-                            height:  MediaQuery.of(context).size.height*.35,
+                            height: MediaQuery.of(context).size.height * .35,
                             width: MediaQuery.of(context).size.width,
                             color: Colors.white10,
                             child: const Icon(
@@ -150,7 +213,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                     const SizedBox(height: 30),
                     Center(
-                      child:Flexible(
+                      child: Flexible(
                         child: TextScroll(
                           mediaItem.title,
                           style: GoogleFonts.poppins(
@@ -161,15 +224,12 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                             ),
                           ),
                           intervalSpaces: 10,
-                          velocity:
-                          Velocity(pixelsPerSecond: Offset(50, 0)),
+                          velocity: Velocity(pixelsPerSecond: Offset(50, 0)),
                           fadedBorder: true,
-                          fadeBorderVisibility:
-                          FadeBorderVisibility.auto,
+                          fadeBorderVisibility: FadeBorderVisibility.auto,
                           fadeBorderSide: FadeBorderSide.both,
                         ),
                       ),
-
                     ),
                     Text(
                       mediaItem.artist ?? 'Unknown Artist',
@@ -185,87 +245,197 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                     SizedBox(height: 40.sp),
                     Padding(
-                      padding:  EdgeInsets.only(left: 18.sp,right: 18.sp),
+                      padding: EdgeInsets.only(left: 18.sp, right: 18.sp),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-
                           GestureDetector(
-                              onTap: () {
-                                // showDialog(
-                                //   context: context,
-                                //   builder: (BuildContext context) {
-                                //     return AlertDialog(
-                                //       title: Text('Sleep Timer'),
-                                //       content: Container(
-                                //         height: 200,
-                                //         width: 200,
-                                //         child: ListView.builder(
-                                //           itemCount: timerOptions.length,
-                                //           itemBuilder: (BuildContext context, int index) {
-                                //             final duration = timerOptions[index];
-                                //             final minutes = duration.inMinutes;
-                                //             bool isSelected = duration == selectedTimer;
-                                //             return ListTile(
-                                //               title: Text(
-                                //                 '$minutes minutes',
-                                //                 style: TextStyle(
-                                //                   color: isSelected
-                                //                       ? Colors
-                                //                       .blue // Customize the selected option's text color
-                                //                       : null,
-                                //                 ),
-                                //               ),
-                                //               onTap: () {
-                                //                 setTimer(
-                                //                     duration); // Set the selected timer
-                                //               },
-                                //             );
-                                //           },
-                                //         ),
-                                //       ),
-                                //       actions: [
-                                //         TextButton(
-                                //           onPressed: () {
-                                //             setState(() {
-                                //               selectedTimer = null;
-                                //               Navigator.pop(context);
-                                //             });
-                                //           },
-                                //           child: Text('Cancel'),
-                                //         ),
-                                //       ],
-                                //     );
-                                //   },
-                                // );
-                              },
-                              child: SizedBox(
-                                  height: 20.sp,
-                                  width: 20.sp,
-                                  child: Image.asset('assets/snooze.png',color:Colors.white,))
+                            onTap: () {
+                              showModalBottomSheet(
+                                context: context,
+                                backgroundColor: Colors.transparent,
+                                builder: (_) {
+                                  return Container(
+                                    padding: const EdgeInsets.all(16),
+                                    decoration: const BoxDecoration(
+                                      color: Color(0xFF0F172A), // dark premium
+                                      borderRadius: BorderRadius.vertical(
+                                        top: Radius.circular(24),
+                                      ),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        // 🔥 Top Handle
+                                        Container(
+                                          width: 40,
+                                          height: 4,
+                                          margin: const EdgeInsets.only(
+                                            bottom: 16,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: Colors.white24,
+                                            borderRadius: BorderRadius.circular(
+                                              10,
+                                            ),
+                                          ),
+                                        ),
+
+                                        // 🔥 Title
+                                        const Text(
+                                          "Sleep Timer",
+                                          style: TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+
+                                        const SizedBox(height: 12),
+
+                                        // 🔥 Timer Options
+                                        ListView.builder(
+                                          shrinkWrap: true,
+                                          itemCount: timerOptions.length,
+                                          itemBuilder: (context, index) {
+                                            final duration =
+                                                timerOptions[index];
+                                            final minutes = duration.inMinutes;
+                                            final isSelected =
+                                                duration == selectedTimer;
+
+                                            return GestureDetector(
+                                              onTap: () {
+                                                setState(() {
+                                                  selectedTimer = duration;
+                                                  if (duration ==
+                                                      Duration.zero) {
+                                                    audio.pause();
+                                                  }
+                                                });
+                                                Navigator.pop(context);
+                                              },
+                                              child: AnimatedContainer(
+                                                duration: const Duration(
+                                                  milliseconds: 200,
+                                                ),
+                                                margin:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 6,
+                                                    ),
+                                                padding:
+                                                    const EdgeInsets.symmetric(
+                                                      vertical: 14,
+                                                      horizontal: 16,
+                                                    ),
+                                                decoration: BoxDecoration(
+                                                  color:
+                                                      isSelected
+                                                          ? Colors.blue
+                                                              .withOpacity(0.15)
+                                                          : Colors.white
+                                                              .withOpacity(
+                                                                0.05,
+                                                              ),
+                                                  borderRadius:
+                                                      BorderRadius.circular(14),
+                                                  border: Border.all(
+                                                    color:
+                                                        isSelected
+                                                            ? Colors.blue
+                                                            : Colors.white24,
+                                                  ),
+                                                ),
+                                                child: Row(
+                                                  children: [
+                                                    Icon(
+                                                      Icons.timer,
+                                                      color:
+                                                          isSelected
+                                                              ? Colors.blue
+                                                              : Colors.white70,
+                                                    ),
+                                                    const SizedBox(width: 12),
+                                                    Text(
+                                                      minutes == 0
+                                                          ? "Turn Off"
+                                                          : "$minutes minutes",
+                                                      style: TextStyle(
+                                                        color:
+                                                            isSelected
+                                                                ? Colors.blue
+                                                                : Colors.white,
+                                                        fontSize: 15,
+                                                        fontWeight:
+                                                            FontWeight.w600,
+                                                      ),
+                                                    ),
+                                                    const Spacer(),
+                                                    if (isSelected)
+                                                      const Icon(
+                                                        Icons.check_circle,
+                                                        color: Colors.blue,
+                                                      ),
+                                                  ],
+                                                ),
+                                              ),
+                                            );
+                                          },
+                                        ),
+
+                                        const SizedBox(height: 8),
+
+                                        // ❌ Cancel
+                                        TextButton(
+                                          onPressed: () {
+                                            setState(
+                                              () => selectedTimer = null,
+                                            );
+                                            Navigator.pop(context);
+                                          },
+                                          child: const Text(
+                                            "Cancel",
+                                            style: TextStyle(
+                                              color: Colors.white70,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                            child: Icon(
+                              Icons.access_time,
+                              size: 30,
+                              color: (selectedTimer != null && selectedTimer != Duration.zero)
+                                  ? ColorSelect.maineColor
+                                  : Colors.white,
+                            ),
+
                           ),
 
                           GestureDetector(
-                              onTap: () async {
-                                showSliderDialog(
-                                  context: context,
-                                  title: "Adjust volume",
-                                  divisions: 10,
-                                  min: 0.0,
-                                  max: 1.0,
-                                  stream: audio.player.volumeStream,
-                                  onChanged: audio.player.setVolume,
-                                  colors: Colors.white,
-                                  value: 0.5,
-                                );
-                              },
-                              child: SizedBox(
-                                  height: 20.sp,
-                                  width: 20.sp,
-                                  child: Image.asset('assets/volume.png',color:Colors.white,))
+                            onTap: () async {
+                              showSliderDialog(
+                                context: context,
+                                title: "Adjust volume",
+                                divisions: 10,
+                                min: 0.0,
+                                max: 1.0,
+                                stream: audio.player.volumeStream,
+                                onChanged: audio.player.setVolume,
+                                colors: Colors.white,
+                                value: 0.5,
+                              );
+                            },
+                            child: const Icon(
+                              Icons.volume_up,
+                              color: Colors.white,
+                              size: 30,
+                            ),
                           ),
-
-
 
                           GestureDetector(
                             onTap: () {
@@ -274,18 +444,26 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                 isScrollControlled: true,
                                 backgroundColor: Colors.transparent,
                                 builder: (_) {
-                                  return ValueListenableBuilder<List<SongModel>>(
+                                  return ValueListenableBuilder<
+                                    List<SongModel>
+                                  >(
                                     valueListenable: audio.currentSongs,
                                     builder: (context, songs, _) {
                                       return ValueListenableBuilder<int>(
                                         valueListenable: audio.currentIndex,
                                         builder: (context, playingIndex, _) {
                                           return Container(
-                                            height: MediaQuery.of(context).size.height * 0.5,
+                                            height:
+                                                MediaQuery.of(
+                                                  context,
+                                                ).size.height *
+                                                0.5,
                                             decoration: const BoxDecoration(
                                               color: Color(0xFF0E0E0E),
                                               borderRadius:
-                                              BorderRadius.vertical(top: Radius.circular(28)),
+                                                  BorderRadius.vertical(
+                                                    top: Radius.circular(28),
+                                                  ),
                                             ),
                                             child: Column(
                                               children: [
@@ -297,7 +475,10 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                                   height: 4,
                                                   decoration: BoxDecoration(
                                                     color: Colors.grey.shade700,
-                                                    borderRadius: BorderRadius.circular(10),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          10,
+                                                        ),
                                                   ),
                                                 ),
 
@@ -317,7 +498,10 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                                   height: 1,
                                                   decoration: BoxDecoration(
                                                     color: Colors.grey.shade700,
-                                                    borderRadius: BorderRadius.circular(10),
+                                                    borderRadius:
+                                                        BorderRadius.circular(
+                                                          10,
+                                                        ),
                                                   ),
                                                 ),
 
@@ -326,93 +510,162 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                                 Expanded(
                                                   child: ListView.builder(
                                                     itemCount: songs.length,
-                                                    padding: const EdgeInsets.only(bottom: 20),
-                                                    itemBuilder: (context, index) {
+                                                    padding:
+                                                        const EdgeInsets.only(
+                                                          bottom: 20,
+                                                        ),
+                                                    itemBuilder: (
+                                                      context,
+                                                      index,
+                                                    ) {
                                                       final song = songs[index];
-                                                      final isPlaying = index == playingIndex;
+                                                      final isPlaying =
+                                                          index == playingIndex;
 
                                                       return AnimatedContainer(
-                                                        duration: const Duration(milliseconds: 300),
-                                                        margin: const EdgeInsets.symmetric(
-                                                            horizontal: 14, vertical: 6),
+                                                        duration:
+                                                            const Duration(
+                                                              milliseconds: 300,
+                                                            ),
+                                                        margin:
+                                                            const EdgeInsets.symmetric(
+                                                              horizontal: 14,
+                                                              vertical: 6,
+                                                            ),
                                                         decoration: BoxDecoration(
-                                                          color: isPlaying
-                                                              ? const Color(0xFF2EDF)
-                                                              .withOpacity(0.12)
-                                                              : Colors.white.withOpacity(0.04),
-                                                          borderRadius: BorderRadius.circular(16),
-                                                          border: isPlaying
-                                                              ? Border.all(
-                                                              color: const Color(0xFF2EDFB4),
-                                                              width: 0.6)
-                                                              : null,
+                                                          color:
+                                                              isPlaying
+                                                                  ? const Color(
+                                                                    0xFF2EDF,
+                                                                  ).withOpacity(
+                                                                    0.12,
+                                                                  )
+                                                                  : Colors.white
+                                                                      .withOpacity(
+                                                                        0.04,
+                                                                      ),
+                                                          borderRadius:
+                                                              BorderRadius.circular(
+                                                                16,
+                                                              ),
+                                                          border:
+                                                              isPlaying
+                                                                  ? Border.all(
+                                                                    color: const Color(
+                                                                      0xFF2EDFB4,
+                                                                    ),
+                                                                    width: 0.6,
+                                                                  )
+                                                                  : null,
                                                         ),
                                                         child: ListTile(
-                                                          contentPadding: const EdgeInsets.symmetric(
-                                                              horizontal: 0, vertical: 0),
+                                                          contentPadding:
+                                                              const EdgeInsets.symmetric(
+                                                                horizontal: 0,
+                                                                vertical: 0,
+                                                              ),
 
                                                           /// 🎵 ARTWORK + PLAY ICON
                                                           leading: Stack(
-                                                            alignment: Alignment.center,
+                                                            alignment:
+                                                                Alignment
+                                                                    .center,
                                                             children: [
                                                               ClipRRect(
-                                                                borderRadius: BorderRadius.circular(12),
+                                                                borderRadius:
+                                                                    BorderRadius.circular(
+                                                                      12,
+                                                                    ),
                                                                 child: QueryArtworkWidget(
                                                                   id: song.id,
-                                                                  type: ArtworkType.AUDIO,
+                                                                  type:
+                                                                      ArtworkType
+                                                                          .AUDIO,
                                                                   size: 200,
                                                                   artworkBorder:
-                                                                  BorderRadius.circular(12),
+                                                                      BorderRadius.circular(
+                                                                        12,
+                                                                      ),
                                                                   nullArtworkWidget: Container(
                                                                     width: 50,
                                                                     height: 50,
                                                                     decoration: BoxDecoration(
-                                                                      color: Colors.grey.shade900,
+                                                                      color:
+                                                                          Colors
+                                                                              .grey
+                                                                              .shade900,
                                                                       borderRadius:
-                                                                      BorderRadius.circular(12),
+                                                                          BorderRadius.circular(
+                                                                            12,
+                                                                          ),
                                                                     ),
                                                                     child: const Icon(
-                                                                      Icons.music_note_rounded,
-                                                                      color: Colors.white70,
+                                                                      Icons
+                                                                          .music_note_rounded,
+                                                                      color:
+                                                                          Colors
+                                                                              .white70,
                                                                     ),
                                                                   ),
                                                                 ),
                                                               ),
-
-
                                                             ],
                                                           ),
 
                                                           title: Row(
-                                                            mainAxisAlignment: MainAxisAlignment.start,
-                                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                                            mainAxisAlignment:
+                                                                MainAxisAlignment
+                                                                    .start,
+                                                            crossAxisAlignment:
+                                                                CrossAxisAlignment
+                                                                    .start,
                                                             children: [
                                                               Expanded(
                                                                 child: Column(
-                                                                  mainAxisAlignment: MainAxisAlignment.center,
-                                                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                                                  mainAxisAlignment:
+                                                                      MainAxisAlignment
+                                                                          .center,
+                                                                  crossAxisAlignment:
+                                                                      CrossAxisAlignment
+                                                                          .start,
                                                                   children: [
                                                                     Text(
                                                                       song.title,
-                                                                      maxLines: 1,
-                                                                      overflow: TextOverflow.ellipsis,
+                                                                      maxLines:
+                                                                          1,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis,
                                                                       style: GoogleFonts.poppins(
-                                                                        color: isPlaying
-                                                                            ? const Color(0xFF2EDFB4)
-                                                                            : Colors.white,
-                                                                        fontSize: 14,
-                                                                        fontWeight: FontWeight.w500,
+                                                                        color:
+                                                                            isPlaying
+                                                                                ? const Color(
+                                                                                  0xFF2EDFB4,
+                                                                                )
+                                                                                : Colors.white,
+                                                                        fontSize:
+                                                                            14,
+                                                                        fontWeight:
+                                                                            FontWeight.w500,
                                                                       ),
                                                                     ),
                                                                     Text(
-                                                                      song.artist ?? "Unknown Artist",
-                                                                      maxLines: 1,
-                                                                      overflow: TextOverflow.ellipsis,
+                                                                      song.artist ??
+                                                                          "Unknown Artist",
+                                                                      maxLines:
+                                                                          1,
+                                                                      overflow:
+                                                                          TextOverflow
+                                                                              .ellipsis,
                                                                       style: GoogleFonts.poppins(
-                                                                        fontSize: 12,
-                                                                        color: isPlaying
-                                                                            ? const Color(0xFF2EDFB4)
-                                                                            : Colors.grey,
+                                                                        fontSize:
+                                                                            12,
+                                                                        color:
+                                                                            isPlaying
+                                                                                ? const Color(
+                                                                                  0xFF2EDFB4,
+                                                                                )
+                                                                                : Colors.grey,
                                                                       ),
                                                                     ),
                                                                   ],
@@ -420,53 +673,74 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                                               ),
 
                                                               GestureDetector(
-                                                                onTap: (){
-                                                                  if( isPlaying){
-
-                                                                  }else{
+                                                                onTap: () {
+                                                                  if (isPlaying) {
+                                                                  } else {
+                                                                    audio.player.seek(
+                                                                      Duration
+                                                                          .zero,
+                                                                      index:
+                                                                          index,
+                                                                    );
                                                                     audio.player
-                                                                        .seek(Duration.zero, index: index);
-                                                                    audio.player.play();
-                                                                    audio.currentIndex.value = index;
-
+                                                                        .play();
+                                                                    audio
+                                                                        .currentIndex
+                                                                        .value = index;
                                                                   }
-
                                                                 },
                                                                 child: Container(
                                                                   width: 40,
                                                                   height: 40,
                                                                   decoration: BoxDecoration(
-                                                                    color:
-                                                                    Colors.black.withOpacity(0.35),
+                                                                    color: Colors
+                                                                        .black
+                                                                        .withOpacity(
+                                                                          0.35,
+                                                                        ),
                                                                     borderRadius:
-                                                                    BorderRadius.circular(12),
+                                                                        BorderRadius.circular(
+                                                                          12,
+                                                                        ),
                                                                   ),
-                                                                  child:    isPlaying? const Icon(
-                                                                    Icons.pause,
-                                                                    color: Colors.white,
-                                                                    size: 30,
-                                                                  ): const Icon(
-                                                                    Icons.play_arrow_rounded,
-                                                                    color: Colors.white,
-                                                                    size: 30,
-                                                                  ),
+                                                                  child:
+                                                                      isPlaying
+                                                                          ? const Icon(
+                                                                            Icons.pause,
+                                                                            color:
+                                                                                Colors.white,
+                                                                            size:
+                                                                                30,
+                                                                          )
+                                                                          : const Icon(
+                                                                            Icons.play_arrow_rounded,
+                                                                            color:
+                                                                                Colors.white,
+                                                                            size:
+                                                                                30,
+                                                                          ),
                                                                 ),
                                                               ),
-
                                                             ],
                                                           ),
 
-
-
                                                           /// 3 DOT MENU
                                                           trailing: GestureDetector(
-                                                            onTap: () =>
-                                                                _openSongOptions(context, song,isPlaying,index),
-                                                            child: const Icon(Icons.more_vert,
-                                                                color: Colors.white70),
+                                                            onTap:
+                                                                () =>
+                                                                    _openSongOptions(
+                                                                      context,
+                                                                      song,
+                                                                      isPlaying,
+                                                                      index,
+                                                                    ),
+                                                            child: const Icon(
+                                                              Icons.more_vert,
+                                                              color:
+                                                                  Colors
+                                                                      .white70,
+                                                            ),
                                                           ),
-
-
                                                         ),
                                                       );
                                                     },
@@ -482,36 +756,33 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                 },
                               );
                             },
-                            child: SizedBox(
-                              height: 22,
-                              width: 22,
-                              child: Image.asset(
-                                'assets/multimedia.png',
-                                color: Colors.white,
-                              ),
+                            child: const Icon(
+                              Icons.playlist_play,
+                              color: Colors.white,
+                              size: 30,
                             ),
                           ),
 
-
                           GestureDetector(
-                              onTap: () async {
-                                _launchYoutubeSearch(mediaItem.title);
-                              },
-                              child: SizedBox(
-                                  height: 20.sp,
-                                  width: 20.sp,
-                                  child: Image.asset('assets/video.png',color:Colors.white,))
+                            onTap: () async {
+                              _launchYoutubeSearch(mediaItem.title);
+                            },
+                            child: const Icon(
+                              Icons.ondemand_video,
+                              color: Colors.white,
+                              size: 30,
+                            ),
                           ),
 
                           GestureDetector(
-                              onTap: () async {
-                                _launchGoogleSearch(
-                                    'lyrics ${mediaItem.title}');
-                              },
-                              child: SizedBox(
-                                  height: 20.sp,
-                                  width: 20.sp,
-                                  child: Image.asset('assets/song_lyrics.png',))
+                            onTap: () async {
+                              _launchGoogleSearch('lyrics ${mediaItem.title}');
+                            },
+                            child: const Icon(
+                              Icons.lyrics,
+                              color: Colors.white,
+                              size: 30,
+                            ),
                           ),
                         ],
                       ),
@@ -522,66 +793,65 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                     /// ⏱ SEEK BAR
                     StreamBuilder<PositionData>(
-                      stream: Rx.combineLatest2<
-                          Duration,
-                          Duration?,
-                          PositionData>(
-                        audio.player.positionStream,
-                        audio.player.durationStream,
-                            (p, d) =>
-                            PositionData(p, d ?? Duration.zero),
-                      ),
+                      stream:
+                          Rx.combineLatest2<Duration, Duration?, PositionData>(
+                            audio.player.positionStream,
+                            audio.player.durationStream,
+                            (p, d) => PositionData(p, d ?? Duration.zero),
+                          ),
                       builder: (context, snapshot) {
                         final position =
-                            snapshot.data?.position ??
-                                Duration.zero;
+                            snapshot.data?.position ?? Duration.zero;
                         final duration =
-                            snapshot.data?.duration ??
-                                Duration.zero;
+                            snapshot.data?.duration ?? Duration.zero;
 
                         return Column(
                           children: [
                             Slider(
                               min: 0,
-                              max: duration.inMilliseconds
-                                  .toDouble()
-                                  .clamp(1, double.infinity),
-                              value: position
-                                  .inMilliseconds
-                                  .clamp(
-                                  0,
-                                  duration.inMilliseconds
-                                      .clamp(1, double.infinity))
-                                  .toDouble(),
+                              max: duration.inMilliseconds.toDouble().clamp(
+                                1,
+                                double.infinity,
+                              ),
+                              value:
+                                  position.inMilliseconds
+                                      .clamp(
+                                        0,
+                                        duration.inMilliseconds.clamp(
+                                          1,
+                                          double.infinity,
+                                        ),
+                                      )
+                                      .toDouble(),
                               activeColor: Colors.white,
                               inactiveColor: Colors.white24,
                               onChanged: (value) {
                                 audio.player.seek(
-                                  Duration(
-                                      milliseconds:
-                                      value.toInt()),
+                                  Duration(milliseconds: value.toInt()),
                                 );
                               },
                             ),
                             Padding(
                               padding: const EdgeInsets.symmetric(
-                                  horizontal: 24),
+                                horizontal: 24,
+                              ),
                               child: Row(
                                 mainAxisAlignment:
-                                MainAxisAlignment
-                                    .spaceBetween,
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
                                     _format(position),
                                     style: const TextStyle(
-                                        color: Colors.white60,
-                                        fontSize: 12),
+                                      color: Colors.white60,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                   Text(
                                     _format(duration),
                                     style: const TextStyle(
-                                        color: Colors.white60,
-                                        fontSize: 12),
+                                      color: Colors.white60,
+                                      fontSize: 12,
+                                    ),
                                   ),
                                 ],
                               ),
@@ -594,29 +864,24 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                     /// 🎛 CONTROLS
                     Padding(
-                      padding:
-                      const EdgeInsets.only(bottom: 51),
+                      padding: const EdgeInsets.only(bottom: 51),
                       child: Row(
-                        mainAxisAlignment:
-                        MainAxisAlignment.spaceEvenly,
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
                           /// 🔀 SHUFFLE
                           StreamBuilder<bool>(
-                            stream: audio.player
-                                .shuffleModeEnabledStream,
+                            stream: audio.player.shuffleModeEnabledStream,
                             builder: (context, snapshot) {
-                              final enabled =
-                                  snapshot.data ?? false;
+                              final enabled = snapshot.data ?? false;
                               return IconButton(
                                 icon: Icon(
                                   Icons.shuffle,
-                                  color: enabled
-                                      ? Colors.green
-                                      : Colors.white,
+                                  color: enabled ? Colors.green : Colors.white,
                                 ),
-                                onPressed: () => audio.player
-                                    .setShuffleModeEnabled(
-                                    !enabled),
+                                onPressed:
+                                    () => audio.player.setShuffleModeEnabled(
+                                      !enabled,
+                                    ),
                               );
                             },
                           ),
@@ -630,32 +895,41 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                             ),
                             onPressed: audio.previous,
                           ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.replay_10,
+                              color: Colors.white,
+                              size: 40,
+                            ),
+                            onPressed: () => audio.seekBackward(),
+                          ),
 
                           /// ▶️ / ⏸
                           StreamBuilder<PlayerState>(
-                            stream:
-                            audio.player.playerStateStream,
+                            stream: audio.player.playerStateStream,
                             builder: (context, snapshot) {
-                              final playing =
-                                  snapshot.data?.playing ??
-                                      false;
+                              final playing = snapshot.data?.playing ?? false;
                               return IconButton(
                                 icon: Icon(
                                   playing
-                                      ? Icons
-                                      .pause_circle_filled
-                                      : Icons
-                                      .play_circle_filled,
+                                      ? Icons.pause_circle_filled
+                                      : Icons.play_circle_filled,
                                   color: Colors.white,
                                   size: 70,
                                 ),
                                 onPressed: () {
-                                  playing
-                                      ? audio.pause()
-                                      : audio.play();
+                                  playing ? audio.pause() : audio.play();
                                 },
                               );
                             },
+                          ),
+                          IconButton(
+                            icon: const Icon(
+                              Icons.forward_10,
+                              color: Colors.white,
+                              size: 40,
+                            ),
+                            onPressed: () => audio.seekForward(),
                           ),
 
                           /// ⏭
@@ -670,19 +944,18 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                           /// 🔁 LOOP
                           StreamBuilder<LoopMode>(
-                            stream:
-                            audio.player.loopModeStream,
+                            stream: audio.player.loopModeStream,
                             builder: (context, snapshot) {
-                              final mode =
-                                  snapshot.data ?? LoopMode.off;
+                              final mode = snapshot.data ?? LoopMode.off;
                               return IconButton(
                                 icon: Icon(
                                   mode == LoopMode.one
                                       ? Icons.repeat_one
                                       : Icons.repeat,
-                                  color: mode == LoopMode.off
-                                      ? Colors.white
-                                      : Colors.green,
+                                  color:
+                                      mode == LoopMode.off
+                                          ? Colors.white
+                                          : Colors.green,
                                 ),
                                 onPressed: () {
                                   audio.player.setLoopMode(
@@ -708,14 +981,17 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
   }
 
   String _format(Duration d) {
-    final m =
-    d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s =
-    d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
     return "$m:$s";
   }
 
-  void _openSongOptions(BuildContext context, SongModel song,bool isPlaying,int index ) {
+  void _openSongOptions(
+    BuildContext context,
+    SongModel song,
+    bool isPlaying,
+    int index,
+  ) {
     final audio = GlobalAudioController();
 
     showModalBottomSheet(
@@ -746,14 +1022,11 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                 title: "Play",
                 color: const Color(0xFF2EDFB4),
                 onTap: () {
-                if( isPlaying){
-
-                  }else{
-                    audio.player
-                        .seek(Duration.zero, index: index);
+                  if (isPlaying) {
+                  } else {
+                    audio.player.seek(Duration.zero, index: index);
                     audio.player.play();
                     audio.currentIndex.value = index;
-
                   }
 
                   Navigator.pop(context);
@@ -799,6 +1072,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
       },
     );
   }
+
   Widget _optionTile({
     required IconData icon,
     required String title,
@@ -818,27 +1092,33 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
       onTap: onTap,
     );
   }
+
   void _showSongInfo(BuildContext context, SongModel song) {
     showDialog(
       context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF121212),
-        title: const Text("Song Info",
-            style: TextStyle(color: Colors.white)),
-        content: Text(
-          "Title: ${song.title}\n"
+      builder:
+          (_) => AlertDialog(
+            backgroundColor: const Color(0xFF121212),
+            title: const Text(
+              "Song Info",
+              style: TextStyle(color: Colors.white),
+            ),
+            content: Text(
+              "Title: ${song.title}\n"
               "Artist: ${song.artist}\n"
               "Duration: ${song.duration}",
-          style: const TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text("Close"),
-          )
-        ],
-      ),
+              style: const TextStyle(color: Colors.white70),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("Close"),
+              ),
+            ],
+          ),
     );
   }
+
+
 
 }

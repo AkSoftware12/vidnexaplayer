@@ -119,4 +119,34 @@ class GlobalAudioController {
   Future<void> dispose() async {
     await player.dispose();
   }
+
+  // ---------------------------------------------------------------------------
+// ⏪ SEEK BACKWARD (10 sec)
+// ---------------------------------------------------------------------------
+  Future<void> seekBackward({int seconds = 10}) async {
+    final current = player.position;
+    final newPosition = current - Duration(seconds: seconds);
+
+    await player.seek(
+      newPosition < Duration.zero ? Duration.zero : newPosition,
+    );
+  }
+
+
+  // ---------------------------------------------------------------------------
+// ⏩ SEEK FORWARD (10 sec)
+// ---------------------------------------------------------------------------
+  Future<void> seekForward({int seconds = 10}) async {
+    final current = player.position;
+    final total = player.duration;
+
+    if (total == null) return;
+
+    final newPosition = current + Duration(seconds: seconds);
+
+    await player.seek(
+      newPosition > total ? total : newPosition,
+    );
+  }
+
 }
