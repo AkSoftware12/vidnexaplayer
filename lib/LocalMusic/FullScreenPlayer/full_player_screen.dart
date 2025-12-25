@@ -182,37 +182,65 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                     const SizedBox(height: 20),
 
-                    /// 🎨 ALBUM ART
-                    Padding(
-                      padding: const EdgeInsets.all(8.0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(0),
-                        child: QueryArtworkWidget(
-                          id: int.tryParse(mediaItem.id) ?? 0,
-                          type: ArtworkType.AUDIO,
-                          artworkFit: BoxFit.cover,
-                          quality: 100,
-                          // 👈 max quality (0–100)
-                          artworkHeight:
-                              MediaQuery.of(context).size.height * .35,
-                          artworkWidth: MediaQuery.of(context).size.width,
-                          artworkBorder: BorderRadius.circular(15),
-                          nullArtworkWidget: Container(
-                            height: MediaQuery.of(context).size.height * .35,
-                            width: MediaQuery.of(context).size.width,
-                            color: Colors.white10,
-                            child: const Icon(
-                              Icons.music_note,
-                              color: Colors.white,
-                              size: 80,
-                            ),
-                          ),
-                        ),
+                    SizedBox(
+                      height: MediaQuery.of(context).size.height * .3,
+                      child: ValueListenableBuilder<List<SongModel>>(
+                        valueListenable: audio.currentSongs,
+                        builder: (context, songs, _) {
+                          return ValueListenableBuilder<int>(
+                            valueListenable: audio.currentIndex,
+                            builder: (context, currentIndex, _) {
+                              return PageView.builder(
+                                controller: PageController(
+                                  viewportFraction: 0.90,
+                                  initialPage: currentIndex,
+                                ),
+                                itemCount: songs.length,
+                                onPageChanged: (index) {
+                                  audio.player.seek(Duration.zero, index: index);
+                                  audio.player.play();
+                                  audio.currentIndex.value = index;
+                                },
+                                itemBuilder: (context, index) {
+                                  final song = songs[index];
+                                  final isActive = index == currentIndex;
+
+                                  return AnimatedPadding(
+                                    duration: const Duration(milliseconds: 300),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 5,
+                                      vertical: isActive ? 0 : 20,
+                                    ),
+                                    child: ClipRRect(
+                                      borderRadius: BorderRadius.circular(18),
+                                      child: QueryArtworkWidget(
+                                        id: song.id,
+                                        type: ArtworkType.AUDIO,
+                                        artworkFit: BoxFit.cover,
+                                        quality: 100,
+                                        artworkBorder:  BorderRadius.circular(10),
+                                        nullArtworkWidget: Container(
+                                          color: Colors.white10,
+                                          child: const Icon(
+                                            Icons.music_note,
+                                            color: Colors.white,
+                                            size: 80,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              );
+                            },
+                          );
+                        },
                       ),
                     ),
 
                     const SizedBox(height: 30),
-                    Center(
+                    Align(
+                      alignment: Alignment.center,
                       child: Flexible(
                         child: TextScroll(
                           mediaItem.title,
@@ -231,13 +259,17 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                         ),
                       ),
                     ),
-                    Text(
-                      mediaItem.artist ?? 'Unknown Artist',
-                      style: GoogleFonts.poppins(
-                        textStyle: TextStyle(
-                          color: Colors.grey,
-                          fontSize: TextSizes.textmedium,
-                          fontWeight: FontWeight.normal,
+                    Align(
+                      alignment: Alignment.center,
+
+                      child: Text(
+                        mediaItem.artist ?? 'Unknown Artist',
+                        style: GoogleFonts.poppins(
+                          textStyle: TextStyle(
+                            color: Colors.grey,
+                            fontSize: TextSizes.textmedium,
+                            fontWeight: FontWeight.normal,
+                          ),
                         ),
                       ),
                     ),

@@ -334,16 +334,16 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                               color: Colors.black),
                         ),
                       ),
-                      Positioned(
-                        top: 0, // 👈 ye line badli
-                        right: 0,
-                        child: badges.Badge(
-                          label: const Text(
-                            '15',
-                            style: TextStyle(color: Colors.white, fontSize: 10),
-                          ),
-                        ),
-                      )
+                      // Positioned(
+                      //   top: 0, // 👈 ye line badli
+                      //   right: 0,
+                      //   child: badges.Badge(
+                      //     label: const Text(
+                      //       '15',
+                      //       style: TextStyle(color: Colors.white, fontSize: 10),
+                      //     ),
+                      //   ),
+                      // )
                     ],
                   ),
 
