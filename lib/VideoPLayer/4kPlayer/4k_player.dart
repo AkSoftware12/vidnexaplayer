@@ -767,7 +767,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                           builder: (context) {
                             final screenHeight =
                                 MediaQuery.of(context).size.height;
-                            final barHeight = screenHeight * 0.4;
+                            final barHeight = screenHeight * 0.3;
                             final brightnessValue = (_brightness * 100).round();
 
                             return Positioned(
@@ -835,7 +835,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                           builder: (context) {
                             final screenHeight =
                                 MediaQuery.of(context).size.height;
-                            final barHeight = screenHeight * 0.4;
+                            final barHeight = screenHeight * 0.3;
                             final volValue = _systemVolume.round();
 
                             return Positioned(
@@ -927,6 +927,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                           ),
                         ),
                       if (!_isLocked && _controlsVisible)
+
                         CustomVideoControls(
                           player: _player,
                           onNext: _playNext,
@@ -965,11 +966,68 @@ class _FullScreenVideoPlayerSystemVolumeState
                           videos: widget.videos,
                           resizeMode: _resizeMode,
                           onToggleResizeMode: _toggleResizeMode,
-                          // onBackPressed: () async {
-                          //
-                          // },
-
                         ),
+
+
+                      // Positioned.fill(
+                      //   child: IgnorePointer(
+                      //     ignoring: !_controlsVisible,
+                      //     child: Stack(
+                      //       children: [
+                      //         // 🔥 SAFE DIM LAYER (NOT FULLSCREEN OPACITY)
+                      //         Positioned.fill(
+                      //           child: Container(
+                      //             color: Colors.black.withOpacity(0.15),
+                      //           ),
+                      //         ),
+                      //
+                      //         // 🔥 CONTROLS IN SEPARATE GPU LAYER
+                      //         RepaintBoundary(
+                      //           child: AnimatedOpacity(
+                      //             opacity: _controlsVisible ? 1 : 0,
+                      //             duration: const Duration(milliseconds: 150),
+                      //             child: CustomVideoControls(
+                      //               player: _player,
+                      //               onNext: _playNext,
+                      //               onPrevious: _playPrevious,
+                      //               onToggleEqualizer: _toggleEqualizer,
+                      //               onToggleFilters: () {
+                      //                 FilterPopup.show(
+                      //                   context,
+                      //                   selectedKey: _selectedFilter,
+                      //                   onSelected: (key) {
+                      //                     setState(() => _selectedFilter = key);
+                      //                   },
+                      //                 );
+                      //               },
+                      //               onToggleOrientation: _toggleOrientation,
+                      //               onToggleFloting: () {
+                      //                 FloatingVideoManager.show(
+                      //                   context,
+                      //                   _player,
+                      //                   _controller,
+                      //                   widget.videos,
+                      //                   _currentIndex,
+                      //                 );
+                      //                 Navigator.pop(context);
+                      //               },
+                      //               onTakeScreenshot: _takeScreenshot,
+                      //               onToggleAudioOnly: _toggleAudioOnly,
+                      //               onToggleLock: _toggleLock,
+                      //               audioOnly: _audioOnly,
+                      //               onCyclePlaybackRate: _openSpeedDialog,
+                      //               onVolume: _openVolumeDialog,
+                      //               index: _currentIndex,
+                      //               videos: widget.videos,
+                      //               resizeMode: _resizeMode,
+                      //               onToggleResizeMode: _toggleResizeMode,
+                      //             ),
+                      //           ),
+                      //         ),
+                      //       ],
+                      //     ),
+                      //   ),
+                      // ),
 
                       if (!_isLocked && _equalizerVisible)
                         Positioned(
@@ -1008,6 +1066,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                     ],
                   ),
         ),
+
       ),
     );
   }

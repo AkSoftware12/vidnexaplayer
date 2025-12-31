@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -72,6 +71,7 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
   void initState() {
     super.initState();
     final p = widget.player;
+
     _positionSub = p.stream.position.listen((pos) {
       if (!mounted) return;
       _position = pos;
@@ -81,36 +81,15 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
       }
       setState(() {});
     });
+
     _durationSub = p.stream.duration.listen((d) {
       _duration = d;
     });
+
     _playingSub = p.stream.playing.listen((playing) {
       if (mounted) setState(() => _isPlaying = playing);
-    });
-
-    // Sync to global PlayPauseSync for floating window
-    widget.player.stream.playing.listen((playing) {
       globalPlayPause.update(playing);
     });
-  }
-
-  Future<void> _togglePlayPause() async {
-    if (_isPlaying) {
-      await widget.player.pause();
-    } else {
-      await widget.player.play();
-    }
-  }
-
-  Future<void> _seekBy(Duration offset) async {
-    final pos = _position + offset;
-    await widget.player.seek(pos);
-  }
-
-  String _format(Duration d) {
-    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$m:$s';
   }
 
   @override
@@ -121,403 +100,270 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
     super.dispose();
   }
 
+  Future<void> _togglePlayPause() async {
+    _isPlaying ? widget.player.pause() : widget.player.play();
+  }
+
+  Future<void> _seekBy(Duration offset) async {
+    await widget.player.seek(_position + offset);
+  }
+
+  String _format(Duration d) {
+    final m = d.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final s = d.inSeconds.remainder(60).toString().padLeft(2, '0');
+    return '$m:$s';
+  }
+
   @override
   Widget build(BuildContext context) {
-    var isLandscape =
+    final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
-    final double playSize = isLandscape ? 22.sp : 45.sp;
-    final double sideSize = isLandscape ? 15.sp : 28.sp;
-    final double appBar = isLandscape ? 20.sp : 100.sp;
-    final double bottom = isLandscape ? 0.sp : 40.sp;
+
+    final playSize = isLandscape ? 22.sp : 45.sp;
+    final sideSize = isLandscape ? 15.sp : 28.sp;
+    final bottomPadding = isLandscape ? 0.sp : 40.sp;
+
     return GestureDetector(
       onTap: () => setState(() => _visible = !_visible),
-      child: AnimatedOpacity(
-        opacity: _visible ? 1 : 0,
-        duration: const Duration(milliseconds: 200),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Positioned(
-              top: isLandscape?3:40,
-              left: 0,
-              right: 0,
-              child: CustomVideoAppBar(
-                title: widget.videos[widget.index].title.toString(),
-                onBackPressed: () {
-                  if (isLandscape) {
-                    // Switch back to portrait
-                     SystemChrome.setPreferredOrientations([
-                      DeviceOrientation.portraitUp,
-                      DeviceOrientation.portraitDown,
-                    ]);
-
-                    SystemChrome.setEnabledSystemUIMode(
-                      SystemUiMode.manual,
-                      overlays: SystemUiOverlay.values, // dono bars visible
-                    );
-                  } else {
-                     ScreenBrightness().resetScreenBrightness();
-                    Navigator.pop(context);
-                  }
-                  setState(() {
-                    isLandscape = !isLandscape;
-                  });
-                },
-                currentIndex: widget.index,
-                onVideoSelected: (index) {
-                  setState(() {
-                    // widget.index = index; // Update playing video
-                    // _initializePlayer(
-                    //   '',
-                    //   // widget.videos![index].path,
-                    //   isNetwork: false,
-                    // );
-                  });
-                },
-                isLandscape: isLandscape,
-                videos: widget.videos,
-              ),
-            ),
-
-            Align(
-              alignment: Alignment.bottomCenter,
-              child: Container(
-                color: Colors.black12,
-                padding: EdgeInsets.symmetric(horizontal: 0.sp, vertical: 0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          IgnorePointer(
+            ignoring: !_visible,
+            child: AnimatedOpacity(
+              opacity: _visible ? 1 : 0,
+              duration: const Duration(milliseconds: 180),
+              child: RepaintBoundary(
+                child: Stack(
+                  fit: StackFit.expand,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Positioned(
-                          left: 0,
-                          bottom: 0,
-                          child: Column(
-                            children: [
-                              // GestureDetector(
-                              //   onTap: widget.onToggleEqualizer,
-                              //   child: Image.asset(
-                              //     'assets/equalizer.png',
-                              //     height: 35,
-                              //     width: 35,
-                              //   ),
-                              // ),
-                              SizedBox(
-                                height: 5,
-                              ),
+                    /// 🔥 SAFE DIM LAYER (NO GREY BUG)
+                    Container(
+                      color: Colors.black.withOpacity(0.15),
+                    ),
 
-                              IconButton(
-                                icon: const Icon(Icons.camera_alt),
-                                color: Colors.white,
-                                iconSize: 24,
-                                onPressed: widget.onTakeScreenshot,
-                              ),
-
-                              IconButton(
-                                icon: const Icon(Icons.screen_rotation),
-                                color: Colors.white,
-                                iconSize: 24,
-                                onPressed: widget.onToggleOrientation,
-                              ),
-                              Padding(
-                                padding: EdgeInsets.only(bottom: 12.0),
-                                child: IconButton(
-                                  icon: const Icon(Icons.headphones),
-                                  color:
-                                      widget.audioOnly == true
-                                          ? Colors.greenAccent
-                                          : Colors.white,
-                                  iconSize: 24,
-                                  onPressed: widget.onToggleAudioOnly,
-                                ),
-                              ),
-                            ],
+                    /// 🔝 APP BAR
+                    Positioned(
+                      top: isLandscape ? 6 : 40,
+                      left: 0,
+                      right: 0,
+                      child: RepaintBoundary(
+                        child: Container(
+                          color: Colors.black.withOpacity(0.4),
+                          child: CustomVideoAppBar(
+                            title: widget.videos[widget.index].title ?? '',
+                            onBackPressed: () {
+                              if (isLandscape) {
+                                SystemChrome.setPreferredOrientations([
+                                  DeviceOrientation.portraitUp,
+                                  DeviceOrientation.portraitDown,
+                                ]);
+                                SystemChrome.setEnabledSystemUIMode(
+                                  SystemUiMode.manual,
+                                  overlays: SystemUiOverlay.values,
+                                );
+                              } else {
+                                ScreenBrightness().resetScreenBrightness();
+                                Navigator.pop(context);
+                              }
+                            },
+                            currentIndex: widget.index,
+                            onVideoSelected: (_) {},
+                            isLandscape: isLandscape,
+                            videos: widget.videos,
                           ),
                         ),
+                      ),
+                    ),
 
-                        Positioned(
-                          // top: sideControlsTop,
-                          right: 0,
-                          bottom: 0,
-
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                              right: isLandscape ? 15.sp : 0.sp,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.center,
+                    /// ⬇️ BOTTOM CONTROLS
+                    Align(
+                      alignment: Alignment.bottomCenter,
+                      child: Container(
+                        color: Colors.black.withOpacity(0.08),
+                        padding: const EdgeInsets.all(8),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            /// LEFT & RIGHT SIDE BUTTONS
+                            Stack(
                               children: [
-                                GestureDetector(
-                                  onTap: widget.onToggleFilters,
-                                  child: Image.asset(
-                                    'assets/hdr.png',
-                                    height: 35,
-                                    width: 35,
-                                    color: Colors.pink,
+                                Align(
+                                  alignment: Alignment.bottomLeft,
+                                  child: Column(
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.camera_alt),
+                                        color: Colors.white,
+                                        onPressed:
+                                        widget.onTakeScreenshot,
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.screen_rotation),
+                                        color: Colors.white,
+                                        onPressed:
+                                        widget.onToggleOrientation,
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.headphones),
+                                        color: widget.audioOnly == true
+                                            ? Colors.greenAccent
+                                            : Colors.white,
+                                        onPressed:
+                                        widget.onToggleAudioOnly,
+                                      ),
+                                    ],
                                   ),
                                 ),
-
-                                //
-                                IconButton(
-                                  icon: Icon(
-                                    Icons.volume_up,
-                                    color: Colors.white,
-                                  ),
-                                  onPressed: widget.onVolume,
-                                  iconSize: 24,
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.speed),
-                                  color: Colors.white,
-                                  iconSize: 24,
-                                  onPressed: widget.onCyclePlaybackRate,
-                                ),
-
-                                Padding(
-                                  padding: EdgeInsets.only(bottom: 12.0),
-                                  child: IconButton(
-                                    icon: const Icon(
-                                      Icons.picture_in_picture_alt,
-                                    ),
-                                    color: Colors.white,
-                                    iconSize: 24,
-                                    onPressed: widget.onToggleFloting,
+                                Align(
+                                  alignment: Alignment.bottomRight,
+                                  child: Column(
+                                    children: [
+                                      IconButton(
+                                        icon: const Icon(Icons.hdr_on),
+                                        color: Colors.pink,
+                                        iconSize: sideSize + 4,
+                                        onPressed:
+                                        widget.onToggleFilters,
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.volume_up),
+                                        color: Colors.white,
+                                        onPressed: widget.onVolume,
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(Icons.speed),
+                                        color: Colors.white,
+                                        onPressed:
+                                        widget.onCyclePlaybackRate,
+                                      ),
+                                      IconButton(
+                                        icon: const Icon(
+                                            Icons.picture_in_picture_alt),
+                                        color: Colors.white,
+                                        onPressed:
+                                        widget.onToggleFloting,
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ],
                             ),
-                          ),
+
+                            /// ⏱ SLIDER
+                            Row(
+                              children: [
+                                Text(
+                                  _format(_position),
+                                  style: const TextStyle(
+                                      color: Colors.white, fontSize: 11),
+                                ),
+                                const SizedBox(width: 4),
+                                Expanded(
+                                  child: RepaintBoundary(
+                                    child: Slider(
+                                      value:
+                                      _progress.clamp(0.0, 1.0),
+                                      onChanged: (v) {
+                                        widget.player
+                                            .seek(_duration * v);
+                                      },
+                                      activeColor: Colors.redAccent,
+                                      inactiveColor: Colors.white24,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  _format(_duration),
+                                  style: const TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11),
+                                ),
+                              ],
+                            ),
+
+                            /// ▶ PLAY CONTROLS
+                            Row(
+                              mainAxisAlignment:
+                              MainAxisAlignment.center,
+                              children: [
+                                IconButton(
+                                  icon:
+                                  const Icon(Icons.lock_open),
+                                  color: Colors.white,
+                                  onPressed:
+                                  widget.onToggleLock,
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                      Icons.skip_previous),
+                                  color: Colors.white,
+                                  iconSize: sideSize + 4,
+                                  onPressed: widget.onPrevious,
+                                ),
+                                IconButton(
+                                  icon: const Icon(Icons.replay_10),
+                                  color: Colors.white,
+                                  iconSize: sideSize + 4,
+                                  onPressed: () =>
+                                      _seekBy(const Duration(
+                                          seconds: -10)),
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    globalPlayPause.isPlaying
+                                        ? Icons.pause_circle_filled
+                                        : Icons.play_circle_fill,
+                                  ),
+                                  color: Colors.white,
+                                  iconSize: playSize + 8,
+                                  onPressed: _togglePlayPause,
+                                ),
+                                IconButton(
+                                  icon:
+                                  const Icon(Icons.forward_10),
+                                  color: Colors.white,
+                                  iconSize: sideSize + 4,
+                                  onPressed: () =>
+                                      _seekBy(const Duration(
+                                          seconds: 10)),
+                                ),
+                                IconButton(
+                                  icon: const Icon(
+                                      Icons.skip_next),
+                                  color: Colors.white,
+                                  iconSize: sideSize + 4,
+                                  onPressed: widget.onNext,
+                                ),
+                                IconButton(
+                                  icon: Icon(
+                                    widget.resizeMode ==
+                                        VideoResizeMode.fit
+                                        ? Icons.fit_screen
+                                        : widget.resizeMode ==
+                                        VideoResizeMode.fill
+                                        ? Icons.crop
+                                        : Icons.zoom_in_map,
+                                  ),
+                                  color: Colors.white,
+                                  onPressed:
+                                  widget.onToggleResizeMode,
+                                ),
+                              ],
+                            ),
+                            SizedBox(height: bottomPadding),
+                          ],
                         ),
-                      ],
-                    ),
-
-                    SizedBox(
-                      height: 10,
-                      child: Row(
-                        children: [
-                          // Current Position Time
-                          Text(
-                            _format(_position),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 11,
-                            ),
-                          ),
-
-                          SizedBox(width: 4),
-
-                          // Slider
-                          Expanded(
-                            child: Slider(
-                              value: _progress.clamp(0.0, 1.0),
-                              onChanged: (v) {
-                                final newPos = _duration * v;
-                                widget.player.seek(newPos);
-                              },
-                              activeColor: Colors.redAccent,
-                              inactiveColor: Colors.white24,
-                            ),
-                          ),
-
-                          SizedBox(width: 4),
-
-                          // Total Duration
-                          Text(
-                            _format(_duration),
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 11,
-                            ),
-                          ),
-                        ],
                       ),
                     ),
-
-                    SizedBox(height: 10),
-
-                    /// COMPACT CONTROL ROW
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconButton(
-                          icon: const Icon(Icons.lock_open),
-                          color: Colors.white,
-                          iconSize: 24,
-                          onPressed: widget.onToggleLock,
-                        ),
-                        Spacer(),
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.skip_previous_rounded),
-                          color: Colors.white,
-                          iconSize: sideSize + 4,
-                          // ICONS CHOTE
-                          onPressed: widget.onPrevious,
-                        ),
-                        SizedBox(width: 10),
-
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.replay_10),
-                          color: Colors.white,
-                          iconSize: sideSize + 4,
-                          onPressed:
-                              () => _seekBy(const Duration(seconds: -10)),
-                        ),
-                        SizedBox(width: 10),
-
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: Icon(
-                            globalPlayPause.isPlaying
-                                ? Icons.pause_circle_filled
-                                : Icons.play_circle_fill,
-                            color: Colors.white,
-                            size: playSize + 8, // PLAY BUTTON bhi thoda chota
-                          ),
-                          onPressed: _togglePlayPause,
-                        ),
-                        SizedBox(width: 10),
-
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.forward_10),
-                          color: Colors.white,
-                          iconSize: sideSize + 4,
-                          onPressed: () => _seekBy(const Duration(seconds: 10)),
-                        ),
-                        SizedBox(width: 10),
-
-                        IconButton(
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          icon: const Icon(Icons.skip_next_rounded),
-                          color: Colors.white,
-                          iconSize: sideSize + 4,
-                          onPressed: widget.onNext,
-                        ),
-                        Spacer(),
-                        IconButton(
-                          icon: Icon(
-                            widget.resizeMode == VideoResizeMode.fit
-                                ? Icons.fit_screen
-                                : widget.resizeMode == VideoResizeMode.fill
-                                ? Icons.crop
-                                : widget.resizeMode == VideoResizeMode.zoom
-                                ? Icons.zoom_in_map
-                                : Icons.open_in_full,
-                            color: Colors.white,
-                          ),
-                          iconSize: 24,
-                          onPressed: widget.onToggleResizeMode,
-                        ),
-                      ],
-                    ),
-                    SizedBox(height: bottom),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
-    );
-  }
-
-  Future<void> showVolumeDialog(
-    BuildContext context, {
-    required double initialVolume,
-    required Function(double) onVolumeChange,
-  }) async {
-    double newVolume = initialVolume;
-
-    await showGeneralDialog(
-      context: context,
-      barrierDismissible: true,
-      barrierColor: Colors.black45,
-      transitionDuration: const Duration(milliseconds: 200),
-      pageBuilder: (_, __, ___) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return Center(
-              child: Material(
-                color: Colors.transparent,
-                child: Container(
-                  width: MediaQuery.of(context).size.width * 0.75,
-                  padding: const EdgeInsets.all(18),
-                  decoration: BoxDecoration(
-                    color: Colors.white12,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white24, width: 1),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        "Volume",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 25),
-
-                      // Slider
-                      Slider(
-                        value: newVolume,
-                        min: 0,
-                        max: 1,
-                        divisions: 10,
-                        activeColor: Colors.blueAccent,
-                        onChanged: (value) {
-                          setState(() => newVolume = value);
-                          onVolumeChange(value);
-                        },
-                      ),
-
-                      const SizedBox(height: 10),
-
-                      // Buttons
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.end,
-                        children: [
-                          TextButton(
-                            onPressed: () {
-                              newVolume = 1.0;
-                              onVolumeChange(1.0);
-                              setState(() {});
-                            },
-                            child: const Text(
-                              "Max",
-                              style: TextStyle(color: Colors.white),
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          TextButton(
-                            onPressed: () {
-                              Navigator.pop(context);
-                            },
-                            child: const Text(
-                              "Close",
-                              style: TextStyle(color: Colors.red),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }
