@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 
+import '../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
 import '../../../../../Mp3Player/mp3_player.dart';
 
 class GenrePage extends StatefulWidget {
@@ -18,6 +19,7 @@ class GenrePage extends StatefulWidget {
 class _GenrePageState extends State<GenrePage> {
   late List<SongModel> _songs;
   final AudioPlayer audioPlayer = AudioPlayer();
+  final audio = GlobalAudioController();
 
   @override
   void initState() {
@@ -84,26 +86,7 @@ class _GenrePageState extends State<GenrePage> {
                       return ListTile(
                         onTap: () async {
 
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) {
-                                return  Mp3Player(
-                                  songs: _songs,
-                                  initialIndex: index, audioPlayer: audioPlayer,
-                                );
-                              },
-                            ),
-                          );
-
-                          // musicService.playSong(
-                          //   widget.song.id.toString(),
-                          //   widget.song.uri.toString(),
-                          //   widget.song.album.toString(),
-                          //   widget.song.title,
-                          //   widget.song.artist.toString(),
-                          // );
-                          // (context as Element).findAncestorStateOfType<BottomNavBarDemoState>()?.toggleMiniPlayerVisibility(true);
+                          audio.playSongs(_songs, index);
 
                         },
                         leading:  QueryArtworkWidget(

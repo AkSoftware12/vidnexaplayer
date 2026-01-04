@@ -400,9 +400,59 @@ class _FullScreenVideoPlayerSystemVolumeState
           1,
           0,
         ];
+      case 'green':
+        return [
+          0.0, 1.0, 0.0, 0, 0, // Red → Green
+          0.0, 1.2, 0.0, 0, 0, // Green boosted
+          0.0, 1.0, 0.0, 0, 0, // Blue → Green
+          0,   0,   0,   1, 0, // Alpha
+        ];
+
+
       default:
         return [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
     }
+  }
+
+  double hdrIntensity = 0.7; // 0..1
+
+  List<double> fakeHdrMatrix({double intensity = 0.65}) {
+    // intensity: 0.0 to 1.0
+    final c = 1.0 + (0.55 * intensity); // contrast
+    final s = 1.0 + (0.75 * intensity); // saturation
+    final b = 6.0 * intensity;          // brightness lift (small)
+
+    // Luma coefficients
+    const r = 0.2126;
+    const g = 0.7152;
+    const bl = 0.0722;
+
+    final ir = (1 - s) * r;
+    final ig = (1 - s) * g;
+    final ib = (1 - s) * bl;
+
+    // Saturation matrix
+    final m00 = ir + s;
+    final m01 = ig;
+    final m02 = ib;
+
+    final m10 = ir;
+    final m11 = ig + s;
+    final m12 = ib;
+
+    final m20 = ir;
+    final m21 = ig;
+    final m22 = ib + s;
+
+    // Contrast: scale RGB around 128 (for 0-255 range)
+    final t = 128.0 * (1 - c) + b;
+
+    return [
+      c * m00, c * m01, c * m02, 0, t,
+      c * m10, c * m11, c * m12, 0, t,
+      c * m20, c * m21, c * m22, 0, t,
+      0,      0,      0,      1, 0,
+    ];
   }
 
 
@@ -702,7 +752,8 @@ class _FullScreenVideoPlayerSystemVolumeState
         MediaQuery.of(context).orientation == Orientation.landscape;
     final double equalizerBottom = isLandscape ? 70 : 130;
     final videoWidget = ColorFiltered(
-      colorFilter: ColorFilter.matrix(_getColorMatrix(_selectedFilter)),
+      // colorFilter: ColorFilter.matrix(_getColorMatrix(_selectedFilter)),
+      colorFilter: ColorFilter.matrix(fakeHdrMatrix(intensity: hdrIntensity)),
       child: Video(
         controller: _controller,
         fit: _resizeMode == VideoResizeMode.fit
@@ -733,10 +784,7 @@ class _FullScreenVideoPlayerSystemVolumeState
         onVerticalDragStart: _onVerticalDragStart,
         onVerticalDragUpdate: _onVerticalDragUpdate,
         onVerticalDragEnd: _onVerticalDragEnd,
-        onHorizontalDragStart: _onHorizontalDragStart,
-        onHorizontalDragUpdate: _onHorizontalDragUpdate,
-        onHorizontalDragEnd: _onHorizontalDragEnd,
-        onDoubleTapDown: _onDoubleTapDown,
+
         onTap: _onScreenTap,
 
         child: Scaffold(
@@ -751,7 +799,28 @@ class _FullScreenVideoPlayerSystemVolumeState
                   ))
                   : Stack(
                     children: [
-                      Positioned.fill(child: videoWidget),
+                      Positioned.fill(child: GestureDetector(
+                          onHorizontalDragStart: _onHorizontalDragStart,
+                          onHorizontalDragUpdate: _onHorizontalDragUpdate,
+                          onHorizontalDragEnd: _onHorizontalDragEnd,
+                          onDoubleTapDown: _onDoubleTapDown,
+
+                          child: videoWidget)),
+                      // subtle vignette
+                      IgnorePointer(
+                        child: Container(
+                          decoration: BoxDecoration(
+                            gradient: RadialGradient(
+                              radius: 1.0,
+                              colors: [
+                                const Color(0x00000000),
+                                Color(0x22000000), // darkness edge
+                              ],
+                              stops: const [0.65, 1.0],
+                            ),
+                          ),
+                        ),
+                      ),
                       if (_showSkipOverlay)
                         Center(
                           child: Icon(
@@ -969,65 +1038,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                         ),
 
 
-                      // Positioned.fill(
-                      //   child: IgnorePointer(
-                      //     ignoring: !_controlsVisible,
-                      //     child: Stack(
-                      //       children: [
-                      //         // 🔥 SAFE DIM LAYER (NOT FULLSCREEN OPACITY)
-                      //         Positioned.fill(
-                      //           child: Container(
-                      //             color: Colors.black.withOpacity(0.15),
-                      //           ),
-                      //         ),
-                      //
-                      //         // 🔥 CONTROLS IN SEPARATE GPU LAYER
-                      //         RepaintBoundary(
-                      //           child: AnimatedOpacity(
-                      //             opacity: _controlsVisible ? 1 : 0,
-                      //             duration: const Duration(milliseconds: 150),
-                      //             child: CustomVideoControls(
-                      //               player: _player,
-                      //               onNext: _playNext,
-                      //               onPrevious: _playPrevious,
-                      //               onToggleEqualizer: _toggleEqualizer,
-                      //               onToggleFilters: () {
-                      //                 FilterPopup.show(
-                      //                   context,
-                      //                   selectedKey: _selectedFilter,
-                      //                   onSelected: (key) {
-                      //                     setState(() => _selectedFilter = key);
-                      //                   },
-                      //                 );
-                      //               },
-                      //               onToggleOrientation: _toggleOrientation,
-                      //               onToggleFloting: () {
-                      //                 FloatingVideoManager.show(
-                      //                   context,
-                      //                   _player,
-                      //                   _controller,
-                      //                   widget.videos,
-                      //                   _currentIndex,
-                      //                 );
-                      //                 Navigator.pop(context);
-                      //               },
-                      //               onTakeScreenshot: _takeScreenshot,
-                      //               onToggleAudioOnly: _toggleAudioOnly,
-                      //               onToggleLock: _toggleLock,
-                      //               audioOnly: _audioOnly,
-                      //               onCyclePlaybackRate: _openSpeedDialog,
-                      //               onVolume: _openVolumeDialog,
-                      //               index: _currentIndex,
-                      //               videos: widget.videos,
-                      //               resizeMode: _resizeMode,
-                      //               onToggleResizeMode: _toggleResizeMode,
-                      //             ),
-                      //           ),
-                      //         ),
-                      //       ],
-                      //     ),
-                      //   ),
-                      // ),
+
 
                       if (!_isLocked && _equalizerVisible)
                         Positioned(

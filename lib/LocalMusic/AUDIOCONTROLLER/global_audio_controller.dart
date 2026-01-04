@@ -1,152 +1,196 @@
+import 'dart:async';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:path_provider/path_provider.dart';
+
+import '../AudioServiceInit/audio_service_init.dart';
+import '../BackgroundAudioHandler/background_audio_handler.dart';
 
 class GlobalAudioController {
-  /// 🔥 SINGLETON
   static final GlobalAudioController _instance =
   GlobalAudioController._internal();
-
   factory GlobalAudioController() => _instance;
 
   GlobalAudioController._internal() {
-    player.playerStateStream.listen((state) {
-      // show mini player
-      if (state.processingState == ProcessingState.ready &&
-          player.sequenceState?.sequence.isNotEmpty == true &&
-          hasPlayedOnce.value == false) {
+    _bindStreams();
+  }
+
+  final OnAudioQuery _audioQuery = OnAudioQuery();
+
+  BackgroundAudioHandler get handler => AudioServiceInit.handler;
+  AudioPlayer get player => handler.player;
+
+  final ValueNotifier<List<SongModel>> currentSongs =
+  ValueNotifier<List<SongModel>>([]);
+  final ValueNotifier<int> currentIndex = ValueNotifier<int>(0);
+  final ValueNotifier<bool> hasPlayedOnce = ValueNotifier(false);
+
+  /// ✅ Remaining timer countdown for badge
+  final ValueNotifier<Duration?> sleepRemaining =
+  ValueNotifier<Duration?>(null);
+
+  StreamSubscription<int?>? _indexSub;
+  StreamSubscription<PlayerState>? _stateSub;
+  StreamSubscription<List<MediaItem>>? _queueSub;
+  StreamSubscription<dynamic>? _customSub;
+  StreamSubscription<PlaybackState>? _pbSub;
+
+  void _bindStreams() {
+    _indexSub = player.currentIndexStream.listen((i) {
+      if (i != null) currentIndex.value = i;
+    });
+
+    // ✅ MORE RELIABLE index sync (device/notification changes)
+    _pbSub = handler.playbackState.listen((ps) {
+      final idx = ps.queueIndex;
+      if (idx != null) currentIndex.value = idx;
+    });
+
+    // ✅ fixed show/hide logic
+    _stateSub = player.playerStateStream.listen((state) {
+      final hasQueue = handler.queue.value.isNotEmpty;
+
+      if (state.processingState == ProcessingState.ready && hasQueue) {
         hasPlayedOnce.value = true;
       }
 
-      // hide mini player
-      if (state.processingState == ProcessingState.idle &&
-          player.sequenceState == null) {
+      if (state.processingState == ProcessingState.idle || !hasQueue) {
         hasPlayedOnce.value = false;
+      }
+    });
+
+    _queueSub = handler.queue.listen((q) {
+      if (q.isEmpty) hasPlayedOnce.value = false;
+    });
+
+    /// ✅ listen countdown events from handler
+    _customSub = handler.customEvent.listen((event) {
+      if (event is Map && event["type"] == "sleep_timer") {
+        final ms = (event["remaining_ms"] as int?) ?? 0;
+        sleepRemaining.value =
+        ms <= 0 ? null : Duration(milliseconds: ms);
       }
     });
   }
 
+  // ---------------- Player controls (device-safe) ----------------
+  void play() => handler.play();
+  void pause() => handler.pause();
+  void next() => handler.skipToNext();
+  void previous() => handler.skipToPrevious();
 
-  /// 🎧 AUDIO PLAYER
-  final AudioPlayer player = AudioPlayer();
-
-  /// 🔥 CURRENT PLAYLIST + INDEX
-  final ValueNotifier<List<SongModel>> currentSongs =
-  ValueNotifier<List<SongModel>>([]);
-
-  final ValueNotifier<int> currentIndex = ValueNotifier<int>(0);
-
-  /// 🔥 MINI PLAYER VISIBILITY FLAG
-  final ValueNotifier<bool> hasPlayedOnce = ValueNotifier(false);
-
-  // ---------------------------------------------------------------------------
-  // 🎶 PLAY SINGLE (resume)
-  // ---------------------------------------------------------------------------
-  void play() {
-    player.play();
-  }
-
-  // ---------------------------------------------------------------------------
-  // 🎵 PLAY SONG LIST (FIRST TIME / NEW PLAYLIST)
-  // ---------------------------------------------------------------------------
-  Future<void> playSongs(List<SongModel> songs, int index) async {
-    if (songs.isEmpty) return;
-    currentSongs.value = songs;
-    currentIndex.value = index;
-    final playlist = ConcatenatingAudioSource(
-      children: songs.map((song) {
-        return AudioSource.uri(
-          Uri.parse(song.uri!),
-          tag: MediaItem(
-            id: song.id.toString(),
-            title: song.title,
-            artist: song.artist ?? 'Unknown',
-            /// 🖼️ ALBUM ART
-            artUri: Uri.parse(
-              "content://media/external/audio/album/${song.albumId}",
-            ),
-          ),
-        );
-      }).toList(),
-    );
-
-    await player.setAudioSource(
-      playlist,
-      initialIndex: index,
-      preload: true,
-    );
-
-    await player.play();
-  }
-
-  // ---------------------------------------------------------------------------
-  // ⏸ PAUSE
-  // ---------------------------------------------------------------------------
-  void pause() {
-    player.pause();
-  }
-
-  // ---------------------------------------------------------------------------
-  // ⏭ NEXT
-  // ---------------------------------------------------------------------------
-  void next() {
-    if (player.hasNext) {
-      player.seekToNext();
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // ⏮ PREVIOUS
-  // ---------------------------------------------------------------------------
-  void previous() {
-    if (player.hasPrevious) {
-      player.seekToPrevious();
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // ❌ CLOSE MINI PLAYER + STOP AUDIO
-  // ---------------------------------------------------------------------------
   Future<void> closeMiniPlayer() async {
-    await player.stop();
+    await handler.stop();
     hasPlayedOnce.value = false;
   }
 
-  // ---------------------------------------------------------------------------
-  // 🧹 DISPOSE (optional – app close)
-  // ---------------------------------------------------------------------------
-  Future<void> dispose() async {
-    await player.dispose();
+  // ---------------- Sleep timer bridge ----------------
+  Future<void> setSleepTimer(Duration? d) async {
+    if (d == null || d == Duration.zero) {
+      await cancelSleepTimer();
+      return;
+    }
+    await handler.customAction('setSleepTimer', {'ms': d.inMilliseconds});
   }
 
-  // ---------------------------------------------------------------------------
-// ⏪ SEEK BACKWARD (10 sec)
-// ---------------------------------------------------------------------------
+  Future<void> cancelSleepTimer() async {
+    await handler.customAction('cancelSleepTimer');
+  }
+
+  // ---------------- Artwork cache (file:// for notification) ----------------
+  Future<Uri?> _cacheArtworkToFile({required int songId}) async {
+    try {
+      final Uint8List? bytes = await _audioQuery.queryArtwork(
+        songId,
+        ArtworkType.AUDIO,
+        size: 800,
+        quality: 100,
+      );
+      if (bytes == null || bytes.isEmpty) return null;
+
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/art_$songId.jpg');
+
+      // ✅ always overwrite (avoid wrong/stale image)
+      await file.writeAsBytes(bytes, flush: true);
+
+      return Uri.file(file.path);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  // ---------------- Play playlist ----------------
+  Future<void> playSongs(List<SongModel> songs, int index) async {
+    if (songs.isEmpty) return;
+
+    currentSongs.value = songs;
+    currentIndex.value = index;
+
+    // ✅ parallel artwork caching (fast)
+    final artUris = await Future.wait(
+      songs.map((s) => _cacheArtworkToFile(songId: s.id)).toList(),
+    );
+
+    final mediaItems = <MediaItem>[];
+    final sources = <AudioSource>[];
+
+    for (int i = 0; i < songs.length; i++) {
+      final song = songs[i];
+      final artFileUri = artUris[i];
+
+      final item = MediaItem(
+        id: song.id.toString(),
+        title: song.title,
+        artist: song.artist ?? 'Unknown',
+        artUri: artFileUri,
+      );
+
+      mediaItems.add(item);
+      sources.add(
+        AudioSource.uri(
+          Uri.parse(song.uri!),
+          tag: item,
+        ),
+      );
+    }
+
+    await handler.setPlaylist(
+      items: mediaItems,
+      sources: sources,
+      initialIndex: index,
+      autoplay: true,
+    );
+
+    hasPlayedOnce.value = true;
+  }
+
+  // ---------------- Seek helpers ----------------
   Future<void> seekBackward({int seconds = 10}) async {
     final current = player.position;
-    final newPosition = current - Duration(seconds: seconds);
-
-    await player.seek(
-      newPosition < Duration.zero ? Duration.zero : newPosition,
-    );
+    final newPos = current - Duration(seconds: seconds);
+    await handler.seek(newPos < Duration.zero ? Duration.zero : newPos);
   }
 
-
-  // ---------------------------------------------------------------------------
-// ⏩ SEEK FORWARD (10 sec)
-// ---------------------------------------------------------------------------
   Future<void> seekForward({int seconds = 10}) async {
-    final current = player.position;
     final total = player.duration;
-
     if (total == null) return;
-
-    final newPosition = current + Duration(seconds: seconds);
-
-    await player.seek(
-      newPosition > total ? total : newPosition,
-    );
+    final current = player.position;
+    final newPos = current + Duration(seconds: seconds);
+    await handler.seek(newPos > total ? total : newPos);
   }
 
+  Future<void> dispose() async {
+    await _indexSub?.cancel();
+    await _pbSub?.cancel();
+    await _stateSub?.cancel();
+    await _queueSub?.cancel();
+    await _customSub?.cancel();
+    await player.dispose();
+  }
 }

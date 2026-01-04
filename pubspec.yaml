@@ -2,7 +2,7 @@ name: videoplayer
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.14+14
+version: 1.0.15+15
 
 environment:
   sdk: ^3.7.0
@@ -20,6 +20,8 @@ dependencies:
   screenshot: ^3.0.0
   gallery_saver_plus: ^3.2.9
   screen_brightness: ^2.1.7
+
+
 
 
 

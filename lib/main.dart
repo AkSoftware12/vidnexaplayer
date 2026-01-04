@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'Home/HomeScreen/home_screen.dart';
+import 'LocalMusic/AudioServiceInit/audio_service_init.dart';
 import 'NotifyListeners/LanguageProvider/language_provider.dart';
 import 'DarkMode/dark_mode.dart';
 import 'Home/HomeBottomnavigation/home_bottomNavigation.dart';
@@ -26,8 +27,13 @@ import 'package:new_version_plus/new_version_plus.dart';
 import 'SplashScreen/splash_screen.dart' hide navigatorKey;
 
 
+
+// adb uninstall com.vidnexa.videoplayer
+
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await AudioServiceInit.init();
   MediaKit.ensureInitialized();
   // 🔒 Lock entire app in Portrait
   await SystemChrome.setPreferredOrientations([
