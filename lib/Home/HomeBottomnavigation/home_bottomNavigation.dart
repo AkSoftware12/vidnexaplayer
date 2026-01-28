@@ -38,6 +38,7 @@ import '../HomeScreen/home2.dart' hide navigatorKey;
 import '../HomeScreen/home_screen.dart' hide navigatorKey;
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
+import '../YoutubeScreen/playlists_screen.dart';
 
 class HomeBottomNavigation extends StatefulWidget {
   final int bottomIndex;
@@ -349,41 +350,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
 
                   const SizedBox(width: 0),
 
-                  // Profile picture with green dot
-                  // GestureDetector(
-                  //   onTap: () {
-                  //     Navigator.push(
-                  //       context,
-                  //       MaterialPageRoute(
-                  //           builder: (context) => const HomeBottomNavigation(
-                  //                 bottomIndex: 3,
-                  //               )),
-                  //     );
-                  //   },
-                  //   child: Stack(
-                  //     children: [
-                  //       const CircleAvatar(
-                  //         radius: 20,
-                  //         // If backgroundImage is not set or fails to load, the child (Icon) will be displayed
-                  //         backgroundImage: NetworkImage(
-                  //             'https://img.freepik.com/free-photo/young-bearded-man-with-striped-shirt_273609-5677.jpg'), // Uncomment and replace with your image path
-                  //       ),
-                  //       Positioned(
-                  //         bottom: 0,
-                  //         right: 0,
-                  //         child: Container(
-                  //           width: 12,
-                  //           height: 12,
-                  //           decoration: BoxDecoration(
-                  //             color: Colors.green,
-                  //             shape: BoxShape.circle,
-                  //             border: Border.all(color: Colors.white, width: 2),
-                  //           ),
-                  //         ),
-                  //       )
-                  //     ],
-                  //   ),
-                  // ),
                 ],
               ),
             ],
@@ -432,7 +398,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       case 1:
         return OfflineMusicTabScreen();
       case 2:
-        return AllVideosScreen(icon: '',);
+        return YouTubeTopPlaylists();
       case 3:
         return UserProfilePage();
       default:
@@ -541,7 +507,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
         ),
         BottomNavigationBarItem(
           icon: SvgPicture.asset('assets/video_svg.svg',color: Colors.grey,),
-          label: 'Video',
+          label: 'Online',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
             decoration: BoxDecoration(

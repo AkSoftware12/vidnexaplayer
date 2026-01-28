@@ -5,6 +5,8 @@ import 'package:flutter/services.dart';
 import 'package:flutter_portal/flutter_portal.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:hive/hive.dart';
+import 'package:hive_flutter/adapters.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,8 +24,6 @@ import 'NotifyListeners/UserData/user_data.dart';
 import 'OnboardScreen/onboarding_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'package:new_version_plus/new_version_plus.dart';
-
 import 'SplashScreen/splash_screen.dart' hide navigatorKey;
 
 
@@ -35,6 +35,8 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AudioServiceInit.init();
   MediaKit.ensureInitialized();
+  await Hive.initFlutter();
+  await Hive.openBox('yt_cache'); // ✅ box open once
   // 🔒 Lock entire app in Portrait
   await SystemChrome.setPreferredOrientations([
     DeviceOrientation.portraitUp,

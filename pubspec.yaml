@@ -20,12 +20,16 @@ dependencies:
   screenshot: ^3.0.0
   gallery_saver_plus: ^3.2.9
   screen_brightness: ^2.1.7
+  country_codes: ^3.1.0
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
 
 
 
 
 
-#  # ✅ Optional Desktop Audio (if targeting Windows/Linux)
+
+  #  # ✅ Optional Desktop Audio (if targeting Windows/Linux)
 #  just_audio_mpv: ^0.1.7
 #  audio_service_mpris: ^0.2.0
 
