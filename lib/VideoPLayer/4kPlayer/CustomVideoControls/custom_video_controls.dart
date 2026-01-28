@@ -10,6 +10,21 @@ import 'package:screen_brightness/screen_brightness.dart';
 import '../../custom_video_appBar.dart';
 import '../4k_player.dart';
 
+/// A revised implementation of the custom video controls that fixes
+/// several issues with the original widget:
+///
+/// * The slider’s total duration now updates correctly because the
+///   duration stream updates state via `setState`, ensuring the UI
+///   reflects the loaded video length.
+/// * When the user drags the progress slider, the local progress value
+///   (`_progress`) is updated via `setState`, so the slider thumb
+///   follows the finger.  The slider’s callback converts the value
+///   into a new position using the total duration before calling
+///   `seek()` on the player.
+/// * The double‑tap skip logic resides in `FullScreenVideoPlayerFixed`.  This
+///   widget only reflects the current position and duration; it does
+///   not need to handle skip accumulation.
+
 class CustomVideoControls extends StatefulWidget {
   final Player player;
   final VoidCallback? onNext;
@@ -71,23 +86,29 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
   void initState() {
     super.initState();
     final p = widget.player;
-
+    // Listen for position updates to update the progress bar.
     _positionSub = p.stream.position.listen((pos) {
       if (!mounted) return;
-      _position = pos;
       final d = p.state.duration;
-      if (d.inMilliseconds > 0) {
-        _progress = pos.inMilliseconds / d.inMilliseconds;
-      }
-      setState(() {});
+      setState(() {
+        _position = pos;
+        if (d.inMilliseconds > 0) {
+          _progress = pos.inMilliseconds / d.inMilliseconds;
+        }
+      });
     });
-
+    // Listen for duration updates and update the state so the UI
+    // reflects the loaded video length.
     _durationSub = p.stream.duration.listen((d) {
-      _duration = d;
+      if (!mounted) return;
+      setState(() {
+        _duration = d;
+      });
     });
-
+    // Listen for playing status updates to toggle play/pause icon.
     _playingSub = p.stream.playing.listen((playing) {
-      if (mounted) setState(() => _isPlaying = playing);
+      if (!mounted) return;
+      setState(() => _isPlaying = playing);
       globalPlayPause.update(playing);
     });
   }
@@ -118,252 +139,224 @@ class _CustomVideoControlsState extends State<CustomVideoControls> {
   Widget build(BuildContext context) {
     final isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
-
     final playSize = isLandscape ? 22.sp : 45.sp;
     final sideSize = isLandscape ? 15.sp : 28.sp;
     final bottomPadding = isLandscape ? 0.sp : 40.sp;
-
     return GestureDetector(
       onTap: () => setState(() => _visible = !_visible),
       child: Stack(
         fit: StackFit.expand,
         children: [
-          IgnorePointer(
-            ignoring: !_visible,
-            child: AnimatedOpacity(
-              opacity: _visible ? 1 : 0,
-              duration: const Duration(milliseconds: 180),
-              child: RepaintBoundary(
-                child: Stack(
-                  fit: StackFit.expand,
-                  children: [
-                    /// 🔥 SAFE DIM LAYER (NO GREY BUG)
-                    Container(
-                      color: Colors.black.withOpacity(0.15),
-                    ),
-
-                    /// 🔝 APP BAR
-                    Positioned(
-                      top: isLandscape ? 6 : 40,
-                      left: 0,
-                      right: 0,
-                      child: RepaintBoundary(
-                        child: Container(
-                          color: Colors.black.withOpacity(0.4),
-                          child: CustomVideoAppBar(
-                            title: widget.videos[widget.index].title ?? '',
-                            onBackPressed: () {
-                              if (isLandscape) {
-                                SystemChrome.setPreferredOrientations([
-                                  DeviceOrientation.portraitUp,
-                                  DeviceOrientation.portraitDown,
-                                ]);
-                                SystemChrome.setEnabledSystemUIMode(
-                                  SystemUiMode.manual,
-                                  overlays: SystemUiOverlay.values,
-                                );
-                              } else {
-                                ScreenBrightness().resetScreenBrightness();
-                                Navigator.pop(context);
-                              }
-                            },
-                            currentIndex: widget.index,
-                            onVideoSelected: (_) {},
-                            isLandscape: isLandscape,
-                            videos: widget.videos,
-                          ),
-                        ),
+        IgnorePointer(
+        ignoring: !_visible,
+        child: AnimatedOpacity(
+          opacity: _visible ? 1 : 0,
+          duration: const Duration(milliseconds: 180),
+          child: RepaintBoundary(
+            child: Stack(
+              fit: StackFit.expand,
+              children: [
+                // Dim layer
+                Container(
+                  color: Colors.black.withOpacity(0.15),
+                ),
+                // Top app bar
+                Positioned(
+                  top: isLandscape ? 6 : 40,
+                  left: 0,
+                  right: 0,
+                  child: RepaintBoundary(
+                    child: Container(
+                      color: Colors.black.withOpacity(0.4),
+                      child: CustomVideoAppBar(
+                        title: widget.videos[widget.index].title ?? '',
+                        onBackPressed: () {
+                          if (isLandscape) {
+                            SystemChrome.setPreferredOrientations([
+                              DeviceOrientation.portraitUp,
+                              DeviceOrientation.portraitDown,
+                            ]);
+                            SystemChrome.setEnabledSystemUIMode(
+                              SystemUiMode.manual,
+                              overlays: SystemUiOverlay.values,
+                            );
+                          } else {
+                            ScreenBrightness().resetScreenBrightness();
+                            Navigator.pop(context);
+                          }
+                        },
+                        currentIndex: widget.index,
+                        onVideoSelected: (_) {},
+                        isLandscape: isLandscape,
+                        videos: widget.videos,
                       ),
                     ),
-
-                    /// ⬇️ BOTTOM CONTROLS
-                    Align(
-                      alignment: Alignment.bottomCenter,
-                      child: Container(
-                        color: Colors.black.withOpacity(0.08),
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                  ),
+                ),
+                // Bottom controls
+                Align(
+                  alignment: Alignment.bottomCenter,
+                  child: Container(
+                    color: Colors.black.withOpacity(0.08),
+                    padding: const EdgeInsets.all(8),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        // Left and right side buttons
+                        Stack(
                           children: [
-                            /// LEFT & RIGHT SIDE BUTTONS
-                            Stack(
-                              children: [
-                                Align(
-                                  alignment: Alignment.bottomLeft,
-                                  child: Column(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.camera_alt),
-                                        color: Colors.white,
-                                        onPressed:
-                                        widget.onTakeScreenshot,
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.screen_rotation),
-                                        color: Colors.white,
-                                        onPressed:
-                                        widget.onToggleOrientation,
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.headphones),
-                                        color: widget.audioOnly == true
-                                            ? Colors.greenAccent
-                                            : Colors.white,
-                                        onPressed:
-                                        widget.onToggleAudioOnly,
-                                      ),
-                                    ],
+                            Align(
+                              alignment: Alignment.bottomLeft,
+                              child: Column(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.camera_alt),
+                                    color: Colors.white,
+                                    onPressed: widget.onTakeScreenshot,
                                   ),
-                                ),
-                                Align(
-                                  alignment: Alignment.bottomRight,
-                                  child: Column(
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.hdr_on),
-                                        color: Colors.pink,
-                                        iconSize: sideSize + 4,
-                                        onPressed:
-                                        widget.onToggleFilters,
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.volume_up),
-                                        color: Colors.white,
-                                        onPressed: widget.onVolume,
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(Icons.speed),
-                                        color: Colors.white,
-                                        onPressed:
-                                        widget.onCyclePlaybackRate,
-                                      ),
-                                      IconButton(
-                                        icon: const Icon(
-                                            Icons.picture_in_picture_alt),
-                                        color: Colors.white,
-                                        onPressed:
-                                        widget.onToggleFloting,
-                                      ),
-                                    ],
+                                  IconButton(
+                                    icon: const Icon(Icons.screen_rotation),
+                                    color: Colors.white,
+                                    onPressed: widget.onToggleOrientation,
                                   ),
-                                ),
-                              ],
+                                  IconButton(
+                                    icon: const Icon(Icons.headphones),
+                                    color: widget.audioOnly == true
+                                        ? Colors.greenAccent
+                                        : Colors.white,
+                                    onPressed: widget.onToggleAudioOnly,
+                                  ),
+                                ],
+                              ),
                             ),
-
-                            /// ⏱ SLIDER
-                            Row(
-                              children: [
-                                Text(
-                                  _format(_position),
-                                  style: const TextStyle(
-                                      color: Colors.white, fontSize: 11),
-                                ),
-                                const SizedBox(width: 4),
-                                Expanded(
-                                  child: RepaintBoundary(
-                                    child: Slider(
-                                      value:
-                                      _progress.clamp(0.0, 1.0),
-                                      onChanged: (v) {
-                                        widget.player
-                                            .seek(_duration * v);
-                                      },
-                                      activeColor: Colors.redAccent,
-                                      inactiveColor: Colors.white24,
-                                    ),
+                            Align(
+                              alignment: Alignment.bottomRight,
+                              child: Column(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.hdr_on),
+                                    color: Colors.pink,
+                                    iconSize: sideSize + 4,
+                                    onPressed: widget.onToggleFilters,
                                   ),
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  _format(_duration),
-                                  style: const TextStyle(
-                                      color: Colors.white70,
-                                      fontSize: 11),
-                                ),
-                              ],
+                                  IconButton(
+                                    icon: const Icon(Icons.volume_up),
+                                    color: Colors.white,
+                                    onPressed: widget.onVolume,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.speed),
+                                    color: Colors.white,
+                                    onPressed: widget.onCyclePlaybackRate,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.picture_in_picture_alt),
+                                    color: Colors.white,
+                                    onPressed: widget.onToggleFloting,
+                                  ),
+                                ],
+                              ),
                             ),
-
-                            /// ▶ PLAY CONTROLS
-                            Row(
-                              mainAxisAlignment:
-                              MainAxisAlignment.center,
-                              children: [
-                                IconButton(
-                                  icon:
-                                  const Icon(Icons.lock_open),
-                                  color: Colors.white,
-                                  onPressed:
-                                  widget.onToggleLock,
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                      Icons.skip_previous),
-                                  color: Colors.white,
-                                  iconSize: sideSize + 4,
-                                  onPressed: widget.onPrevious,
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.replay_10),
-                                  color: Colors.white,
-                                  iconSize: sideSize + 4,
-                                  onPressed: () =>
-                                      _seekBy(const Duration(
-                                          seconds: -10)),
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    globalPlayPause.isPlaying
-                                        ? Icons.pause_circle_filled
-                                        : Icons.play_circle_fill,
-                                  ),
-                                  color: Colors.white,
-                                  iconSize: playSize + 8,
-                                  onPressed: _togglePlayPause,
-                                ),
-                                IconButton(
-                                  icon:
-                                  const Icon(Icons.forward_10),
-                                  color: Colors.white,
-                                  iconSize: sideSize + 4,
-                                  onPressed: () =>
-                                      _seekBy(const Duration(
-                                          seconds: 10)),
-                                ),
-                                IconButton(
-                                  icon: const Icon(
-                                      Icons.skip_next),
-                                  color: Colors.white,
-                                  iconSize: sideSize + 4,
-                                  onPressed: widget.onNext,
-                                ),
-                                IconButton(
-                                  icon: Icon(
-                                    widget.resizeMode ==
-                                        VideoResizeMode.fit
-                                        ? Icons.fit_screen
-                                        : widget.resizeMode ==
-                                        VideoResizeMode.fill
-                                        ? Icons.crop
-                                        : Icons.zoom_in_map,
-                                  ),
-                                  color: Colors.white,
-                                  onPressed:
-                                  widget.onToggleResizeMode,
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: bottomPadding),
                           ],
                         ),
-                      ),
+                        // Slider row
+                        Row(
+                          children: [
+                            Text(
+                              _format(_position),
+                              style: const TextStyle(
+                                  color: Colors.white, fontSize: 11),
+                            ),
+                            const SizedBox(width: 4),
+                            Expanded(
+                              child: RepaintBoundary(
+                                child: Slider(
+                                  value: _progress.clamp(0.0, 1.0),
+                                  onChanged: (v) {
+                                    // Update local progress so the thumb moves.
+                                    setState(() => _progress = v);
+                                    // Compute new position and seek.
+                                    final int seekMillis =
+                                    (_duration.inMilliseconds * v).round();
+                                    widget.player
+                                        .seek(Duration(milliseconds: seekMillis));
+                                  },
+                                  activeColor: Colors.redAccent,
+                                  inactiveColor: Colors.white24,
+                                ),
+                              ),
+                            ),
+                            // End time removed based on user request
+                          ],
+                        ),
+                        // Playback controls
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.lock_open),
+                              color: Colors.white,
+                              onPressed: widget.onToggleLock,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.skip_previous),
+                              color: Colors.white,
+                              iconSize: sideSize + 4,
+                              onPressed: widget.onPrevious,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.replay_10),
+                              color: Colors.white,
+                              iconSize: sideSize + 4,
+                              onPressed: () => _seekBy(const Duration(seconds: -10)),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                globalPlayPause.isPlaying
+                                    ? Icons.pause_circle_filled
+                                    : Icons.play_circle_fill,
+                              ),
+                              color: Colors.white,
+                              iconSize: playSize + 8,
+                              onPressed: _togglePlayPause,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.forward_10),
+                              color: Colors.white,
+                              iconSize: sideSize + 4,
+                              onPressed: () => _seekBy(const Duration(seconds: 10)),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.skip_next),
+                              color: Colors.white,
+                              iconSize: sideSize + 4,
+                              onPressed: widget.onNext,
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                widget.resizeMode == VideoResizeMode.fit
+                                    ? Icons.fit_screen
+                                    : widget.resizeMode == VideoResizeMode.fill
+                                    ? Icons.crop
+                                    : Icons.zoom_in_map,
+                              ),
+                              color: Colors.white,
+                              onPressed: widget.onToggleResizeMode,
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: bottomPadding),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ),
           ),
-        ],
+        ),
       ),
+      ]
+    ),
     );
   }
 }
