@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
@@ -11,9 +10,8 @@ import 'package:on_audio_query_forked/on_audio_query.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:videoplayer/Utils/color.dart';
-
 import '../../TextScroll/text_scroll.dart';
+import '../../Utils/color.dart';
 import '../../Utils/common.dart';
 import '../AUDIOCONTROLLER/global_audio_controller.dart';
 

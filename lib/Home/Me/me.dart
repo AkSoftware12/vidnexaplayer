@@ -1,6 +1,5 @@
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:fluttertoast/fluttertoast.dart';
@@ -15,19 +14,18 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
-import '../../ComingSoon/coming_soon.dart'
-    show ComingSoonPage, ComingSoonScreen;
+import '../../ComingSoon/coming_soon.dart' show ComingSoonPage, ComingSoonScreen;
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
 import '../../DeviceSpace/device_space.dart';
 import '../../HexColorCode/HexColor.dart';
+import '../../LockScreen/LockScreen/lock_screen.dart';
 import '../../Model/property_type.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/AppBar/colorList.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
 import '../../Utils/textSize.dart';
-import '../../VideoPLayer/AllVideo/all_videos.dart';
 import '../../app_store/app_store.dart';
 import '../HomeBottomnavigation/home_bottomNavigation.dart';
 
@@ -966,19 +964,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                             ),
                           ),
                         ),
-                        Text(
-                          '591 MB total',
-                          style: GoogleFonts.openSans(
-                            textStyle: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12.sp,
-                              // Adjust font size as needed
-                              fontWeight:
-                                  FontWeight
-                                      .w700, // Adjust font weight as needed
-                            ),
-                          ),
-                        ),
                       ],
                     ),
                     SizedBox(height: 8),
@@ -1041,22 +1026,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                     Padding(
                                       padding: EdgeInsets.only(
                                         bottom: 0.sp,
-                                        top: 3.sp,
-                                      ),
-                                      child: Text(
-                                        '3.2 GB',
-                                        style: GoogleFonts.poppins(
-                                          textStyle: TextStyle(
-                                            fontSize: 12.sp,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom: 0.sp,
                                         top: 0.sp,
                                       ),
                                       child: Text(
@@ -1077,14 +1046,14 @@ class _UserProfilePageState extends State<UserProfilePage> {
                           ),
                           GestureDetector(
                             onTap: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder:
-                                      (context) =>
-                                          AllVideosScreen(icon: 'AppBar'),
-                                ),
-                              );
+                              // Navigator.push(
+                              //   context,
+                              //   MaterialPageRoute(
+                              //     builder:
+                              //         (context) =>
+                              //             AllVideosScreen(icon: 'AppBar'),
+                              //   ),
+                              // );
                             },
                             child: Container(
                               width:
@@ -1125,22 +1094,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                           color: Colors.white,
                                           height: 25.sp,
                                           width: 25.sp,
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom: 0.sp,
-                                        top: 3.sp,
-                                      ),
-                                      child: Text(
-                                        '3.2 GB',
-                                        style: GoogleFonts.poppins(
-                                          textStyle: TextStyle(
-                                            fontSize: 12.sp,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.white,
-                                          ),
                                         ),
                                       ),
                                     ),
@@ -1326,22 +1279,6 @@ class _UserProfilePageState extends State<UserProfilePage> {
                                     Padding(
                                       padding: EdgeInsets.only(
                                         bottom: 0.sp,
-                                        top: 3.sp,
-                                      ),
-                                      child: Text(
-                                        '3.2 GB',
-                                        style: GoogleFonts.poppins(
-                                          textStyle: TextStyle(
-                                            fontSize: 12.sp,
-                                            fontWeight: FontWeight.w800,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    Padding(
-                                      padding: EdgeInsets.only(
-                                        bottom: 0.sp,
                                         top: 0.sp,
                                       ),
                                       child: Text(
@@ -1381,119 +1318,7 @@ class _UserProfilePageState extends State<UserProfilePage> {
                     ProfileQuickActionList(),
                     SizedBox(height: 8),
 
-                    // Padding(
-                    //   padding: EdgeInsets.only(top: 0.sp),
-                    //   child: Container(
-                    //     decoration: BoxDecoration(
-                    //       borderRadius: BorderRadius.circular(15),
-                    //       gradient: LinearGradient(
-                    //         colors: [
-                    //           HexColor('#6663f2'), // Purple
-                    //           Colors.purple // Purple
-                    //         ],
-                    //         begin: Alignment.topLeft,
-                    //         end: Alignment.bottomRight,
-                    //       ),
-                    //     ),
-                    //     child: SizedBox(
-                    //       width: double.infinity,
-                    //       child: Padding(
-                    //         padding: EdgeInsets.all(15.sp),
-                    //         child: Row(
-                    //           children: [
-                    //             Container(
-                    //                 width: 70.sp,
-                    //                 height: 70.sp,
-                    //                 decoration: BoxDecoration(
-                    //                   color: Colors.white24,
-                    //                   borderRadius: BorderRadius.circular(15),
-                    //                 ),
-                    //                 child: Icon(
-                    //                   AntDesign.play_circle_fill,
-                    //                   size: 50.sp,
-                    //                   color: Colors.white,
-                    //                 )),
-                    //             SizedBox(
-                    //               width: 20.sp,
-                    //             ),
-                    //             Column(
-                    //               mainAxisAlignment: MainAxisAlignment.start,
-                    //               crossAxisAlignment: CrossAxisAlignment.start,
-                    //               children: [
-                    //                 Text.rich(
-                    //                   TextSpan(
-                    //                     text: AppConstants.appName,
-                    //                     style: GoogleFonts.openSans(
-                    //                       textStyle: TextStyle(
-                    //                         color: Colors.white,
-                    //                         fontSize: 20.sp,
-                    //                         // Adjust font size as needed
-                    //                         fontWeight: FontWeight
-                    //                             .bold, // Adjust font weight as needed
-                    //                       ),
-                    //                     ),
-                    //                   ),
-                    //                   textAlign: TextAlign
-                    //                       .start, // Ensure text starts at the beginning
-                    //                 ),
-                    //                 Text.rich(
-                    //                   TextSpan(
-                    //                     text:
-                    //                         "Now Aaviailable on iOS & Android",
-                    //                     style: GoogleFonts.openSans(
-                    //                       textStyle: TextStyle(
-                    //                         color: Colors.white70,
-                    //                         fontSize: 12.sp,
-                    //                         // Adjust font size as needed
-                    //                         fontWeight: FontWeight
-                    //                             .w600, // Adjust font weight as needed
-                    //                       ),
-                    //                     ),
-                    //                   ),
-                    //                   textAlign: TextAlign
-                    //                       .start, // Ensure text starts at the beginning
-                    //                 ),
-                    //                 Padding(
-                    //                   padding: EdgeInsets.only(
-                    //                       left: 00.sp,
-                    //                       right: 00.sp,
-                    //                       top: 10.sp),
-                    //                   child: Container(
-                    //                     decoration: BoxDecoration(
-                    //                       borderRadius:
-                    //                           BorderRadius.circular(10),
-                    //                       color: Colors.white24,
-                    //                     ),
-                    //                     padding: EdgeInsets.all(3.sp),
-                    //                     child: Padding(
-                    //                       padding: EdgeInsets.all(5.sp),
-                    //                       child: Text.rich(
-                    //                         TextSpan(
-                    //                           text: "Install Now",
-                    //                           style: GoogleFonts.openSans(
-                    //                             textStyle: TextStyle(
-                    //                               color: Colors.white,
-                    //                               fontSize: 13.sp,
-                    //                               // Adjust font size as needed
-                    //                               fontWeight: FontWeight
-                    //                                   .bold, // Adjust font weight as needed
-                    //                             ),
-                    //                           ),
-                    //                         ),
-                    //                         textAlign: TextAlign
-                    //                             .start, // Ensure text starts at the beginning
-                    //                       ),
-                    //                     ),
-                    //                   ),
-                    //                 ),
-                    //               ],
-                    //             ),
-                    //           ],
-                    //         ),
-                    //       ),
-                    //     ),
-                    //   ),
-                    // ),
+
                     SizedBox(height: 16),
                     // Quick Actions
                     Text(
@@ -2255,15 +2080,18 @@ class _ProfileQuickActionListState extends State<ProfileQuickActionList> {
           itemBuilder: (context, index) {
             return GestureDetector(
               onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => ComingSoonScreen(
-                          title: items[index].text.toString(),
-                        ),
-                  ),
-                );
+
+                if(index==2){
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder:
+                          (context) => VaultScreen(
+                      ),
+                    ),
+                  );
+
+                }
               },
               child: Container(
                 width:
@@ -2273,18 +2101,7 @@ class _ProfileQuickActionListState extends State<ProfileQuickActionList> {
                 child: Container(
                   height: 25.sp,
                   width: MediaQuery.of(context).size.width * 0.25,
-                  // decoration: BoxDecoration(
-                  //   gradient: LinearGradient(
-                  //     colors: [
-                  //       items[index].color, // starting color
-                  //       items[index].color2, // ending color
-                  //     ],
-                  //     begin: Alignment.topLeft,
-                  //     end: Alignment.bottomRight,
-                  //   ),
-                  //   borderRadius: BorderRadius.circular(10.sp),
-                  //
-                  // ),
+
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     crossAxisAlignment: CrossAxisAlignment.center,

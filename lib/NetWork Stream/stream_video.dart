@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:videoplayer/Utils/color.dart';
 
-import '../VideoPLayer/video_player.dart';
+import '../VideoPLayer/4kPlayer/4k_player.dart';
 
 class VideoPlayerStream extends StatefulWidget {
   const VideoPlayerStream({super.key});
@@ -31,18 +31,20 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
       _isLoading = true;
     });
 
-    // Navigate to the video player screen with the URL
-    Navigator.push(
+
+      Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => VideoPlayerScreen(videos: [], initialIndex: 0,url: _urlController.text,),
+        builder: (context) => FullScreenVideoPlayerFixed(
+          videos: const [],
+          initialUrl: _urlController.text,),
       ),
     ).then((_) {
       setState(() {
         _isLoading = false;
       });
     });
-  }
+ }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(

@@ -1,41 +1,29 @@
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/material.dart' as badges;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
-// import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:icons_plus/icons_plus.dart';
 import 'package:new_version_plus/new_version_plus.dart';
-// import 'package:imagewidget/imagewidget.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:upgrader/upgrader.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:videoplayer/Photo/image_album.dart';
 import 'package:videoplayer/Utils/color.dart';
 import '../../DarkMode/dark_mode.dart';
-import '../../DarkMode/styles/theme_data_style.dart';
 import '../../DeviceSpace/device_space.dart';
-import '../../Docouments/docouments.dart';
 import '../../LocalMusic/MiniPlayer/mini_player.dart';
 import '../../NetWork Stream/stream_video.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
-import '../../NotifyListeners/AppBar/colorList.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
-import '../../Pdf/pdf_screen.dart';
 import '../../SplashScreen/splash_screen.dart';
 import '../../Utils/textSize.dart';
-import '../../VideoPLayer/AllVideo/all_videos.dart';
 import '../../app_store/app_store.dart';
-import '../../main.dart';
 import '../HomeScreen/home2.dart' hide navigatorKey;
-import '../HomeScreen/home_screen.dart' hide navigatorKey;
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
 import '../YoutubeScreen/playlists_screen.dart';
@@ -402,7 +390,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       case 3:
         return UserProfilePage();
       default:
-        return HomeScreen(); // Fallback to HomeScreen
+        return DemoHomeScreen(); // Fallback to HomeScreen
     }
   }
 

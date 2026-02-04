@@ -9,105 +9,80 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
 import '../../Photo/image_album.dart';
+import '../../RecentlyVideos/RecentlyPlayedScreen/recently_played_screen.dart';
+import '../../VideoPLayer/4kPlayer/4k_player.dart';
 import '../../VideoPLayer/VideoList/video_list.dart';
 import 'BannerSlider/banner_slider.dart';
 import 'BottomsheetHomeScreen/bottomsheet_menu_button.dart';
 import 'HorizontalGridList/horizontal_gridlist.dart';
 
+import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+
 class VideoProvider with ChangeNotifier {
-  Map<String, List<File>> _videosByFolder = {};
-  bool _isLoading = true;
-  String? _errorMessage;
+  static const _key = 'recently_played_videos';
+  static const int _max = 20;
+
   List<String> _recentlyPlayed = [];
-  bool _hasPermissions = false;
-
-  Map<String, List<File>> get videosByFolder => _videosByFolder;
-
-  bool get isLoading => _isLoading;
-
-  String? get errorMessage => _errorMessage;
 
   List<String> get recentlyPlayed => _recentlyPlayed;
 
-  bool get hasPermissions => _hasPermissions;
-
-  void setPermissions(bool value) {
-    _hasPermissions = value;
-    notifyListeners();
-  }
-
-  // ✅ SHARED_PREFERENCES से actual data load करें
   Future<void> loadRecentlyPlayed() async {
     try {
-      _errorMessage = null;
-
-      // ✅ SharedPreferences से actual recently played videos load करें
       final prefs = await SharedPreferences.getInstance();
-      final recentlyPlayedJson =
-          prefs.getStringList('recently_played_videos') ?? [];
-
-      // ✅ JSON को File paths में convert करें
-      _recentlyPlayed = recentlyPlayedJson;
-
-      print('✅ Loaded ${_recentlyPlayed.length} recently played videos');
+      _recentlyPlayed = prefs.getStringList(_key) ?? [];
       notifyListeners();
-    } catch (e) {
-      print('❌ Error loading recently played: $e');
+    } catch (_) {
       _recentlyPlayed = [];
       notifyListeners();
     }
   }
 
-  // ✅ Video play करने पर recently played में add करें
-  Future<void> addToRecentlyPlayed(String videoPath) async {
+  Future<void> addToRecentlyPlayed(String assetId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
+      List<String> list = prefs.getStringList(_key) ?? [];
 
-      // ✅ Duplicate remove करें
-      List<String> currentList =
-          prefs.getStringList('recently_played_videos') ?? [];
-      currentList.remove(videoPath); // Remove if already exists
-      currentList.insert(0, videoPath); // Add to beginning
+      list.remove(assetId);
+      list.insert(0, assetId);
 
-      // ✅ Max 20 videos रखें
-      if (currentList.length > 20) {
-        currentList = currentList.sublist(0, 20);
-      }
+      if (list.length > _max) list = list.sublist(0, _max);
 
-      await prefs.setStringList('recently_played_videos', currentList);
-      _recentlyPlayed = currentList;
+      await prefs.setStringList(_key, list);
+      _recentlyPlayed = list;
       notifyListeners();
-
-      print('✅ Added to recently played: $videoPath');
-    } catch (e) {
-      print('❌ Error adding to recently played: $e');
-    }
+    } catch (_) {}
   }
 
-  // ✅ Video remove करने के लिए
-  Future<void> removeFromRecentlyPlayed(String videoPath) async {
+  Future<void> removeFromRecentlyPlayed(String assetId) async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      List<String> currentList =
-          prefs.getStringList('recently_played_videos') ?? [];
-      currentList.remove(videoPath);
-      await prefs.setStringList('recently_played_videos', currentList);
-      _recentlyPlayed = currentList;
+      List<String> list = prefs.getStringList(_key) ?? [];
+      list.remove(assetId);
+
+      await prefs.setStringList(_key, list);
+      _recentlyPlayed = list;
       notifyListeners();
-    } catch (e) {
-      print('❌ Error removing from recently played: $e');
-    }
+    } catch (_) {}
+  }
+  void removeRecentlyPlayed(String id) {
+    recentlyPlayed.remove(id);
+    notifyListeners();
   }
 
-  Future<void> deleteFolder(String path) async {
-    try {
-      final dir = Directory(path);
-      if (await dir.exists()) {
-        await dir.delete(recursive: true);
+  void removeRecentAt(int index) {
+    if (index < 0 || index >= recentlyPlayed.length) return;
+    recentlyPlayed.removeAt(index);
+    notifyListeners();
+  }
 
-        notifyListeners();
-      } else {}
-    } catch (e) {} finally {}
+  Future<void> clearRecentlyPlayed() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_key);
+      _recentlyPlayed = [];
+      notifyListeners();
+    } catch (_) {}
   }
 }
 
@@ -118,7 +93,8 @@ class DemoHomeScreen extends StatefulWidget {
   State<DemoHomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+class _HomeScreenState extends State<DemoHomeScreen>
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   List<AssetPathEntity> _albums = [];
   bool _isLoading = true;
   bool _hasPermission = false;
@@ -128,6 +104,7 @@ class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderSt
   bool _isListView = true;
   bool _isGridView = false;
   bool _isCompactView = false;
+
   @override
   void initState() {
     super.initState();
@@ -200,11 +177,7 @@ class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderSt
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  Icons.lock_outline,
-                  color: Colors.red,
-                  size: 48.sp,
-                ),
+                Icon(Icons.lock_outline, color: Colors.red, size: 48.sp),
                 SizedBox(height: 16.sp),
                 Text(
                   'Permissions Required',
@@ -228,7 +201,6 @@ class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderSt
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 16.sp),
-
 
                 SizedBox(height: 16.sp),
                 ElevatedButton(
@@ -257,7 +229,6 @@ class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderSt
           ),
         ),
       ),
-
     );
   }
 
@@ -277,219 +248,240 @@ class _HomeScreenState extends State<DemoHomeScreen> with SingleTickerProviderSt
           child: Column(
             children: [
               SizedBox(height: 10.sp),
-              BannerSlider(),
-
-            _isLoading ? SizedBox():
+              const BannerSlider(),
 
 
 
+              _isLoading
+                  ? SizedBox()
+                  : !_hasPermission
+                  ? _buildPermissionCard()
+                  : FadeTransition(
+                    opacity: _fadeAnimation,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
 
-          !_hasPermission
-              ? _buildPermissionCard()
-              : FadeTransition(
-            opacity: _fadeAnimation,
-            child: SingleChildScrollView(
-              child: Column(
-                children: [
+                          RecentlyPlayedSection(
+                            onTap: (videos, index) {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => FullScreenVideoPlayerFixed(
+                                    videos: videos,
+                                    initialIndex: index,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
 
-
-                  _albums.isNotEmpty
-                      ? HorizontalGridList(album: _albums[0], index: 0)
-                      : const SizedBox.shrink(),
-                  Padding(
-                    padding: EdgeInsets.symmetric(horizontal: 10.sp, vertical: 8.sp),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Row(
-                          children: [
-                            Container(
-                              padding: EdgeInsets.all(6.sp),
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(10.sp),
-                              ),
-                              child: Icon(
-                                Icons.folder_open_rounded,
-                                color: Colors.blueAccent,
-                                size: 18.sp,
-                              ),
+                          _albums.isNotEmpty
+                              ? HorizontalGridList(album: _albums[0], index: 0)
+                              : const SizedBox.shrink(),
+                          Padding(
+                            padding: EdgeInsets.symmetric(
+                              horizontal: 10.sp,
+                              vertical: 8.sp,
                             ),
-                            SizedBox(width: 8.sp),
-                            Text(
-                              'Folders',
-                              style: GoogleFonts.poppins(
-                                textStyle: TextStyle(
-                                  color: Colors.black87,
-                                  fontSize: 15.sp,
-                                  fontWeight: FontWeight.w600,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: EdgeInsets.all(6.sp),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(
+                                          10.sp,
+                                        ),
+                                      ),
+                                      child: Icon(
+                                        Icons.folder_open_rounded,
+                                        color: Colors.blueAccent,
+                                        size: 18.sp,
+                                      ),
+                                    ),
+                                    SizedBox(width: 8.sp),
+                                    Text(
+                                      'Folders',
+                                      style: GoogleFonts.poppins(
+                                        textStyle: TextStyle(
+                                          color: Colors.black87,
+                                          fontSize: 15.sp,
+                                          fontWeight: FontWeight.w600,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+
+                                Row(
+                                  children: [
+                                    // IconButton(
+                                    //   icon: Icon(Icons.refresh, color: Colors.black),
+                                    //   onPressed: () async {
+                                    //     await _requestPermissionAndLoadAlbums();
+                                    //   },
+                                    //   tooltip: 'Refresh Videos',
+                                    // ),
+                                    Container(
+                                      height: 32.sp,
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withOpacity(0.1),
+                                        borderRadius: BorderRadius.circular(30),
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          // 🔸 List View Button
+                                          _buildToggleButton(
+                                            icon: Icons.list,
+                                            isActive: _isListView,
+                                            onTap: () {
+                                              setState(() {
+                                                _isListView = true;
+                                                _isGridView = false;
+                                                _isCompactView = false;
+                                              });
+                                            },
+                                          ),
+                                          // 🔸 Grid View Button
+                                          _buildToggleButton(
+                                            icon: Icons.grid_view_rounded,
+                                            isActive: _isGridView,
+                                            onTap: () {
+                                              setState(() {
+                                                _isListView = false;
+                                                _isGridView = true;
+                                                _isCompactView = false;
+                                              });
+                                            },
+                                          ),
+                                          // 🔸 Compact View Button
+                                          _buildToggleButton(
+                                            icon: Icons.view_agenda_rounded,
+                                            isActive: _isCompactView,
+                                            onTap: () {
+                                              setState(() {
+                                                _isListView = false;
+                                                _isGridView = false;
+                                                _isCompactView = true;
+                                              });
+                                            },
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ],
+                            ),
+                          ),
+                          _isLoading
+                              ? Center(
+                                child: Padding(
+                                  padding: EdgeInsets.all(20.sp),
+                                  child: CircularProgressIndicator(
+                                    color: Colors.blue,
+                                  ),
+                                ),
+                              )
+                              : _albums.isEmpty
+                              ? Center(
+                                child: Padding(
+                                  padding: EdgeInsets.only(top: 50.sp),
+                                  child: Text(
+                                    'No albums found',
+                                    style: GoogleFonts.poppins(
+                                      textStyle: TextStyle(
+                                        color: Colors.black54,
+                                        fontSize: 13.sp,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              )
+                              : FadeTransition(
+                                opacity: _fadeAnimation,
+                                child: AnimatedSwitcher(
+                                  duration: Duration(milliseconds: 000),
+                                  switchInCurve: Curves.easeIn,
+                                  switchOutCurve: Curves.easeIn,
+                                  child:
+                                      _isListView
+                                          ? ListView.builder(
+                                            key: ValueKey('listView'),
+                                            shrinkWrap: true,
+                                            physics:
+                                                NeverScrollableScrollPhysics(),
+                                            itemCount: _albums.length,
+                                            itemBuilder: (context, index) {
+                                              return AlbumTile(
+                                                album: _albums[index],
+                                                index: index,
+                                              );
+                                            },
+                                          )
+                                          : _isGridView
+                                          ? GridView.builder(
+                                            key: ValueKey('gridView'),
+                                            padding: EdgeInsets.symmetric(
+                                              horizontal: 3.sp,
+                                              vertical: 0.sp,
+                                            ),
+                                            shrinkWrap: true,
+                                            physics:
+                                                NeverScrollableScrollPhysics(),
+                                            itemCount: _albums.length,
+                                            gridDelegate:
+                                                SliverGridDelegateWithFixedCrossAxisCount(
+                                                  crossAxisCount: 2,
+                                                  mainAxisSpacing: 2.sp,
+                                                  crossAxisSpacing: 2.sp,
+                                                  childAspectRatio: 2.5,
+                                                ),
+                                            itemBuilder: (context, index) {
+                                              return AlbumGridTile(
+                                                album: _albums[index],
+                                                index: index,
+                                              );
+                                            },
+                                          )
+                                          : GridView.builder(
+                                            padding: EdgeInsets.all(8.w),
+                                            itemCount: _albums.length,
+                                            shrinkWrap: true,
+                                            physics:
+                                                NeverScrollableScrollPhysics(),
+                                            gridDelegate:
+                                                SliverGridDelegateWithFixedCrossAxisCount(
+                                                  crossAxisCount: 3,
+                                                  crossAxisSpacing: 2.w,
+                                                  mainAxisSpacing: 2.h,
+                                                  childAspectRatio: 1,
+                                                ),
+                                            itemBuilder: (context, index) {
+                                              return AlbumGridTile3(
+                                                album: _albums[index],
+                                                index: index,
+                                              );
+                                            },
+                                          ),
                                 ),
                               ),
-                            ),
-                          ],
-                        ),
-
-                        Row(
-                          children: [
-                            // IconButton(
-                            //   icon: Icon(Icons.refresh, color: Colors.black),
-                            //   onPressed: () async {
-                            //     await _requestPermissionAndLoadAlbums();
-                            //   },
-                            //   tooltip: 'Refresh Videos',
-                            // ),
-                            Container(
-                              height: 32.sp,
-                              decoration: BoxDecoration(
-                                color: Colors.blue.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              child: Row(
-                                children: [
-                                  // 🔸 List View Button
-                                  _buildToggleButton(
-                                    icon: Icons.list,
-                                    isActive: _isListView,
-                                    onTap: () {
-                                      setState(() {
-                                        _isListView = true;
-                                        _isGridView = false;
-                                        _isCompactView = false;
-                                      });
-                                    },
-                                  ),
-                                  // 🔸 Grid View Button
-                                  _buildToggleButton(
-                                    icon: Icons.grid_view_rounded,
-                                    isActive: _isGridView,
-                                    onTap: () {
-                                      setState(() {
-                                        _isListView = false;
-                                        _isGridView = true;
-                                        _isCompactView = false;
-                                      });
-                                    },
-                                  ),
-                                  // 🔸 Compact View Button
-                                  _buildToggleButton(
-                                    icon: Icons.view_agenda_rounded,
-                                    isActive: _isCompactView,
-                                    onTap: () {
-                                      setState(() {
-                                        _isListView = false;
-                                        _isGridView = false;
-                                        _isCompactView = true;
-                                      });
-                                    },
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  _isLoading
-                      ? Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(20.sp),
-                      child: CircularProgressIndicator(color: Colors.blue),
-                    ),
-                  )
-                      :
-                  _albums.isEmpty
-                      ? Center(
-                    child: Padding(
-                      padding: EdgeInsets.only(top: 50.sp),
-                      child: Text(
-                        'No albums found',
-                        style: GoogleFonts.poppins(
-                          textStyle: TextStyle(
-                            color: Colors.black54,
-                            fontSize: 13.sp,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
+                        ],
                       ),
                     ),
-                  )
-                      : FadeTransition(
-                    opacity: _fadeAnimation,
-                    child: AnimatedSwitcher(
-                        duration: Duration(milliseconds: 000),
-                        switchInCurve: Curves.easeIn,
-                        switchOutCurve: Curves.easeIn,
-                        child:
-                        _isListView
-                            ? ListView.builder(
-                          key: ValueKey('listView'),
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                          itemCount: _albums.length,
-                          itemBuilder: (context, index) {
-                            return AlbumTile(
-                              album: _albums[index],
-                              index: index,
-                            );
-                          },
-                        )
-                            : _isGridView
-                            ? GridView.builder(
-                          key: ValueKey('gridView'),
-                          padding: EdgeInsets.symmetric(
-                            horizontal: 3.sp,
-                            vertical: 0.sp,
-                          ),
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                          itemCount: _albums.length,
-                          gridDelegate:
-                          SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            mainAxisSpacing: 2.sp,
-                            crossAxisSpacing: 2.sp,
-                            childAspectRatio: 2.5,
-                          ),
-                          itemBuilder: (context, index) {
-                            return AlbumGridTile(
-                              album: _albums[index],
-                              index: index,
-                            );
-                          },
-                        )
-                            : GridView.builder(
-                          padding: EdgeInsets.all(8.w),
-                          itemCount: _albums.length,
-                          shrinkWrap: true,
-                          physics: NeverScrollableScrollPhysics(),
-                          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 3,
-                            crossAxisSpacing: 2.w,
-                            mainAxisSpacing: 2.h,
-                            childAspectRatio: 1,
-                          ),
-                          itemBuilder: (context, index) {
-                            return AlbumGridTile3(album: _albums[index], index: index);
-                          },
-                        )
-
-
-                    ),
                   ),
-                ],
-              ),
-            ),
-          ),
-
-
-
             ],
           ),
         ),
       ),
     );
   }
+
   Widget _buildToggleButton({
     required IconData icon,
     required bool isActive,
@@ -555,14 +547,16 @@ class AlbumTile extends StatelessWidget {
 
         return GestureDetector(
           onTap: () {
-
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) =>  VideoFolderScreen( folderName: album.name, videos: album,),
+                builder:
+                    (context) => VideoFolderScreen(
+                      folderName: album.name,
+                      videos: album,
+                    ),
               ),
             );
-
           },
           child: AnimatedScale(
             duration: Duration(milliseconds: 500),
@@ -597,42 +591,33 @@ class AlbumTile extends StatelessWidget {
                         children: [
                           album.name.isNotEmpty
                               ? Text(
-                            album.name,
-                            style: GoogleFonts.poppins(
-                              textStyle: TextStyle(
-                                color:
-                                Theme
-                                    .of(context)
-                                    .colorScheme
-                                    .secondary,
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-                          )
+                                album.name,
+                                style: GoogleFonts.poppins(
+                                  textStyle: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.secondary,
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              )
                               : Text(
-                            'SD Card',
-                            style: GoogleFonts.poppins(
-                              textStyle: TextStyle(
-                                color:
-                                Theme
-                                    .of(context)
-                                    .colorScheme
-                                    .secondary,
-                                fontSize: 13.sp,
-                                fontWeight: FontWeight.w600,
+                                'SD Card',
+                                style: GoogleFonts.poppins(
+                                  textStyle: TextStyle(
+                                    color:
+                                        Theme.of(context).colorScheme.secondary,
+                                    fontSize: 13.sp,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
                           SizedBox(height: 4.h),
                           Text(
                             '${snapshot.data ?? 0} Videos',
                             style: GoogleFonts.poppins(
                               textStyle: TextStyle(
-                                color: Theme
-                                    .of(context)
-                                    .colorScheme
-                                    .secondary,
+                                color: Theme.of(context).colorScheme.secondary,
                                 fontSize: 10.sp,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -657,10 +642,9 @@ class AlbumTile extends StatelessWidget {
                     ),
                     GestureDetector(
                       onTap: () {
-
                         FolderBottomSheet.show(
                           context,
-                          folderName:  album.name,
+                          folderName: album.name,
                           videos: album,
                           formattedSize: '2.5 GB',
                           location: '/storage/emulated/0/Movies',
@@ -682,10 +666,7 @@ class AlbumTile extends StatelessWidget {
                         child: Icon(
                           Icons.more_vert,
                           size: 20.sp,
-                          color: Theme
-                              .of(context)
-                              .colorScheme
-                              .secondary,
+                          color: Theme.of(context).colorScheme.secondary,
                         ),
                       ),
                     ),
@@ -744,18 +725,21 @@ class AlbumGridTile extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) =>  VideoFolderScreen( folderName: album.name, videos: album,),
+                builder:
+                    (context) => VideoFolderScreen(
+                      folderName: album.name,
+                      videos: album,
+                    ),
               ),
             );
-
           },
-          child:AnimatedScale(
+          child: AnimatedScale(
             duration: Duration(milliseconds: 500),
             scale: snapshot.hasData ? 1.0 : 1,
             child: Container(
               margin: EdgeInsets.all(4.sp),
               decoration: BoxDecoration(
-                color:Colors.white,
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(10.sp),
                 boxShadow: [
                   BoxShadow(
@@ -781,7 +765,7 @@ class AlbumGridTile extends StatelessWidget {
                         shape: BoxShape.circle,
                         border: Border.all(color: Colors.white30, width: 1),
                       ),
-                      child:  Padding(
+                      child: Padding(
                         padding: EdgeInsets.all(8.sp),
                         child: Image.asset(selectedIcon),
                       ),
@@ -796,44 +780,39 @@ class AlbumGridTile extends StatelessWidget {
                           children: [
                             album.name.isNotEmpty
                                 ? Text(
-                              album.name,
-                              style: GoogleFonts.poppins(
-                                textStyle: TextStyle(
-                                  color:
-                                  Theme
-                                      .of(context)
-                                      .colorScheme
-                                      .secondary,
-                                  fontSize: 13.sp,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                              maxLines: 1,
-                            )
+                                  album.name,
+                                  style: GoogleFonts.poppins(
+                                    textStyle: TextStyle(
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.secondary,
+                                      fontSize: 13.sp,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
+                                  maxLines: 1,
+                                )
                                 : Text(
-                              'SD Card',
-                              style: GoogleFonts.poppins(
-                                textStyle: TextStyle(
-                                  color:
-                                  Theme
-                                      .of(context)
-                                      .colorScheme
-                                      .secondary,
-                                  fontSize: 13.sp,
-                                  fontWeight: FontWeight.w600,
+                                  'SD Card',
+                                  style: GoogleFonts.poppins(
+                                    textStyle: TextStyle(
+                                      color:
+                                          Theme.of(
+                                            context,
+                                          ).colorScheme.secondary,
+                                      fontSize: 13.sp,
+                                      fontWeight: FontWeight.w600,
+                                    ),
+                                  ),
                                 ),
-
-                              ),
-                            ),
                             SizedBox(height: 4.h),
                             Text(
                               '${snapshot.data ?? 0} Videos',
                               style: GoogleFonts.poppins(
                                 textStyle: TextStyle(
-                                  color: Theme
-                                      .of(context)
-                                      .colorScheme
-                                      .secondary,
+                                  color:
+                                      Theme.of(context).colorScheme.secondary,
                                   fontSize: 10.sp,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -847,10 +826,9 @@ class AlbumGridTile extends StatelessWidget {
                     ),
                     GestureDetector(
                       onTap: () {
-
                         FolderBottomSheet.show(
                           context,
-                          folderName:  album.name,
+                          folderName: album.name,
                           videos: album,
                           formattedSize: '2.5 GB',
                           location: '/storage/emulated/0/Movies',
@@ -873,14 +851,10 @@ class AlbumGridTile extends StatelessWidget {
                         child: Icon(
                           Icons.more_vert,
                           size: 20.sp,
-                          color: Theme
-                              .of(context)
-                              .colorScheme
-                              .secondary,
+                          color: Theme.of(context).colorScheme.secondary,
                         ),
                       ),
                     ),
-
                   ],
                 ),
               ),
@@ -947,17 +921,20 @@ class AlbumGridTile3 extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) =>  VideoFolderScreen( folderName: album.name, videos: album,),
+                builder:
+                    (context) => VideoFolderScreen(
+                      folderName: album.name,
+                      videos: album,
+                    ),
               ),
             );
-
           },
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 300),
             curve: Curves.easeOut,
             margin: EdgeInsets.all(2.sp),
             decoration: BoxDecoration(
-              color:Colors.white,
+              color: Colors.white,
               borderRadius: BorderRadius.circular(10.sp),
               boxShadow: [
                 BoxShadow(
@@ -975,9 +952,7 @@ class AlbumGridTile3 extends StatelessWidget {
                   alignment: Alignment.topCenter,
                   child: Column(
                     children: [
-                      SizedBox(
-                        height: 10.sp,
-                      ),
+                      SizedBox(height: 10.sp),
                       Container(
                         height: 50.sp,
                         width: 50.sp,
@@ -986,14 +961,13 @@ class AlbumGridTile3 extends StatelessWidget {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white30, width: 1),
                         ),
-                        child:  Padding(
+                        child: Padding(
                           padding: EdgeInsets.all(8.sp),
                           child: Image.asset(selectedIcon),
                         ),
                       ),
                     ],
                   ),
-
                 ),
 
                 // Glass info overlay
@@ -1020,7 +994,9 @@ class AlbumGridTile3 extends StatelessWidget {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
-                                album.name.isNotEmpty ? album.name : "Untitled Album",
+                                album.name.isNotEmpty
+                                    ? album.name
+                                    : "Untitled Album",
                                 style: GoogleFonts.poppins(
                                   textStyle: TextStyle(
                                     color: Colors.black,
@@ -1046,10 +1022,9 @@ class AlbumGridTile3 extends StatelessWidget {
                         ),
                         GestureDetector(
                           onTap: () {
-
                             FolderBottomSheet.show(
                               context,
-                              folderName:  album.name,
+                              folderName: album.name,
                               videos: album,
                               formattedSize: '2.5 GB',
                               location: '/storage/emulated/0/Movies',
@@ -1072,14 +1047,10 @@ class AlbumGridTile3 extends StatelessWidget {
                             child: Icon(
                               Icons.more_vert,
                               size: 20.sp,
-                              color: Theme
-                                  .of(context)
-                                  .colorScheme
-                                  .secondary,
+                              color: Theme.of(context).colorScheme.secondary,
                             ),
                           ),
                         ),
-
                       ],
                     ),
                   ),

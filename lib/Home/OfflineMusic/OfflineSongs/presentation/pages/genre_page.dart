@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
-
 import '../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
-import '../../../../../Mp3Player/mp3_player.dart';
 
 class GenrePage extends StatefulWidget {
   final GenreModel genre;

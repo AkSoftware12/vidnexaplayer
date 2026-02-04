@@ -9,13 +9,14 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:provider/provider.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:volume_controller/volume_controller.dart';
-import 'package:videoplayer/HexColorCode/HexColor.dart';
+
+import '../../Home/HomeScreen/home2.dart';
 import '../../NotifyListeners/PlayPauseSync/play_pause.dart';
 import '../custom_video_appBar.dart';
-import 'CustomVideoControls/custom_video_controls.dart';
 import 'FlotingVideo/floting_video.dart';
 import 'HDR/hdr.dart';
 import 'PopupPlayer/Speed/speed.dart';
@@ -26,15 +27,23 @@ final globalPlayPause = PlayPauseSync();
 enum VideoResizeMode { fit, fill, zoom, stretch }
 
 class FullScreenVideoPlayerFixed extends StatefulWidget {
+  /// ✅ Local list (can be empty for URL streaming mode)
   final List<AssetEntity> videos;
+
+  /// ✅ Safe even if videos empty
   final int initialIndex;
+
+  /// ✅ If provided -> plays this network link
+  final String? initialUrl;
+
   final Player? externalPlayer;
   final VideoController? externalController;
 
   const FullScreenVideoPlayerFixed({
     super.key,
-    required this.videos,
-    required this.initialIndex,
+    this.videos = const [],
+    this.initialIndex = 0,
+    this.initialUrl,
     this.externalPlayer,
     this.externalController,
   });
@@ -51,8 +60,12 @@ class _FullScreenVideoPlayerSystemVolumeState
   late final VideoController _controller;
   VideoResizeMode _resizeMode = VideoResizeMode.fit;
 
-  // Track the system volume in 0–100 range.  This is updated via
-  // VolumeController.listener and used for UI controls.
+  bool get _hasLocalList => widget.videos.isNotEmpty;
+
+  bool get _hasUrl =>
+      (widget.initialUrl != null && widget.initialUrl!.trim().isNotEmpty);
+
+  // system volume 0..100
   double _systemVolume = 100.0;
   StreamSubscription<double>? _volumeSubscription;
 
@@ -66,6 +79,7 @@ class _FullScreenVideoPlayerSystemVolumeState
   bool _showLogo = false;
   String _selectedFilter = 'normal';
   Timer? _systemUiTimer;
+  bool _isSeeking = false;
 
   // Equalizer sliders (dB)
   double bassGain = 0.0;
@@ -82,6 +96,7 @@ class _FullScreenVideoPlayerSystemVolumeState
 
   bool _isLandscapeMode = false;
 
+  // seek state
   bool _isDragging = false;
   double _dragStartX = 0.0;
   Duration _dragStartPosition = Duration.zero;
@@ -95,12 +110,10 @@ class _FullScreenVideoPlayerSystemVolumeState
   bool _showVolumeOverlay = false;
   Timer? _brightnessTimer;
   Timer? _volumeTimer;
-  bool _verticalDragLeft = false;
-  bool _verticalDragRight = false;
+
   Duration _position = Duration.zero;
   Duration _duration = Duration.zero;
   bool _isPlaying = false;
-
 
   bool _hdrOn = false;
   bool _showHdrOverlay = false;
@@ -113,18 +126,81 @@ class _FullScreenVideoPlayerSystemVolumeState
   late final StreamSubscription<Duration> _durationSub;
   StreamSubscription<bool>? _playingSub;
 
+  // =========================================================
+  // ✅ MX PLAYER PAN ENGINE + SEEK OVERLAY + BUBBLE + HAPTIC
+  // =========================================================
+  bool _panActive = false;
+  bool _panIsHorizontal = false;
+  bool _panIsVertical = false;
+
+  Offset _panStart = Offset.zero;
+  double _panStartVolume = 0; // 0..100
+  double _panStartBrightness = 0; // 0..1
+  Duration _panStartPos = Duration.zero;
+
+  static const double _axisLockThreshold = 10; // px
+  static const double _seekSpeed = 1.2; // tune 0.8..1.8
+  static const double _volSpeed = 120; // tune 80..160
+  static const double _briSpeed = 1.2; // tune 0.8..1.6
+
+  bool _verticalDragLeft = false;
+  bool _verticalDragRight = false;
+
+  // throttle system volume set
+  Timer? _volThrottle;
+
+  // seek overlay + bubble
+  bool _showSeekOverlay = false;
+  String _seekOverlayText = '';
+  Timer? _seekOverlayTimer;
+
+  bool _showSeekBubble = false;
+  Timer? _seekBubbleTimer;
+  Duration _bubblePos = Duration.zero;
+
+  // haptic edge control (volume 0/100)
+  int _lastHapticEdge = -1; // -1 none, 0 min, 1 max
+  DateTime _lastHapticAt = DateTime.fromMillisecondsSinceEpoch(0);
+
   @override
   void initState() {
     super.initState();
-    _currentIndex = widget.initialIndex;
+
+    _currentIndex =
+        _hasLocalList
+            ? widget.initialIndex.clamp(0, widget.videos.length - 1)
+            : 0;
+
+    // ✅ Reuse external player/controller if coming from floating
     if (widget.externalPlayer != null && widget.externalController != null) {
       _player = widget.externalPlayer!;
       _controller = widget.externalController!;
       _isLoading = false;
+
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+
+        if (_hasUrl) {
+          await _playFromUrl(widget.initialUrl!.trim());
+        } else {
+          if (!_player.state.playing) {
+            await _player.play();
+          }
+        }
+      });
     } else {
       _player = Player();
       _controller = VideoController(_player);
-      _loadVideo();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+
+        if (_hasUrl) {
+          await _playFromUrl(widget.initialUrl!.trim());
+        } else {
+          await _loadVideo();
+        }
+      });
     }
 
     // Set player's internal volume to 100% so system volume controls the loudness.
@@ -133,57 +209,73 @@ class _FullScreenVideoPlayerSystemVolumeState
     // Initialise brightness
     ScreenBrightness().current.then((value) => _brightness = value);
 
-    // Hide the native operating system volume UI.  The
-    // volume_controller plugin provides a `showSystemUI` variable to
-    // control this behaviour.  Setting it to `false` prevents the
-    // OS‑level volume HUD from being displayed【88287368509493†L331-L336】.
+    // Hide native OS volume UI
     VolumeController.instance.showSystemUI = false;
 
     // Initialise system volume and listener.
     VolumeController.instance.getVolume().then((v) {
+      if (!mounted) return;
       setState(() {
         _systemVolume = v * 100;
       });
     });
+
     _volumeSubscription = VolumeController.instance.addListener((
       double volume,
     ) {
+      if (!mounted) return;
       setState(() {
         _systemVolume = volume * 100;
       });
     }, fetchInitialVolume: false);
 
-    // Listen to player position & duration changes so we can update
-    // the progress bar.  When the player position updates, we
-    // convert it to a Duration and store it locally.  Similarly for
-    // duration.
+    // ✅ Listen to position changes
     _positionSub = _player.stream.position.listen((position) {
-      if (mounted) {
-        setState(() {
-          _currentPosition = position;
-        });
-      }
+      if (!mounted) return;
+      setState(() {
+        _currentPosition = position;
+      });
     });
+
+    // ✅ Listen to duration changes (with safe fallback)
     _durationSub = _player.stream.duration.listen((duration) {
-      if (mounted) {
-        setState(() {
-          _totalDuration = duration;
-        });
+      if (!mounted) return;
+
+      final d = duration == Duration.zero ? _player.state.duration : duration;
+
+      setState(() {
+        _totalDuration = d;
+      });
+    });
+
+    // ✅ IMPORTANT: pull initial values immediately (externalPlayer case)
+    _syncFromPlayerState();
+
+    // ✅ duration sometimes arrives a little later -> sync again
+    Future.delayed(const Duration(milliseconds: 200), () {
+      if (!mounted) return;
+      _syncFromPlayerState();
+    });
+
+    // Completed listener (only for local list)
+    _player.stream.completed.listen((completed) async {
+      if (!completed) return;
+
+      if (!_hasLocalList) {
+        // URL mode: do nothing on completed (or you can loop)
+        return;
+      }
+
+      if (_currentIndex == widget.videos.length - 1) {
+        setState(() => _showLogo = true);
+        await _player.pause();
+        await Future.delayed(const Duration(seconds: 5));
+        if (mounted) setState(() => _showLogo = true);
+      } else {
+        await _playNext();
       }
     });
 
-    _player.stream.completed.listen((completed) async {
-      if (completed) {
-        if (_currentIndex == widget.videos.length - 1) {
-          setState(() => _showLogo = true);
-          await _player.pause();
-          await Future.delayed(const Duration(seconds: 5));
-          if (mounted) setState(() => _showLogo = true);
-        } else {
-          await _playNext();
-        }
-      }
-    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!mounted) return;
       setState(() => _controlsVisible = true);
@@ -191,11 +283,13 @@ class _FullScreenVideoPlayerSystemVolumeState
       _hideBottomBar();
     });
 
+    // Default portrait
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.portraitDown,
     ]);
 
+    // Playing state sync (global play/pause)
     _playingSub = _player.stream.playing.listen((playing) {
       if (!mounted) return;
       setState(() => _isPlaying = playing);
@@ -203,25 +297,51 @@ class _FullScreenVideoPlayerSystemVolumeState
     });
   }
 
+  Future<void> _playFromUrl(String url) async {
+    try {
+      setState(() {
+        _isLoading = true;
+        _showLogo = false;
+      });
+
+      await _player.open(Media(url), play: true);
+
+      _syncFromPlayerState();
+    } catch (e) {
+      Fluttertoast.showToast(
+        msg: "Link play failed: $e",
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.CENTER,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+        fontSize: 14,
+      );
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  void _syncFromPlayerState() {
+    final pos = _player.state.position;
+    final dur = _player.state.duration;
+
+    if (!mounted) return;
+
+    setState(() {
+      _currentPosition = pos;
+      _totalDuration = dur;
+    });
+  }
+
   void _startHideTimer() {
     _hideTimer?.cancel();
-
-    final duration =
-        isLandscape ? const Duration(seconds: 5) : const Duration(seconds: 5);
-
+    final duration = const Duration(seconds: 5);
     _hideTimer = Timer(duration, () {
       if (mounted && !_isLocked) {
         setState(() => _controlsVisible = false);
       }
     });
   }
-
-  // void _onScreenTap() {
-  //   if (_isLocked) return;
-  //
-  //   setState(() => _controlsVisible = true);
-  //   _startHideTimer();
-  // }
 
   void _onScreenTap() {
     if (_isLocked) return;
@@ -235,31 +355,52 @@ class _FullScreenVideoPlayerSystemVolumeState
     }
   }
 
-
   Future<void> _loadVideo() async {
+    if (!_hasLocalList) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
     setState(() {
       _isLoading = true;
       _showLogo = false;
     });
+
+    // ✅ RECENT ADD (AssetEntity.id save)
+    try {
+      final id = widget.videos[_currentIndex].id;
+      Provider.of<VideoProvider>(context, listen: false).addToRecentlyPlayed(id);
+    } catch (_) {}
+
     final file = await widget.videos[_currentIndex].file;
+
     if (file != null) {
       await _player.open(Media(file.path), play: false);
       await Future.delayed(const Duration(milliseconds: 100));
       await _player.play();
+    } else {
+      Fluttertoast.showToast(
+        msg: "Video file not found",
+        gravity: ToastGravity.CENTER,
+        backgroundColor: Colors.red,
+        textColor: Colors.white,
+      );
     }
-    setState(() => _isLoading = false);
+
+    if (mounted) setState(() => _isLoading = false);
   }
 
   Future<void> _applyEqualizer() async {
     final weightedGain =
         (bassGain * 0.6 + midGain * 0.3 + trebleGain * 0.1) / 15.0;
     final factor = (1.0 + weightedGain).clamp(0.5, 1.5);
-    // Set the player's internal volume based on the factor (0.5–1.5 of 100)
     final newVolume = (factor * 100).clamp(0.0, 100.0);
     await _player.setVolume(newVolume);
   }
 
   Future<void> _playNext() async {
+    if (!_hasLocalList) return;
+
     if (_currentIndex < widget.videos.length - 1) {
       _currentIndex++;
       await _player.stop();
@@ -268,6 +409,8 @@ class _FullScreenVideoPlayerSystemVolumeState
   }
 
   Future<void> _playPrevious() async {
+    if (!_hasLocalList) return;
+
     if (_currentIndex > 0) {
       _currentIndex--;
       await _player.stop();
@@ -329,19 +472,13 @@ class _FullScreenVideoPlayerSystemVolumeState
           ),
     );
 
-    // Insert Overlay
     Overlay.of(context).insert(entry);
-
-    // Auto remove
-    Future.delayed(const Duration(milliseconds: 900)).then((_) {
-      entry.remove();
-    });
+    Future.delayed(
+      const Duration(milliseconds: 900),
+    ).then((_) => entry.remove());
   }
 
-  List<double> _getColorMatrix(
-    String filter, {
-    double hdrIntensity = 0.65, // only used for HDR
-  }) {
+  List<double> _getColorMatrix(String filter, {double hdrIntensity = 0.65}) {
     switch (filter) {
       case 'dark':
         return [
@@ -366,7 +503,6 @@ class _FullScreenVideoPlayerSystemVolumeState
           1,
           0,
         ];
-
       case 'blue':
         return [
           0.4,
@@ -390,7 +526,6 @@ class _FullScreenVideoPlayerSystemVolumeState
           1,
           0,
         ];
-
       case 'warm':
         return [
           1.6,
@@ -414,7 +549,6 @@ class _FullScreenVideoPlayerSystemVolumeState
           1,
           0,
         ];
-
       case 'sepia':
         return [
           0.5,
@@ -438,7 +572,6 @@ class _FullScreenVideoPlayerSystemVolumeState
           1,
           0,
         ];
-
       case 'neon':
         return [
           1.2,
@@ -462,7 +595,6 @@ class _FullScreenVideoPlayerSystemVolumeState
           1,
           0,
         ];
-
       case 'green':
         return [
           0.0,
@@ -486,25 +618,20 @@ class _FullScreenVideoPlayerSystemVolumeState
           1,
           0,
         ];
-
-      /// 🔥 FAKE HDR FILTER
       case 'hdr':
         return fakeHdrMatrix(intensity: hdrIntensity);
-
       default:
         return [1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0];
     }
   }
 
-  double hdrIntensity = 0.7; // 0..1
+  double hdrIntensity = 0.7;
 
   List<double> fakeHdrMatrix({double intensity = 0.65}) {
-    // intensity: 0.0 to 1.0
-    final c = 1.0 + (0.55 * intensity); // contrast
-    final s = 1.0 + (0.75 * intensity); // saturation
-    final b = 6.0 * intensity; // brightness lift (small)
+    final c = 1.0 + (0.55 * intensity);
+    final s = 1.0 + (0.75 * intensity);
+    final b = 6.0 * intensity;
 
-    // Luma coefficients
     const r = 0.2126;
     const g = 0.7152;
     const bl = 0.0722;
@@ -513,7 +640,6 @@ class _FullScreenVideoPlayerSystemVolumeState
     final ig = (1 - s) * g;
     final ib = (1 - s) * bl;
 
-    // Saturation matrix
     final m00 = ir + s;
     final m01 = ig;
     final m02 = ib;
@@ -526,7 +652,6 @@ class _FullScreenVideoPlayerSystemVolumeState
     final m21 = ig;
     final m22 = ib + s;
 
-    // Contrast: scale RGB around 128 (for 0-255 range)
     final t = 128.0 * (1 - c) + b;
 
     return [
@@ -623,17 +748,16 @@ class _FullScreenVideoPlayerSystemVolumeState
       }
     } catch (_) {}
   }
+
   Future<void> toggleHdr() async {
     if (_hdrChanging) return;
 
     _hdrChanging = true;
 
-    // show popup overlay
     setState(() {
       _showHdrOverlay = true;
     });
 
-    // simulate HDR processing delay
     await Future.delayed(const Duration(seconds: 3));
 
     if (!mounted) return;
@@ -646,8 +770,6 @@ class _FullScreenVideoPlayerSystemVolumeState
 
     _hdrChanging = false;
   }
-
-
 
   void _openSpeedDialog() {
     PlaybackSpeedDialog.show(
@@ -665,7 +787,6 @@ class _FullScreenVideoPlayerSystemVolumeState
       context,
       currentVolume: _systemVolume / 100.0,
       onVolumeChange: (v) async {
-        // Clamp and set system volume.  The dialog returns 0–1.
         final clamped = v.clamp(0.0, 1.0);
         await VolumeController.instance.setVolume(clamped);
         setState(() {
@@ -690,10 +811,6 @@ class _FullScreenVideoPlayerSystemVolumeState
       ]);
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
-  }
-
-  void _toggleEqualizer() {
-    setState(() => _equalizerVisible = !_equalizerVisible);
   }
 
   void _hideBottomBar() {
@@ -724,90 +841,203 @@ class _FullScreenVideoPlayerSystemVolumeState
     }
   }
 
-  void _onHorizontalDragStart(DragStartDetails details) {
+  // =========================================================
+  // ✅ MX PAN ENGINE: Seek + Volume/Brightness + overlays
+  // =========================================================
+  void _onPanStart(DragStartDetails details) async {
     if (_isLocked) return;
-    // Prevent horizontal seeking gestures from interfering with UI
-    // controls placed near the bottom of the screen.  If the user
-    // starts a drag in the bottom 20% of the screen, we ignore it.
-    final screenHeight = MediaQuery.of(context).size.height;
-    if (details.localPosition.dy > screenHeight * 0.8) {
-      _isDragging = false;
-      return;
+
+    _panActive = true;
+    _panIsHorizontal = false;
+    _panIsVertical = false;
+
+    _panStart = details.localPosition;
+    _panStartPos = _player.state.position;
+
+    _panStartVolume = _systemVolume;
+
+    try {
+      _panStartBrightness = await ScreenBrightness().current;
+    } catch (_) {
+      _panStartBrightness = _brightness;
     }
-    final duration = _player.state.duration;
-    if (duration.inMilliseconds <= 0) return;
-    _isDragging = true;
-    _dragStartX = details.localPosition.dx;
-    _dragStartPosition = _player.state.position;
+
+    _hideSeekOverlay(immediate: true);
+    _hideSeekBubble(immediate: true);
   }
 
-  void _onHorizontalDragUpdate(DragUpdateDetails details) {
-    if (!_isDragging || _isLocked) return;
-    final duration = _player.state.duration;
-    if (duration.inMilliseconds <= 0) return;
-    final screenWidth = MediaQuery.of(context).size.width;
-    final dx = details.localPosition.dx - _dragStartX;
-    final relative = dx / screenWidth;
-    final offsetMs = (duration.inMilliseconds * relative).toInt();
-    int newMs = _dragStartPosition.inMilliseconds + offsetMs;
-    newMs = newMs.clamp(0, duration.inMilliseconds);
-    final newPos = Duration(milliseconds: newMs);
-    _player.seek(newPos);
+  Future<void> _onPanUpdate(DragUpdateDetails details) async {
+    _onUserInteractionFromBottom(details, context);
+    if (!_panActive || _isLocked) return;
+
+    final size = MediaQuery.of(context).size;
+    final dxTotal = details.localPosition.dx - _panStart.dx;
+    final dyTotal = details.localPosition.dy - _panStart.dy;
+
+    // Axis lock decide (MX style)
+    if (!_panIsHorizontal && !_panIsVertical) {
+      if (dxTotal.abs() < _axisLockThreshold &&
+          dyTotal.abs() < _axisLockThreshold) {
+        return;
+      }
+
+      if (dxTotal.abs() > dyTotal.abs()) {
+        // Horizontal seek (avoid bottom slider zone)
+        if (_panStart.dy > size.height * 0.80) return;
+        _panIsHorizontal = true;
+      } else {
+        _panIsVertical = true;
+        final isLeft = _panStart.dx < size.width * 0.5;
+        _verticalDragLeft = isLeft;
+        _verticalDragRight = !isLeft;
+      }
+    }
+
+    // ---------- HORIZONTAL SEEK ----------
+    if (_panIsHorizontal) {
+      final duration = _player.state.duration;
+      if (duration.inMilliseconds <= 0) return;
+
+      final relative = dxTotal / size.width;
+      final offsetMs =
+          (duration.inMilliseconds * relative * _seekSpeed).toInt();
+
+      int newMs = _panStartPos.inMilliseconds + offsetMs;
+      newMs = newMs.clamp(0, duration.inMilliseconds);
+
+      final newPos = Duration(milliseconds: newMs);
+      _player.seek(newPos);
+
+      setState(() {
+        _currentPosition = newPos;
+        _bubblePos = newPos;
+      });
+
+      final sign = offsetMs >= 0 ? "+" : "-";
+      final off = Duration(milliseconds: offsetMs.abs());
+      _showSeekOverlayText("$sign${_formatDuration(off)}");
+      _showSeekBubbleNow();
+      return;
+    }
+
+    // ---------- VERTICAL BRIGHTNESS / VOLUME ----------
+    if (_panIsVertical) {
+      final h = size.height;
+      final delta = (-dyTotal / h); // swipe up => +ve
+
+      if (_verticalDragLeft) {
+        final b = (_panStartBrightness + delta * _briSpeed).clamp(0.0, 1.0);
+        _brightness = b;
+
+        try {
+          await ScreenBrightness().setScreenBrightness(b);
+        } catch (_) {}
+
+        setState(() => _showBrightnessOverlay = true);
+
+        _brightnessTimer?.cancel();
+        _brightnessTimer = Timer(const Duration(milliseconds: 800), () {
+          if (mounted) setState(() => _showBrightnessOverlay = false);
+        });
+      } else if (_verticalDragRight) {
+        final v = (_panStartVolume + delta * _volSpeed).clamp(0.0, 100.0);
+
+        setState(() {
+          _systemVolume = v;
+          _showVolumeOverlay = true;
+        });
+
+        _handleVolumeEdgeHaptic(v);
+
+        _volThrottle?.cancel();
+        _volThrottle = Timer(const Duration(milliseconds: 35), () async {
+          await VolumeController.instance.setVolume(_systemVolume / 100);
+        });
+
+        _volumeTimer?.cancel();
+        _volumeTimer = Timer(const Duration(milliseconds: 800), () {
+          if (mounted) setState(() => _showVolumeOverlay = false);
+        });
+      }
+    }
+  }
+
+  void _onPanEnd(DragEndDetails details) {
+    _panActive = false;
+    _panIsHorizontal = false;
+    _panIsVertical = false;
+    _verticalDragLeft = false;
+    _verticalDragRight = false;
+
+    _hideSeekOverlay(immediate: false);
+    _hideSeekBubble(immediate: false);
+  }
+
+  void _handleVolumeEdgeHaptic(double v) {
+    final now = DateTime.now();
+    if (now.difference(_lastHapticAt).inMilliseconds < 180) return;
+
+    if (v <= 0.0) {
+      if (_lastHapticEdge != 0) {
+        _lastHapticEdge = 0;
+        _lastHapticAt = now;
+        HapticFeedback.mediumImpact();
+      }
+    } else if (v >= 100.0) {
+      if (_lastHapticEdge != 1) {
+        _lastHapticEdge = 1;
+        _lastHapticAt = now;
+        HapticFeedback.mediumImpact();
+      }
+    } else {
+      _lastHapticEdge = -1;
+    }
+  }
+
+  void _showSeekOverlayText(String text) {
     setState(() {
-      _currentPosition = newPos;
+      _seekOverlayText = text;
+      _showSeekOverlay = true;
+    });
+
+    _seekOverlayTimer?.cancel();
+    _seekOverlayTimer = Timer(const Duration(milliseconds: 450), () {
+      if (!mounted) return;
+      setState(() => _showSeekOverlay = false);
     });
   }
 
-  void _onHorizontalDragEnd(DragEndDetails details) {
-    if (!_isDragging) return;
-    _isDragging = false;
-  }
-
-  void _onVerticalDragStart(DragStartDetails details) {
-    final width = MediaQuery.of(context).size.width;
-    final dx = details.localPosition.dx;
-    _verticalDragLeft = dx < width * 0.5;
-    _verticalDragRight = dx >= width * 0.5;
-  }
-
-  Future<void> _onVerticalDragUpdate(DragUpdateDetails details) async {
-    _onUserInteractionFromBottom(details, context);
-    if (_isLocked) return;
-    if (_verticalDragLeft) {
-      final delta = -details.delta.dy / 300;
-      _brightness = (_brightness + delta).clamp(0.0, 1.0);
-      try {
-        await ScreenBrightness().setScreenBrightness(_brightness);
-      } catch (_) {}
-      setState(() => _showBrightnessOverlay = true);
-      _brightnessTimer?.cancel();
-      _brightnessTimer = Timer(const Duration(milliseconds: 800), () {
-        if (mounted) setState(() => _showBrightnessOverlay = false);
-      });
-    } else if (_verticalDragRight) {
-      final drag = -details.delta.dy;
-      // Perfect speed
-      const sensitivity = 0.75;
-      double newVolume = _systemVolume + drag * sensitivity;
-      newVolume = newVolume.clamp(0.0, 100.0);
-      // Apply to system
-      await VolumeController.instance.setVolume(newVolume / 100);
-      setState(() {
-        _systemVolume = newVolume;
-        _showVolumeOverlay = true;
-      });
-      _volumeTimer?.cancel();
-      _volumeTimer = Timer(const Duration(milliseconds: 800), () {
-        if (mounted) setState(() => _showVolumeOverlay = false);
+  void _hideSeekOverlay({required bool immediate}) {
+    _seekOverlayTimer?.cancel();
+    if (immediate) {
+      if (mounted) setState(() => _showSeekOverlay = false);
+    } else {
+      _seekOverlayTimer = Timer(const Duration(milliseconds: 450), () {
+        if (mounted) setState(() => _showSeekOverlay = false);
       });
     }
   }
 
-  void _onVerticalDragEnd(DragEndDetails details) {
-    _verticalDragLeft = false;
-    _verticalDragRight = false;
+  void _showSeekBubbleNow() {
+    setState(() => _showSeekBubble = true);
+    _seekBubbleTimer?.cancel();
+    _seekBubbleTimer = Timer(const Duration(milliseconds: 650), () {
+      if (mounted) setState(() => _showSeekBubble = false);
+    });
   }
 
+  void _hideSeekBubble({required bool immediate}) {
+    _seekBubbleTimer?.cancel();
+    if (immediate) {
+      if (mounted) setState(() => _showSeekBubble = false);
+    } else {
+      _seekBubbleTimer = Timer(const Duration(milliseconds: 650), () {
+        if (mounted) setState(() => _showSeekBubble = false);
+      });
+    }
+  }
+
+  // Double tap (your existing)
   void _onDoubleTapDown(TapDownDetails details) {
     if (_isLocked) return;
     final width = MediaQuery.of(context).size.width;
@@ -815,40 +1045,54 @@ class _FullScreenVideoPlayerSystemVolumeState
     final position = _player.state.position;
     final duration = _player.state.duration;
     if (duration.inMilliseconds <= 0) return;
+
     if (dx < width / 2) {
       final newPositionMs = (position.inMilliseconds - 10000).clamp(
         0,
         duration.inMilliseconds,
       );
-      _player.seek(Duration(milliseconds: newPositionMs));
+      final newPos = Duration(milliseconds: newPositionMs);
+      _player.seek(newPos);
       setState(() {
         _skipDirection = -1;
         _showSkipOverlay = true;
-        _currentPosition = Duration(milliseconds: newPositionMs);
+        _currentPosition = newPos;
+        _bubblePos = newPos;
       });
+      _showSeekOverlayText("-00:10");
+      _showSeekBubbleNow();
     } else {
       final newPositionMs = (position.inMilliseconds + 10000).clamp(
         0,
         duration.inMilliseconds,
       );
-      _player.seek(Duration(milliseconds: newPositionMs));
+      final newPos = Duration(milliseconds: newPositionMs);
+      _player.seek(newPos);
       setState(() {
         _skipDirection = 1;
         _showSkipOverlay = true;
-        _currentPosition = Duration(milliseconds: newPositionMs);
+        _currentPosition = newPos;
+        _bubblePos = newPos;
       });
+      _showSeekOverlayText("+00:10");
+      _showSeekBubbleNow();
     }
+
     _skipOverlayTimer?.cancel();
     _skipOverlayTimer = Timer(const Duration(milliseconds: 600), () {
       if (mounted) setState(() => _showSkipOverlay = false);
     });
   }
 
+  // =========================================================
+
   @override
   void dispose() {
+    // if floating is active you may not want to dispose player
     if (!FloatingVideoManager.isActive) {
       _player.dispose();
     }
+
     _positionSub.cancel();
     _durationSub.cancel();
     _systemUiTimer?.cancel();
@@ -856,6 +1100,10 @@ class _FullScreenVideoPlayerSystemVolumeState
     _brightnessTimer?.cancel();
     _volumeTimer?.cancel();
     _volumeSubscription?.cancel();
+    _volThrottle?.cancel();
+    _seekOverlayTimer?.cancel();
+    _seekBubbleTimer?.cancel();
+
     VolumeController.instance.removeListener();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     _playingSub?.cancel();
@@ -866,7 +1114,6 @@ class _FullScreenVideoPlayerSystemVolumeState
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Always restart hide timer on orientation change
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_isLocked) {
         setState(() => _controlsVisible = true);
@@ -875,21 +1122,30 @@ class _FullScreenVideoPlayerSystemVolumeState
     });
   }
 
+  // =================== BUILD (UI SAME) =====================
   @override
   Widget build(BuildContext context) {
-    bool isLandscape =
+    final bool isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
+
     final double equalizerBottom = isLandscape ? 70 : 130;
     final playSize = isLandscape ? 22.sp : 45.sp;
     final sideSize = isLandscape ? 15.sp : 28.sp;
     final bottomPadding = isLandscape ? 0.sp : 40.sp;
+
+    final maxMs = _totalDuration.inMilliseconds;
+    final safeMax = (maxMs <= 0 ? 1 : maxMs);
+    final posMs = _currentPosition.inMilliseconds.clamp(0, safeMax);
+
+    final String appBarTitle =
+        _hasLocalList
+            ? (widget.videos[_currentIndex].title ?? '')
+            : (_hasUrl ? widget.initialUrl!.trim() : 'Streaming');
+
     final videoWidget = ColorFiltered(
-      // You can uncomment this line and choose an actual filter for the video
       colorFilter: ColorFilter.matrix(
         _getColorMatrix(_selectedFilter, hdrIntensity: 0.8),
       ),
-      // colorFilter: ColorFilter.matrix(_getColorMatrix(_selectedFilter)),
-      // colorFilter: ColorFilter.matrix(fakeHdrMatrix(intensity: hdrIntensity)),
       child: Video(
         controller: _controller,
         fit:
@@ -903,23 +1159,32 @@ class _FullScreenVideoPlayerSystemVolumeState
         controls: null,
       ),
     );
+
     return WillPopScope(
       onWillPop: () async {
-        FloatingVideoManager.show(
-          context,
-          _player,
-          _controller,
-          widget.videos,
-          _currentIndex,
-        );
+        // ✅ only show floating when we have local list (safe)
+        if (_hasLocalList) {
+          FloatingVideoManager.show(
+            context,
+            _player,
+            _controller,
+            widget.videos,
+            _currentIndex,
+          );
+        }
         return true;
       },
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
-        onVerticalDragStart: _onVerticalDragStart,
-        onVerticalDragUpdate: _onVerticalDragUpdate,
-        onVerticalDragEnd: _onVerticalDragEnd,
+
+        // ✅ ONLY ONE ENGINE (MX style)
+        onPanStart: _onPanStart,
+        onPanUpdate: _onPanUpdate,
+        onPanEnd: _onPanEnd,
+
         onTap: _onScreenTap,
+        onDoubleTapDown: _onDoubleTapDown,
+
         child: Scaffold(
           backgroundColor: Colors.black,
           body:
@@ -933,17 +1198,9 @@ class _FullScreenVideoPlayerSystemVolumeState
                   )
                   : Stack(
                     children: [
-                      Positioned.fill(
-                        child: GestureDetector(
-                          behavior: HitTestBehavior.translucent,
-                          onHorizontalDragStart: _onHorizontalDragStart,
-                          onHorizontalDragUpdate: _onHorizontalDragUpdate,
-                          onHorizontalDragEnd: _onHorizontalDragEnd,
-                          onDoubleTapDown: _onDoubleTapDown,
-                          child: videoWidget,
-                        ),
-                      ),
-                      // subtle vignette
+                      Positioned.fill(child: videoWidget),
+
+                      // subtle vignette (same)
                       IgnorePointer(
                         child: Container(
                           decoration: BoxDecoration(
@@ -951,27 +1208,88 @@ class _FullScreenVideoPlayerSystemVolumeState
                               radius: 1.0,
                               colors: [
                                 const Color(0x00000000),
-                                const Color(0x22000000), // darkness edge
+                                const Color(0x22000000),
                               ],
                               stops: const [0.65, 1.0],
                             ),
                           ),
                         ),
                       ),
-                      if (_showSkipOverlay)
-                        Center(
-                          child: Icon(
-                            _skipDirection == -1
-                                ? Icons.replay_10
-                                : Icons.forward_10,
-                            color: Colors.white,
-                            size: 80,
+
+                      // ✅ Center seek overlay
+                      if (_showSeekOverlay)
+                        Positioned.fill(
+                          child: IgnorePointer(
+                            child: Center(
+                              child: AnimatedScale(
+                                duration: const Duration(milliseconds: 120),
+                                scale: _showSeekOverlay ? 1 : 0.95,
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 18,
+                                    vertical: 12,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black.withOpacity(0.70),
+                                    borderRadius: BorderRadius.circular(16),
+                                    border: Border.all(
+                                      color: Colors.white.withOpacity(0.10),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    _seekOverlayText,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w800,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
                         ),
+
+                      // ✅ Seek bubble (time preview)
+                      if (_showSeekBubble)
+                        Positioned(
+                          top: 70,
+                          left: 0,
+                          right: 0,
+                          child: IgnorePointer(
+                            child: Center(
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 14,
+                                  vertical: 8,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.72),
+                                  borderRadius: BorderRadius.circular(14),
+                                  border: Border.all(
+                                    color: Colors.white.withOpacity(0.10),
+                                  ),
+                                ),
+                                child: Text(
+                                  "${_formatDuration(_bubblePos)} / ${_formatDuration(_totalDuration)}",
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+
+                      // brightness overlay (same)
                       if (_showBrightnessOverlay)
                         Builder(
                           builder: (context) {
-                            final screenHeight = MediaQuery.of(context).size.height;
+                            final screenHeight =
+                                MediaQuery.of(context).size.height;
                             final barHeight = screenHeight * 0.3;
                             final brightnessValue = (_brightness * 100).round();
                             return Positioned(
@@ -980,7 +1298,6 @@ class _FullScreenVideoPlayerSystemVolumeState
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  // Vertical brightness bar
                                   Container(
                                     width: 20,
                                     height: barHeight,
@@ -995,19 +1312,16 @@ class _FullScreenVideoPlayerSystemVolumeState
                                         height: barHeight * _brightness,
                                         decoration: BoxDecoration(
                                           color: ColorSelect.maineColor2,
-                                          // Top round hide when brightness is full
-                                          borderRadius: BorderRadius.vertical(
-                                            top: Radius.circular(
-                                              _brightness >= 0.99 ? 20 : 20,
-                                            ),
-                                            bottom: const Radius.circular(20),
-                                          ),
+                                          borderRadius:
+                                              const BorderRadius.vertical(
+                                                top: Radius.circular(20),
+                                                bottom: Radius.circular(20),
+                                              ),
                                         ),
                                       ),
                                     ),
                                   ),
                                   const SizedBox(width: 8),
-                                  // Icon + brightness value
                                   Row(
                                     children: [
                                       const Icon(
@@ -1031,6 +1345,8 @@ class _FullScreenVideoPlayerSystemVolumeState
                             );
                           },
                         ),
+
+                      // volume overlay
                       if (_showVolumeOverlay)
                         Builder(
                           builder: (context) {
@@ -1038,23 +1354,24 @@ class _FullScreenVideoPlayerSystemVolumeState
                                 MediaQuery.of(context).size.height;
                             final barHeight = screenHeight * 0.3;
                             final volValue = _systemVolume.round();
+                            final frac = (_systemVolume / 100).clamp(0.0, 1.0);
+
                             return Positioned(
                               right: 20,
                               top: screenHeight / 2 - barHeight / 2,
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.center,
                                 children: [
-                                  // Icon + Number
                                   Row(
                                     children: [
                                       Icon(
-                                        _systemVolume <= 0
+                                        volValue == 0
                                             ? Icons.volume_off
                                             : Icons.volume_up,
                                         color: Colors.white,
                                         size: 32,
                                       ),
-                                      const SizedBox(width: 4),
+                                      const SizedBox(width: 6),
                                       Text(
                                         volValue.toString(),
                                         style: const TextStyle(
@@ -1065,41 +1382,38 @@ class _FullScreenVideoPlayerSystemVolumeState
                                       ),
                                     ],
                                   ),
-                                  const SizedBox(width: 8),
-                                  // Smooth animated bar
-                                  TweenAnimationBuilder<double>(
-                                    tween: Tween<double>(
-                                      begin: 0,
-                                      end: _systemVolume / 100,
+                                  const SizedBox(width: 10),
+                                  Container(
+                                    width: 22,
+                                    height: barHeight,
+                                    decoration: BoxDecoration(
+                                      color: Colors.black54,
+                                      borderRadius: BorderRadius.circular(14),
                                     ),
-                                    duration: const Duration(milliseconds: 120),
-                                    curve: Curves.easeOut,
-                                    builder: (context, animValue, child) {
-                                      return Container(
-                                        width: 20,
-                                        height: barHeight,
-                                        decoration: BoxDecoration(
-                                          color: Colors.black54,
-                                          borderRadius: BorderRadius.circular(
-                                            12,
+                                    child: Align(
+                                      alignment: Alignment.bottomCenter,
+                                      child: AnimatedContainer(
+                                        duration: const Duration(
+                                          milliseconds: 120,
+                                        ),
+                                        curve: Curves.easeOutCubic,
+                                        width: 22,
+                                        height: barHeight * frac,
+                                        decoration: const BoxDecoration(
+                                          gradient: LinearGradient(
+                                            begin: Alignment.bottomCenter,
+                                            end: Alignment.topCenter,
+                                            colors: [
+                                              Colors.greenAccent,
+                                              Colors.green,
+                                            ],
+                                          ),
+                                          borderRadius: BorderRadius.vertical(
+                                            bottom: Radius.circular(14),
                                           ),
                                         ),
-                                        child: Align(
-                                          alignment: Alignment.bottomCenter,
-                                          child: Container(
-                                            width: double.infinity,
-                                            height: barHeight * animValue,
-                                            decoration: const BoxDecoration(
-                                              color: Colors.green,
-                                              borderRadius:
-                                                  BorderRadius.vertical(
-                                                    bottom: Radius.circular(12),
-                                                  ),
-                                            ),
-                                          ),
-                                        ),
-                                      );
-                                    },
+                                      ),
+                                    ),
                                   ),
                                 ],
                               ),
@@ -1107,130 +1421,144 @@ class _FullScreenVideoPlayerSystemVolumeState
                           },
                         ),
 
-                      // ✅ HDR overlay
-                        if (_showHdrOverlay)
-                          Positioned.fill(
-                            child: AnimatedOpacity(
-                              opacity: _showHdrOverlay ? 1 : 0,
-                              duration: const Duration(milliseconds: 180),
-                              child: BackdropFilter(
-                                filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                                child: Container(
-                                  color: Colors.black.withOpacity(0.45),
-                                  alignment: Alignment.center,
-                                  child: TweenAnimationBuilder<double>(
-                                    tween: Tween(begin: 0.85, end: 1),
-                                    duration: const Duration(milliseconds: 260),
-                                    curve: Curves.easeOutBack,
-                                    builder: (context, scale, child) {
-                                      return Transform.scale(scale: scale, child: child);
-                                    },
-                                    child: Container(
-                                      width: 280,
-                                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 24),
-                                      decoration: BoxDecoration(
-                                        borderRadius: BorderRadius.circular(26),
-                                        gradient: LinearGradient(
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                          colors: _hdrOn
-                                              ? [
-                                            const Color(0xFF0F172A),
-                                            const Color(0xFF1E293B),
-                                          ]
-                                              : [
-                                            const Color(0xFFFFC857),
-                                            const Color(0xFFFF8A00),
-                                          ],
-                                        ),
-                                        boxShadow: [
-                                          BoxShadow(
-                                            color: Colors.black.withOpacity(0.65),
-                                            blurRadius: 35,
-                                            spreadRadius: 4,
-                                          ),
-                                        ],
-                                        border: Border.all(
-                                          color: Colors.white.withOpacity(0.12),
-                                        ),
+                      // ✅ HDR overlay (same - premium)
+                      if (_showHdrOverlay)
+                        Positioned.fill(
+                          child: AnimatedOpacity(
+                            opacity: _showHdrOverlay ? 1 : 0,
+                            duration: const Duration(milliseconds: 180),
+                            child: BackdropFilter(
+                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                              child: Container(
+                                color: Colors.black.withOpacity(0.45),
+                                alignment: Alignment.center,
+                                child: TweenAnimationBuilder<double>(
+                                  tween: Tween(begin: 0.85, end: 1),
+                                  duration: const Duration(milliseconds: 260),
+                                  curve: Curves.easeOutBack,
+                                  builder: (context, scale, child) {
+                                    return Transform.scale(
+                                      scale: scale,
+                                      child: child,
+                                    );
+                                  },
+                                  child: Container(
+                                    width: 280,
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 22,
+                                      vertical: 24,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      borderRadius: BorderRadius.circular(26),
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                        colors:
+                                            _hdrOn
+                                                ? const [
+                                                  Color(0xFF0F172A),
+                                                  Color(0xFF1E293B),
+                                                ]
+                                                : const [
+                                                  Color(0xFFFFC857),
+                                                  Color(0xFFFF8A00),
+                                                ],
                                       ),
-                                      child: Column(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          /// 🔄 Animated HDR Icon
-                                          TweenAnimationBuilder<double>(
-                                            tween: Tween(begin: 0, end: 1),
-                                            duration: const Duration(seconds: 1),
-                                            builder: (_, value, child) {
-                                              return Transform.rotate(
-                                                angle: value * 6.28,
-                                                child: child,
-                                              );
-                                            },
-                                            child: Container(
-                                              padding: const EdgeInsets.all(18),
-                                              decoration: BoxDecoration(
-                                                shape: BoxShape.circle,
-                                                gradient: RadialGradient(
-                                                  colors: [
-                                                    Colors.white.withOpacity(0.35),
-                                                    Colors.white.withOpacity(0.05),
-                                                  ],
-                                                ),
-                                              ),
-                                              child: Icon(
-                                                Icons.hdr_on_rounded,
-                                                size: 40,
-                                                color: _hdrOn ? Colors.orangeAccent : Colors.black87,
-                                              ),
-                                            ),
-                                          ),
-
-                                          const SizedBox(height: 18),
-
-                                          Text(
-                                            "HDR PROCESSING",
-                                            style: TextStyle(
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.w800,
-                                              letterSpacing: 1.6,
-                                              color: _hdrOn ? Colors.white70 : Colors.black87,
-                                            ),
-                                          ),
-
-                                          const SizedBox(height: 8),
-
-                                          Text(
-                                            _hdrOn ? "Turning HDR OFF" : "Turning HDR ON",
-                                            textAlign: TextAlign.center,
-                                            style: TextStyle(
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.w900,
-                                              color: _hdrOn ? Colors.white : Colors.black,
-                                            ),
-                                          ),
-
-                                          const SizedBox(height: 20),
-
-                                          /// ⏳ Loader
-                                          SizedBox(
-                                            width: 34,
-                                            height: 34,
-                                            child:CupertinoActivityIndicator(
-                                              radius: 20,
-
-                                              color: _hdrOn ? Colors.white : Colors.white,
-                                            ),
-
-                                          ),
-                                        ],
+                                      boxShadow: [
+                                        BoxShadow(
+                                          color: Colors.black.withOpacity(0.65),
+                                          blurRadius: 35,
+                                          spreadRadius: 4,
+                                        ),
+                                      ],
+                                      border: Border.all(
+                                        color: Colors.white.withOpacity(0.12),
                                       ),
+                                    ),
+                                    child: Column(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        TweenAnimationBuilder<double>(
+                                          tween: Tween(begin: 0, end: 1),
+                                          duration: const Duration(seconds: 1),
+                                          builder: (_, value, child) {
+                                            return Transform.rotate(
+                                              angle: value * 6.28,
+                                              child: child,
+                                            );
+                                          },
+                                          child: Container(
+                                            padding: const EdgeInsets.all(18),
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              gradient: RadialGradient(
+                                                colors: [
+                                                  Colors.white.withOpacity(
+                                                    0.35,
+                                                  ),
+                                                  Colors.white.withOpacity(
+                                                    0.05,
+                                                  ),
+                                                ],
+                                              ),
+                                            ),
+                                            child: Icon(
+                                              Icons.hdr_on_rounded,
+                                              size: 40,
+                                              color:
+                                                  _hdrOn
+                                                      ? Colors.orangeAccent
+                                                      : Colors.black87,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 18),
+                                        Text(
+                                          "HDR PROCESSING",
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.w800,
+                                            letterSpacing: 1.6,
+                                            color:
+                                                _hdrOn
+                                                    ? Colors.white70
+                                                    : Colors.black87,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          _hdrOn
+                                              ? "Turning HDR OFF"
+                                              : "Turning HDR ON",
+                                          textAlign: TextAlign.center,
+                                          style: TextStyle(
+                                            fontSize: 18,
+                                            fontWeight: FontWeight.w900,
+                                            color:
+                                                _hdrOn
+                                                    ? Colors.white
+                                                    : Colors.black,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 20),
+                                        const SizedBox(
+                                          width: 34,
+                                          height: 34,
+                                          child: CupertinoActivityIndicator(
+                                            radius: 20,
+                                            color: Colors.white,
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ),
                                 ),
                               ),
                             ),
                           ),
+                        ),
+
+                      // lock overlay (same)
                       if (_isLocked)
                         Center(
                           child: GestureDetector(
@@ -1250,6 +1578,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                           ),
                         ),
 
+                      // equalizer (same)
                       if (!_isLocked && _equalizerVisible)
                         Positioned(
                           bottom: equalizerBottom.toDouble(),
@@ -1284,9 +1613,8 @@ class _FullScreenVideoPlayerSystemVolumeState
                           ),
                         ),
 
-                      if (!_isLocked &&
-                          _controlsVisible
-                          )
+                      // ✅ controls
+                      if (!_isLocked && _controlsVisible)
                         Column(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
@@ -1296,33 +1624,62 @@ class _FullScreenVideoPlayerSystemVolumeState
                                 padding: EdgeInsets.only(
                                   top: isLandscape ? 0.sp : 40.sp,
                                 ),
-                                child: CustomVideoAppBar(
-                                  title:
-                                      widget.videos[_currentIndex].title ?? '',
-                                  onBackPressed: () {
-                                    if (isLandscape) {
-                                      SystemChrome.setPreferredOrientations([
-                                        DeviceOrientation.portraitUp,
-                                        DeviceOrientation.portraitDown,
-                                      ]);
-                                      SystemChrome.setEnabledSystemUIMode(
-                                        SystemUiMode.manual,
-                                        overlays: SystemUiOverlay.values,
-                                      );
-                                    } else {
-                                      ScreenBrightness()
-                                          .resetScreenBrightness();
-                                      Navigator.pop(context);
-                                    }
-                                  },
-                                  currentIndex: _currentIndex,
-                                  onVideoSelected: (_) {},
-                                  isLandscape: isLandscape,
-                                  videos: widget.videos,
-                                ),
+                                child:
+                                    _hasLocalList
+                                        ? CustomVideoAppBar(
+                                          title: appBarTitle,
+                                          onBackPressed: () {
+                                            if (isLandscape) {
+                                              SystemChrome.setPreferredOrientations(
+                                                [
+                                                  DeviceOrientation.portraitUp,
+                                                  DeviceOrientation
+                                                      .portraitDown,
+                                                ],
+                                              );
+                                              SystemChrome.setEnabledSystemUIMode(
+                                                SystemUiMode.manual,
+                                                overlays:
+                                                    SystemUiOverlay.values,
+                                              );
+                                            } else {
+                                              ScreenBrightness()
+                                                  .resetScreenBrightness();
+                                              Navigator.pop(context);
+                                            }
+                                          },
+                                          currentIndex: _currentIndex,
+                                          onVideoSelected: (index) async {
+                                            if (index == _currentIndex) {
+                                              if (!_player.state.playing) {
+                                                await _player.play();
+                                              }
+                                              return;
+                                            }
+
+                                            setState(() {
+                                              _currentIndex = index;
+                                            });
+
+                                            await _player.stop();
+                                            await _loadVideo();
+                                          },
+                                          isLandscape: isLandscape,
+                                          videos: widget.videos,
+                                        )
+                                        : Container(
+                                          child: _StreamTopBar(
+                                            title: appBarTitle,
+                                            onBack: () {
+                                              ScreenBrightness()
+                                                  .resetScreenBrightness();
+                                              Navigator.pop(context);
+                                            },
+                                          ),
+                                        ),
                               ),
                             ),
-                            // Bottom controls
+
                             Column(
                               children: [
                                 Stack(
@@ -1334,30 +1691,23 @@ class _FullScreenVideoPlayerSystemVolumeState
                                           IconButton(
                                             icon: const Icon(Icons.camera_alt),
                                             color: Colors.white,
-                                            onPressed: () {
-                                              _takeScreenshot();
-                                            },
+                                            onPressed: _takeScreenshot,
                                           ),
                                           IconButton(
                                             icon: const Icon(
                                               Icons.screen_rotation,
                                             ),
                                             color: Colors.white,
-                                            onPressed: () {
-                                              _toggleOrientation();
-                                            },
+                                            onPressed: _toggleOrientation,
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.headphones),
                                             color:
-                                                _audioOnly == true
+                                                _audioOnly
                                                     ? Colors.greenAccent
                                                     : Colors.white,
-                                            onPressed: () {
-                                              _toggleAudioOnly();
-                                            },
+                                            onPressed: _toggleAudioOnly,
                                           ),
-
                                           IconButton(
                                             icon: const Icon(Icons.color_lens),
                                             color: Colors.white,
@@ -1367,14 +1717,12 @@ class _FullScreenVideoPlayerSystemVolumeState
                                                 selectedKey: _selectedFilter,
                                                 onSelected: (key) {
                                                   setState(
-                                                        () => _selectedFilter = key,
+                                                    () => _selectedFilter = key,
                                                   );
                                                 },
                                               );
                                             },
                                           ),
-
-
                                         ],
                                       ),
                                     ),
@@ -1383,47 +1731,44 @@ class _FullScreenVideoPlayerSystemVolumeState
                                       child: Column(
                                         children: [
                                           IconButton(
-                                            icon: Icon(
+                                            icon: const Icon(
                                               Icons.hdr_auto_select_sharp,
                                               size: 30,
-
                                             ),
                                             color:
-                                            _selectedFilter == 'hdr'
-                                                ? Colors.pink
-                                                : Colors.grey,
+                                                _selectedFilter == 'hdr'
+                                                    ? Colors.pink
+                                                    : Colors.grey,
                                             onPressed: toggleHdr,
-
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.volume_up),
                                             color: Colors.white,
-                                            onPressed: () {
-                                              _openVolumeDialog();
-                                            },
+                                            onPressed: _openVolumeDialog,
                                           ),
                                           IconButton(
                                             icon: const Icon(Icons.speed),
                                             color: Colors.white,
-                                            onPressed: () {
-                                              _openSpeedDialog();
-                                            },
+                                            onPressed: _openSpeedDialog,
                                           ),
                                           IconButton(
                                             icon: const Icon(
                                               Icons.picture_in_picture_alt,
                                             ),
                                             color: Colors.white,
-                                            onPressed: () {
-                                              FloatingVideoManager.show(
-                                                context,
-                                                _player,
-                                                _controller,
-                                                widget.videos,
-                                                _currentIndex,
-                                              );
-                                              Navigator.pop(context);
-                                            },
+                                            onPressed:
+                                                _hasLocalList
+                                                    ? () {
+                                                      FloatingVideoManager.show(
+                                                        context,
+                                                        _player,
+                                                        _controller,
+                                                        widget.videos,
+                                                        _currentIndex,
+                                                      );
+                                                      Navigator.pop(context);
+                                                    }
+                                                    : null, // ✅ disable for URL mode
                                           ),
                                         ],
                                       ),
@@ -1433,7 +1778,6 @@ class _FullScreenVideoPlayerSystemVolumeState
 
                                 Row(
                                   children: [
-                                    /// ⏱ START TIME (current position)
                                     Text(
                                       _formatDuration(_currentPosition),
                                       style: const TextStyle(
@@ -1442,40 +1786,45 @@ class _FullScreenVideoPlayerSystemVolumeState
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
-
-                                    const SizedBox(width: 8),
-
-                                    /// 🎚 SLIDER (4K style)
+                                    const SizedBox(width: 1),
                                     Expanded(
                                       child: Slider(
                                         value:
-                                            _currentPosition.inMilliseconds
-                                                .clamp(
-                                                  0,
-                                                  _totalDuration.inMilliseconds,
-                                                )
-                                                .toDouble(),
+                                            posMs.clamp(0, safeMax).toDouble(),
                                         min: 0.0,
-                                        max:
-                                            _totalDuration.inMilliseconds
-                                                .toDouble(),
+                                        max: safeMax.toDouble(),
                                         activeColor: Colors.green,
                                         inactiveColor: Colors.white54,
+
+                                        onChangeStart: (_) {
+                                          _isSeeking = true;
+                                        },
+
                                         onChanged: (value) {
+                                          if (!_isSeeking) return;
+                                          setState(() {
+                                            _bubblePos = Duration(
+                                              milliseconds: value.round(),
+                                            );
+                                            _currentPosition = _bubblePos;
+                                          });
+                                        },
+
+                                        onChangeEnd: (value) {
                                           final newPos = Duration(
                                             milliseconds: value.round(),
                                           );
                                           _player.seek(newPos);
+
                                           setState(() {
                                             _currentPosition = newPos;
+                                            _bubblePos = newPos;
+                                            _isSeeking = false;
                                           });
                                         },
                                       ),
                                     ),
-
-                                    const SizedBox(width: 8),
-
-                                    /// ⏱ TOTAL TIME (end duration)
+                                    const SizedBox(width: 1),
                                     Text(
                                       _formatDuration(_totalDuration),
                                       style: const TextStyle(
@@ -1486,23 +1835,21 @@ class _FullScreenVideoPlayerSystemVolumeState
                                     ),
                                   ],
                                 ),
+
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.center,
                                   children: [
                                     IconButton(
                                       icon: const Icon(Icons.lock_open),
                                       color: Colors.white,
-                                      onPressed: () {
-                                        _toggleLock();
-                                      },
+                                      onPressed: _toggleLock,
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.skip_previous),
                                       color: Colors.white,
                                       iconSize: sideSize + 4,
-                                      onPressed: () {
-                                        _playPrevious();
-                                      },
+                                      onPressed:
+                                          _hasLocalList ? _playPrevious : null,
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.replay_10),
@@ -1521,9 +1868,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                       ),
                                       color: Colors.white,
                                       iconSize: playSize + 8,
-                                      onPressed: () {
-                                        _togglePlayPause();
-                                      },
+                                      onPressed: _togglePlayPause,
                                     ),
                                     IconButton(
                                       icon: const Icon(Icons.forward_10),
@@ -1538,9 +1883,8 @@ class _FullScreenVideoPlayerSystemVolumeState
                                       icon: const Icon(Icons.skip_next),
                                       color: Colors.white,
                                       iconSize: sideSize + 4,
-                                      onPressed: () {
-                                        _playNext();
-                                      },
+                                      onPressed:
+                                          _hasLocalList ? _playNext : null,
                                     ),
                                     IconButton(
                                       icon: Icon(
@@ -1552,9 +1896,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                             : Icons.zoom_in_map,
                                       ),
                                       color: Colors.white,
-                                      onPressed: () {
-                                        _toggleResizeMode();
-                                      },
+                                      onPressed: _toggleResizeMode,
                                     ),
                                   ],
                                 ),
@@ -1570,6 +1912,7 @@ class _FullScreenVideoPlayerSystemVolumeState
     );
   }
 
+  // helpers
   String _formatDuration(Duration d) {
     final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
     final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
@@ -1577,16 +1920,53 @@ class _FullScreenVideoPlayerSystemVolumeState
   }
 
   Future<void> _togglePlayPause() async {
-    _isPlaying ? _player.pause() : _player.play();
+    _player.state.playing ? _player.pause() : _player.play();
   }
 
   Future<void> _seekBy(Duration offset) async {
     await _player.seek(_currentPosition + offset);
   }
-
-
-
-
 }
 
+/// ✅ Simple top bar for URL streaming mode (when videos list is empty)
+class _StreamTopBar extends StatelessWidget {
+  final String title;
+  final VoidCallback onBack;
 
+  const _StreamTopBar({required this.title, required this.onBack});
+
+  @override
+  Widget build(BuildContext context) {
+    return
+
+
+      Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 0),
+      child: Row(
+        children: [
+          Card(
+            color: Colors.white10,
+
+            child: IconButton(
+              onPressed: onBack,
+              icon: const Icon(Icons.arrow_back, color: Colors.white),
+            ),
+          ),
+          const SizedBox(width: 6),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

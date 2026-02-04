@@ -1,20 +1,15 @@
 import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:video_player/video_player.dart';
-import 'package:video_thumbnail/video_thumbnail.dart';
 import 'package:path/path.dart' as path;
-
+import '../../Home/HomeScreen/home2.dart';
 import '../../Utils/color.dart';
 import '../4kPlayer/4k_player.dart';
-import '../video_player.dart';
 
 class VideoFolderScreen extends StatefulWidget {
   final String folderName;
@@ -549,10 +544,6 @@ class PhotoTile extends StatelessWidget {
                   initialIndex: initialIndex,
                 ),
 
-                // VideoPlayerScreen(
-                //   videos: photos,
-                //   initialIndex: initialIndex,
-                // ),
           ),
         );
       },
@@ -737,16 +728,19 @@ class PhotoTile extends StatelessWidget {
                     ],
                   ).then((value) async {
                     if (value == "Play") {
+
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           builder:
-                              (context) => VideoPlayerScreen(
-                                videos: photos,
-                                initialIndex: initialIndex,
-                              ),
+                              (context) =>  FullScreenVideoPlayerFixed(
+                            videos: photos,
+                            initialIndex: initialIndex,
+                          ),
+
                         ),
                       );
+
                     } else if (value == "Delete") {
                       onDelete();
                     } else if (value == "Info") {
@@ -840,10 +834,12 @@ class GridviewList extends StatelessWidget {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (context) => VideoPlayerScreen(
+            builder:
+                (context) =>  FullScreenVideoPlayerFixed(
               videos: photos,
               initialIndex: initialIndex,
             ),
+
           ),
         );
       },
@@ -1004,10 +1000,12 @@ class GridviewList extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
-                              builder: (context) => VideoPlayerScreen(
+                              builder:
+                                  (context) =>  FullScreenVideoPlayerFixed(
                                 videos: photos,
                                 initialIndex: initialIndex,
                               ),
+
                             ),
                           );
                         } else if (value == "Delete") {

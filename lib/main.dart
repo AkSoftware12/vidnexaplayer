@@ -4,27 +4,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_portal/flutter_portal.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:hive/hive.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:upgrader/upgrader.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:videoplayer/HexColorCode/HexColor.dart';
-import 'package:videoplayer/Utils/color.dart';
-import 'Home/HomeScreen/home_screen.dart';
+import 'Home/HomeScreen/home2.dart';
 import 'LocalMusic/AudioServiceInit/audio_service_init.dart';
 import 'NotifyListeners/LanguageProvider/language_provider.dart';
 import 'DarkMode/dark_mode.dart';
-import 'Home/HomeBottomnavigation/home_bottomNavigation.dart';
 import 'NotifyListeners/AppBar/app_bar_color.dart';
 import 'NotifyListeners/UserData/user_data.dart';
-import 'OnboardScreen/onboarding_screen.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
-import 'SplashScreen/splash_screen.dart' hide navigatorKey;
+import 'SplashScreen/splash_screen.dart';
 
 
 
@@ -79,16 +70,10 @@ Future<void> main() async {
 class MyApp extends StatelessWidget {
   final RouteObserver<PageRoute> _routeObserver = RouteObserver();
 
-  MyApp({Key? key}) : super(key: key);
+  MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
-    // final upgrader = Upgrader(
-    //   debugDisplayAlways: false,
-    //   countryCode: 'IN',
-    // );
-
-
     return Portal(
       child: Provider.value(
         value: _routeObserver,
@@ -110,7 +95,7 @@ class MyApp extends StatelessWidget {
                     Locale('en', ''), // English
                     Locale('hi', ' '), // Hindi
                   ],
-                  home: Scaffold(
+                  home: const Scaffold(
                     body:  SplashScreen(),
                   ),
                 );
@@ -120,42 +105,6 @@ class MyApp extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-
-
-class AuthenticationWrapper extends StatefulWidget {
-  @override
-  State<AuthenticationWrapper> createState() => _AuthenticationWrapperState();
-}
-
-class _AuthenticationWrapperState extends State<AuthenticationWrapper> {
-  bool isLoggedIn = false;
-
-  @override
-  void initState() {
-    super.initState();
-    checkLoginStatus();
-  }
-
-  Future<void> checkLoginStatus() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool loggedIn = prefs.getBool('isLoggedIn') ?? false;
-    if (loggedIn) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => const HomeBottomNavigation()));
-    } else {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => OnboardingScreen()));
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return const Scaffold(body: Center(child: CircularProgressIndicator()));
   }
 }
 

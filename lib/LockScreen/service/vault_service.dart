@@ -1,65 +1,176 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:crypto/crypto.dart';
+
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// Provides a simple PIN-protected vault for hiding files within the
-/// application.  Files added to the vault are copied into a hidden
-/// directory within the application's documents directory.  A hashed
-/// PIN is persisted using [SharedPreferences]; PIN creation and
-/// verification are handled within this service.
 class VaultService {
-  static const _pinKey = 'vault_pin_hash';
-
-  /// Ensures the vault directory exists and returns its path.
-  Future<String> _vaultDir() async {
+  // ---------------- PIN STORE (simple demo) ----------------
+  // NOTE: production me SharedPreferences / secure_storage use karo.
+  Future<File> _pinFile() async {
     final dir = await getApplicationDocumentsDirectory();
-    final v = Directory('${dir.path}/.vault');
-    if (!v.existsSync()) v.createSync(recursive: true);
-    return v.path;
+    return File(p.join(dir.path, 'vault_pin.txt'));
   }
 
-  /// Hashes a PIN using SHA-256.  Hashing ensures the PIN is never
-  /// stored in plaintext on the device.
-  String _hashPin(String pin) => sha256.convert(utf8.encode(pin)).toString();
-
-  /// Returns whether a PIN has already been set for the vault.
   Future<bool> hasPin() async {
-    final sp = await SharedPreferences.getInstance();
-    return (sp.getString(_pinKey) ?? '').isNotEmpty;
+    final f = await _pinFile();
+    return f.exists();
   }
 
-  /// Saves a new [pin] for the vault.  The PIN is hashed before
-  /// storage.
   Future<void> setPin(String pin) async {
-    final sp = await SharedPreferences.getInstance();
-    await sp.setString(_pinKey, _hashPin(pin));
+    final f = await _pinFile();
+    await f.writeAsString(pin);
   }
 
-  /// Verifies whether [pin] matches the stored PIN hash.  Returns
-  /// `true` if the PIN is correct, otherwise `false`.
   Future<bool> verifyPin(String pin) async {
-    final sp = await SharedPreferences.getInstance();
-    final saved = sp.getString(_pinKey) ?? '';
-    return saved == _hashPin(pin);
+    final f = await _pinFile();
+    if (!await f.exists()) return false;
+    final saved = (await f.readAsString()).trim();
+    return saved == pin.trim();
   }
 
-  /// Adds [file] into the vault by copying it into the vault directory.
-  /// Returns the new file created within the vault.  Note that
-  /// duplicate file names will overwrite existing files.
-  Future<File> addToVault(File file) async {
-    final vdir = await _vaultDir();
-    final name = file.uri.pathSegments.last;
-    final target = File('$vdir/$name');
-    return file.copy(target.path);
+  // ---------------- VAULT FOLDER ----------------
+  Future<Directory> _vaultDir() async {
+    final dir = await getApplicationDocumentsDirectory();
+    final v = Directory(p.join(dir.path, "vault"));
+    if (!await v.exists()) await v.create(recursive: true);
+    return v;
   }
 
-  /// Lists all files currently in the vault.  Returns only files, not
-  /// directories.  Note that this does not require the vault to be
-  /// unlocked; unlocking is handled externally.
+  Future<File> _indexFile() async {
+    final v = await _vaultDir();
+    final f = File(p.join(v.path, "vault_index.json"));
+    if (!await f.exists()) {
+      await f.writeAsString(jsonEncode({}));
+    }
+    return f;
+  }
+
+  Future<Map<String, dynamic>> _readIndex() async {
+    final f = await _indexFile();
+    final raw = await f.readAsString();
+    final m = jsonDecode(raw);
+    if (m is Map<String, dynamic>) return m;
+    if (m is Map) return m.cast<String, dynamic>();
+    return {};
+  }
+
+  Future<void> _writeIndex(Map<String, dynamic> data) async {
+    final f = await _indexFile();
+    await f.writeAsString(jsonEncode(data));
+  }
+
+  // ---------------- LIST ----------------
   Future<List<FileSystemEntity>> listVaultFiles() async {
-    final vdir = await _vaultDir();
-    return Directory(vdir).listSync().where((e) => e is File).toList();
+    final v = await _vaultDir();
+    final list = v
+        .listSync()
+        .where((e) => e is File)
+        .toList();
+
+    // hide index file
+    list.removeWhere((e) => p.basename(e.path) == "vault_index.json");
+    return list;
+  }
+
+  // ---------------- ADD ----------------
+  Future<void> addToVault(File src) async {
+    final v = await _vaultDir();
+    final name = p.basename(src.path);
+
+    final safeName = await _uniqueName(v.path, name);
+    final dest = File(p.join(v.path, safeName));
+
+    await src.copy(dest.path);
+
+    final idx = await _readIndex();
+    idx[safeName] = {
+      "originalPath": src.path,
+      "addedAt": DateTime.now().toIso8601String(),
+    };
+    await _writeIndex(idx);
+  }
+
+  Future<String> _uniqueName(String dir, String name) async {
+    var candidate = name;
+    var i = 1;
+    while (await File(p.join(dir, candidate)).exists()) {
+      final base = p.basenameWithoutExtension(name);
+      final ext = p.extension(name);
+      candidate = "${base}_$i$ext";
+      i++;
+    }
+    return candidate;
+  }
+
+  // ---------------- RESTORE ----------------
+  /// Restore vault file to originalPath if possible,
+  /// else restore to selected folder (targetDir required).
+  /// Returns restored path, or null if failed/cancelled.
+  Future<String?> restoreFromVault({
+    required File vaultFile,
+    Directory? targetDir,
+    bool overwrite = false,
+  }) async {
+    if (!await vaultFile.exists()) return null;
+
+    final fileName = p.basename(vaultFile.path);
+    final idx = await _readIndex();
+    final meta = idx[fileName];
+
+    String? originalPath;
+    if (meta is Map) {
+      originalPath = meta["originalPath"]?.toString();
+    }
+
+    String destPath;
+
+    // try original path first
+    if (originalPath != null && originalPath.trim().isNotEmpty) {
+      destPath = originalPath.trim();
+      final parent = Directory(p.dirname(destPath));
+      if (!await parent.exists()) {
+        // original folder missing -> fallback to targetDir
+        if (targetDir == null) return null;
+        destPath = p.join(targetDir.path, fileName);
+      }
+    } else {
+      // no original info -> require targetDir
+      if (targetDir == null) return null;
+      destPath = p.join(targetDir.path, fileName);
+    }
+
+    var destFile = File(destPath);
+
+    // if exists
+    if (await destFile.exists()) {
+      if (overwrite) {
+        await destFile.delete();
+      } else {
+        final safe = await _uniqueName(destFile.parent.path, p.basename(destFile.path));
+        destFile = File(p.join(destFile.parent.path, safe));
+      }
+    }
+
+    // ensure parent exists
+    if (!await destFile.parent.exists()) {
+      await destFile.parent.create(recursive: true);
+    }
+
+    await vaultFile.copy(destFile.path);
+    return destFile.path;
+  }
+
+  // ---------------- DELETE ----------------
+  Future<void> deleteFromVault(File vaultFile) async {
+    final fileName = p.basename(vaultFile.path);
+
+    if (await vaultFile.exists()) {
+      await vaultFile.delete();
+    }
+
+    final idx = await _readIndex();
+    idx.remove(fileName);
+    await _writeIndex(idx);
   }
 }

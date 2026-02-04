@@ -92,141 +92,192 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 110.sp,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: items.length,
-        padding: EdgeInsets.symmetric(horizontal: 5.sp),
-        physics: const BouncingScrollPhysics(),
-        itemBuilder: (context, index) {
-          final item = items[index];
-          return GestureDetector(
-            onTap: () {
-              if (index == 0) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => VideoFolderScreen(
-                          folderName: 'All Videos',
-                          videos: widget.album,
-                        ),
-                  ),
-                );
-              }
-              // Navigator.push( // context, // MaterialPageRoute( // builder: (context) => AllVideosScreen(icon: 'AppBar'), // ), // ); }
-              else if (index == 1) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => AlbumScreen()),
-                );
-              } else if (index == 2) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder: (context) => HomeBottomNavigation(bottomIndex: 1),
-                  ),
-                );
-              } else if (index == 3) {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (context) => VideoPlayerStream()),
-                );
-              }
-            },
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 400),
-              curve: Curves.easeOut,
-              margin: EdgeInsets.symmetric(horizontal: 3.sp, vertical: 8.sp),
-              width: 140.sp,
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [item.color, item.color2],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(20.sp),
-
-              ),
-              child: Stack(
+    return Column(
+      children: [
+        Padding(
+          padding: EdgeInsets.symmetric(horizontal: 8.w, vertical: 10.h),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Row(
                 children: [
                   Container(
+                    padding: EdgeInsets.all(6.sp),
                     decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(20.sp),
-                      gradient: LinearGradient(
-                        colors: [
-                          Colors.white.withOpacity(0.08),
-                          Colors.transparent,
-                        ],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
+                      color: Colors.blue.withOpacity(0.12),
+                      borderRadius: BorderRadius.circular(8.sp),
+                    ),
+                    child: Icon(
+                      Icons.play_circle_fill_rounded,
+                      size: 16.sp,
+                      color: Colors.blue,
                     ),
                   ),
-                  Padding(
-                    padding: EdgeInsets.all(10.sp),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Align(
-                          alignment: Alignment.topRight,
-                          child: Container(
-                            height: 35.sp,
-                            width: 35.sp,
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              shape: BoxShape.circle,
-                            ),
-                            child: Padding(
-                              padding: EdgeInsets.all(6.sp),
-                              child: Image.asset(
-                                item.imageUrl,
-                                color: Colors.white,
-                                fit: BoxFit.contain,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const Spacer(),
-                        Text(
-                          item.text,
-                          style: GoogleFonts.poppins(
-                            fontSize: 13.5.sp,
-                            fontWeight: FontWeight.w700,
-                            color: Colors.white,
-                          ),
-                        ),
-                        SizedBox(height: 4.sp),
-                        // Row(
-                        //   children: [
-                        //     Icon(
-                        //       Icons.folder_open,
-                        //       color: Colors.white,
-                        //       size: 13.sp,
-                        //     ),
-                        //     SizedBox(width: 4.sp),
-                        //     Text(
-                        //       '${item.count} items',
-                        //       style: GoogleFonts.poppins(
-                        //         fontSize: 11.sp,
-                        //         color: Colors.white.withOpacity(0.9),
-                        //         fontWeight: FontWeight.w500,
-                        //       ),
-                        //     ),
-                        //   ],
-                        // ),
-                        // SizedBox(height: 2.sp),
+                  SizedBox(width: 8.sp),
 
-                      ],
-                    ),
+                  /// 👉 Title + Subtitle
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "Media Categories",
+                        style: GoogleFonts.poppins(
+                          fontSize: 14.sp,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.black87,
+                        ),
+                      ),
+                      Text(
+                        "Videos, Music & Albums", // 👈 subtitle
+                        style: GoogleFonts.poppins(
+                          fontSize: 7.sp,
+                          fontWeight: FontWeight.w400,
+                          color: Colors.black45,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ),
-          );
-        },
-      ),
+
+              Container(
+                padding: EdgeInsets.all(5.sp),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.grey.withOpacity(0.08),
+                ),
+                child: Icon(
+                  Icons.arrow_forward_ios,
+                  color: Colors.black54,
+                  size: 15.sp,
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        SizedBox(
+          height: 80.sp,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            itemCount: items.length,
+            padding: EdgeInsets.symmetric(horizontal: 5.sp, vertical: 0.sp),
+            // physics: const BouncingScrollPhysics(),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return GestureDetector(
+                onTap: () {
+                  if (index == 0) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => VideoFolderScreen(
+                              folderName: 'All Videos',
+                              videos: widget.album,
+                            ),
+                      ),
+                    );
+                  }
+                  // Navigator.push( // context, // MaterialPageRoute( // builder: (context) => AllVideosScreen(icon: 'AppBar'), // ), // ); }
+                  else if (index == 1) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (context) => AlbumScreen()),
+                    );
+                  } else if (index == 2) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder:
+                            (context) => HomeBottomNavigation(bottomIndex: 1),
+                      ),
+                    );
+                  } else if (index == 3) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => VideoPlayerStream(),
+                      ),
+                    );
+                  }
+                },
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 400),
+                  curve: Curves.easeOut,
+                  margin: EdgeInsets.symmetric(
+                    horizontal: 3.sp,
+                    vertical: 0.sp,
+                  ),
+                  width: 120.sp,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [item.color, item.color2],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(10.sp),
+                  ),
+                  child: Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(20.sp),
+                          gradient: LinearGradient(
+                            colors: [
+                              Colors.white.withOpacity(0.08),
+                              Colors.transparent,
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                        ),
+                      ),
+                      Padding(
+                        padding: EdgeInsets.all(5.sp),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Align(
+                              alignment: Alignment.topRight,
+                              child: Container(
+                                height: 35.sp,
+                                width: 35.sp,
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.15),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: Padding(
+                                  padding: EdgeInsets.all(6.sp),
+                                  child: Image.asset(
+                                    item.imageUrl,
+                                    color: Colors.white,
+                                    fit: BoxFit.contain,
+                                  ),
+                                ),
+                              ),
+                            ),
+                            const Spacer(),
+                            Text(
+                              item.text,
+                              style: GoogleFonts.poppins(
+                                fontSize: 12.sp,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+        SizedBox(height: 5.sp),
+      ],
     );
   }
 }

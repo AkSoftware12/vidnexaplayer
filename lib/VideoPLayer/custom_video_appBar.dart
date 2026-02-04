@@ -1,345 +1,532 @@
-import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:videoplayer/Utils/color.dart';
 
 class CustomVideoAppBar extends StatelessWidget {
   final String title;
   final VoidCallback onBackPressed;
-  final bool isLandscape; // <-- add this
+  final bool isLandscape;
   final List<AssetEntity> videos;
-  final int currentIndex; // Currently playing video
-  final ValueChanged<int>? onVideoSelected; // Callback to play selected video
+  final int currentIndex;
+  final ValueChanged<int>? onVideoSelected;
 
   const CustomVideoAppBar({
+    super.key,
     required this.title,
     required this.onBackPressed,
     required this.videos,
+    required this.isLandscape,
     this.currentIndex = 0,
     this.onVideoSelected,
-    super.key,
-    required this.isLandscape,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      // height: isLandscape ? 25.sp : null,
-      padding: const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            Colors.black.withOpacity(0.8),
-            Colors.black.withOpacity(0.6),
-          ],
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 10,
-            spreadRadius: 2,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Center(
-        child: Row(
-          children: [
-            // Back Button
-            _buildIconButton(
-              icon: Icons.arrow_back,
-              onPressed: onBackPressed,
-              tooltip: 'Back',
-            ),
-            SizedBox(width: 4.sp),
-            // Title
-            Expanded(
-              child: Text(
-                title,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: isLandscape ? 7.sp : 14.sp,
-                  fontWeight: FontWeight.w600,
-                  letterSpacing: 0.5,
-                ),
-                overflow: TextOverflow.ellipsis,
-              ),
-            ),
-            SizedBox(width: 4.sp),
+    final media = MediaQuery.of(context);
+    final barH = isLandscape ? 46.h : 45.h;
 
-            SizedBox(width: 4.sp),
-            // Playlist Button
-            _buildIconButton(
-              icon: Icons.playlist_play_sharp,
-              onPressed: () => _showVideoList(context),
-              tooltip: 'Playlist',
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+        child: Container(
+          padding: EdgeInsets.only(left: 10.w, right: 10.w),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.black.withOpacity(0.72),
+                Colors.black.withOpacity(0.28),
+                Colors.transparent,
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
             ),
-            SizedBox(width: 4.sp),
-            // // Other Button (optional)
-            // _buildIconButton(
-            //   icon: Icons.arrow_drop_down_circle_rounded,
-            //   onPressed: () => print('Other action'),
-            //   tooltip: 'Other',
-            // ),
-          ],
+            border: Border(
+              bottom: BorderSide(color: Colors.white.withOpacity(0.06)),
+            ),
+          ),
+          child: SizedBox(
+            height: barH,
+            child: Row(
+              children: [
+                _glassIcon(
+                  icon: Icons.arrow_back_rounded,
+                  tooltip: "Back",
+                  onTap: onBackPressed,
+                  size: isLandscape ? 34 : 40,
+                ),
+                SizedBox(width: 10.w),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        title,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: isLandscape ? 5.sp : 12.sp,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.2,
+                        ),
+                      ),
+                      SizedBox(height: 2.h),
+                      Text(
+                        "${currentIndex + 1}/${videos.length} • Playlist",
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: Colors.white.withOpacity(0.62),
+                          fontSize: isLandscape ? 4.sp : 11.sp,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                SizedBox(width: 10.w),
+                _glassIcon(
+                  icon: Icons.playlist_play_rounded,
+                  tooltip: "Playlist",
+                  onTap: () => _showVideoList(context),
+                  size: isLandscape ? 34 : 40,
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );
   }
 
-  // Reusable IconButton
-  Widget _buildIconButton({
+  Widget _glassIcon({
     required IconData icon,
-    required VoidCallback onPressed,
     required String tooltip,
+    required VoidCallback onTap,
+    required double size,
   }) {
     return Tooltip(
       message: tooltip,
       child: InkWell(
-        borderRadius: BorderRadius.circular(20),
-        onTap: onPressed,
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: Colors.white.withOpacity(0.1),
-          ),
-          child: Icon(
-            icon,
-            color: Colors.white,
-            size: 24,
+        borderRadius: BorderRadius.circular(999),
+        onTap: onTap,
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(999),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(
+              height: size,
+              width: size,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.08),
+                border: Border.all(color: Colors.white.withOpacity(0.10)),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.25),
+                    blurRadius: 16,
+                    offset: const Offset(0, 6),
+                  )
+                ],
+              ),
+              child: Icon(icon, color: Colors.white, size: size * 0.55),
+            ),
           ),
         ),
       ),
     );
   }
 
-  // Modern playlist bottom sheet
-
   void _showVideoList(BuildContext context) {
-    if (videos == null) return;
+    final media = MediaQuery.of(context);
+    final isLand = media.orientation == Orientation.landscape;
 
-    final isLandscape =
-        MediaQuery.of(context).orientation == Orientation.landscape;
+    if (isLand) {
+      final panelWidth = (media.size.width * 0.40).clamp(320.0, 560.0);
 
-    Widget sheetContent(ScrollController? scrollController) {
-      return ClipRRect(
-        borderRadius: isLandscape
-            ? const BorderRadius.horizontal(left: Radius.circular(24))
-            : const BorderRadius.vertical(top: Radius.circular(24)),
-        child: BackdropFilter(
-          filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-          child: Container(
-            height: double.infinity,
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.5), // semi-transparent
-              borderRadius: isLandscape
-                  ? const BorderRadius.horizontal(left: Radius.circular(24))
-                  : const BorderRadius.vertical(top: Radius.circular(24)),
-            ),
-            child: SafeArea(
-              top: false,
-              bottom: false,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Center(
-                    child: Container(
-                      height: 4,
-                      width: 40,
-                      margin: const EdgeInsets.only(bottom: 16),
-                      decoration: BoxDecoration(
-                        color: Colors.white24,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ),
-                  const Text(
-                    "Playlist",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 20,
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.8,
-                      decoration: TextDecoration.none,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Expanded(
-                    child: ListView.builder(
-                      controller: scrollController,
-                      physics: const BouncingScrollPhysics(),
-                      itemCount: videos.length,
-                      itemBuilder: (context, index) {
-                        bool isPlaying = index == currentIndex;
-                        // String name = videos.path.split('/').last;
-
-                        return AnimatedContainer(
-                          duration: const Duration(milliseconds: 250),
-                          margin: const EdgeInsets.symmetric(vertical: 6),
-                          decoration: BoxDecoration(
-                            color: isPlaying
-                                ? Colors.amber.withOpacity(0.15)
-                                : Colors.white.withOpacity(0.07),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: isPlaying
-                                  ? Colors.amberAccent.withOpacity(0.9)
-                                  : Colors.transparent,
-                              width: 1.5,
-                            ),
-                          ),
-                          child: InkWell(
-                            borderRadius: BorderRadius.circular(14),
-                            onTap: () {
-                              Navigator.pop(context);
-                              if (onVideoSelected != null) {
-                                onVideoSelected!(index);
-                              }
-                            },
-                            child: Padding(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 14, vertical: 12),
-                              child: Row(
-                                children: [
-                                  Container(
-                                    height: 42,
-                                    width: 42,
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: isPlaying
-                                          ? const LinearGradient(
-                                        colors: [Colors.amber, Colors.orange],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      )
-                                          : const LinearGradient(
-                                        colors: [Colors.grey, Colors.white30],
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      isPlaying
-                                          ? Icons.play_arrow_rounded
-                                          : Icons.videocam_rounded,
-                                      color: isPlaying
-                                          ? Colors.black
-                                          : Colors.white.withOpacity(0.9),
-                                      size: 26,
-                                    ),
-                                  ),
-                                  const SizedBox(width: 14),
-                                  Expanded(
-                                    child: Column(
-                                      children: [
-                                        Text(
-                                          videos[index].title.toString(),
-                                          style: TextStyle(
-                                            color: isPlaying
-                                                ? Colors.amberAccent
-                                                : Colors.white70,
-                                            fontWeight: isPlaying
-                                                ? FontWeight.bold
-                                                : FontWeight.w500,
-                                            fontSize: 15,
-                                            decoration: TextDecoration.none,
-                                          ),
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-
-                                      ],
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  if (isPlaying)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                          horizontal: 8, vertical: 4),
-                                      decoration: BoxDecoration(
-                                        color: Colors.amber.withOpacity(0.15),
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(
-                                            color: Colors.amberAccent, width: 1),
-                                      ),
-                                      child: const Text(
-                                        "Playing",
-                                        style: TextStyle(
-                                          color: Colors.amberAccent,
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.w600,
-                                          decoration: TextDecoration.none,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    if (isLandscape) {
       showGeneralDialog(
         context: context,
         barrierDismissible: true,
         barrierLabel: '',
-        barrierColor: Colors.black38,
+        barrierColor: Colors.black.withOpacity(0.35),
         pageBuilder: (_, __, ___) {
           return Align(
             alignment: Alignment.centerRight,
-            child: FractionallySizedBox(
-              widthFactor: 0.35,
-              heightFactor: 1.0,
+            child: SizedBox(
+              width: panelWidth,
+              height: media.size.height,
               child: Material(
                 color: Colors.transparent,
-                child: sheetContent(ScrollController()),
+                child: _PlaylistPanel(
+                  videos: videos,
+                  initialIndex: currentIndex, // ✅ pass initial index
+                  onVideoSelected: onVideoSelected,
+                  isLandscape: true,
+                  scrollController: ScrollController(),
+                ),
               ),
             ),
           );
         },
         transitionBuilder: (_, anim, __, child) {
-          final curvedAnim = CurvedAnimation(
-            parent: anim,
-            curve: Curves.easeOutCubic,
-          );
+          final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
           return SlideTransition(
-            position: Tween(begin: const Offset(1, 0), end: Offset.zero)
-                .animate(curvedAnim),
-            child: FadeTransition(opacity: curvedAnim, child: child),
+            position: Tween(begin: const Offset(1, 0), end: Offset.zero).animate(curved),
+            child: FadeTransition(opacity: curved, child: child),
           );
         },
       );
     } else {
       showModalBottomSheet(
         context: context,
-        backgroundColor: Colors.transparent,
         isScrollControlled: true,
-        builder: (context) {
+        backgroundColor: Colors.transparent,
+        builder: (ctx) {
           return DraggableScrollableSheet(
             expand: false,
-            initialChildSize: 0.4,
-            minChildSize: 0.25,
-            maxChildSize: 0.9,
-            builder: (context, scrollController) =>
-                sheetContent(scrollController),
+            initialChildSize: 0.42,
+            minChildSize: 0.30,
+            maxChildSize: 0.92,
+            builder: (ctx, controller) {
+              return _PlaylistPanel(
+                videos: videos,
+                initialIndex: currentIndex, // ✅ pass initial index
+                onVideoSelected: onVideoSelected,
+                isLandscape: false,
+                scrollController: controller,
+              );
+            },
           );
         },
       );
     }
+  }
+}
+
+// ✅ CHANGED: Stateful so list updates on tap
+class _PlaylistPanel extends StatefulWidget {
+  final List<AssetEntity> videos;
+  final int initialIndex;
+  final ValueChanged<int>? onVideoSelected;
+  final bool isLandscape;
+  final ScrollController scrollController;
+
+  const _PlaylistPanel({
+    required this.videos,
+    required this.initialIndex,
+    required this.onVideoSelected,
+    required this.isLandscape,
+    required this.scrollController,
+  });
+
+  @override
+  State<_PlaylistPanel> createState() => _PlaylistPanelState();
+}
+
+class _PlaylistPanelState extends State<_PlaylistPanel> {
+  late int playingIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    playingIndex = widget.initialIndex; // ✅ local state
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final media = MediaQuery.of(context);
+
+    final topPad = media.padding.top;
+    final bottomPad = media.padding.bottom;
+
+    return ClipRRect(
+      borderRadius: widget.isLandscape
+          ? const BorderRadius.horizontal(left: Radius.circular(24))
+          : const BorderRadius.vertical(top: Radius.circular(24)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 16, sigmaY: 16),
+        child: Container(
+          height: media.size.height,
+          padding: EdgeInsets.only(
+            top: widget.isLandscape ? topPad : 0,
+            bottom: bottomPad,
+          ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: [
+                Colors.black.withOpacity(0.74),
+                Colors.black.withOpacity(0.56),
+              ],
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+            ),
+            border: Border.all(color: Colors.white.withOpacity(0.08)),
+          ),
+          child: SafeArea(
+            top: !widget.isLandscape,
+            bottom: !widget.isLandscape,
+            child: Column(
+              children: [
+                SizedBox(height: 10.h),
+
+                if (!widget.isLandscape)
+                  Container(
+                    height: 4,
+                    width: 42,
+                    margin: EdgeInsets.only(bottom: 12.h),
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(100),
+                    ),
+                  ),
+
+                Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 14.w),
+                  child: Row(
+                    children: [
+                      Container(
+                        height: 38,
+                        width: 38,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFFB703), Color(0xFFFF6A00)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.orange.withOpacity(0.22),
+                              blurRadius: 18,
+                              offset: const Offset(0, 8),
+                            )
+                          ],
+                        ),
+                        child: const Icon(Icons.playlist_play_rounded,
+                            color: Colors.black, size: 24),
+                      ),
+                      SizedBox(width: 12.w),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              "Playlist",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                            SizedBox(height: 2.h),
+                            Text(
+                              "${playingIndex + 1}/${widget.videos.length} playing", // ✅ updated
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.6),
+                                fontSize: 11,
+                                fontWeight: FontWeight.w600,
+                                decoration: TextDecoration.none,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      InkWell(
+                        borderRadius: BorderRadius.circular(999),
+                        onTap: () => Navigator.pop(context),
+                        child: Container(
+                          height: 38,
+                          width: 38,
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.08),
+                            borderRadius: BorderRadius.circular(999),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.10),
+                            ),
+                          ),
+                          child: Icon(
+                            Icons.close_rounded,
+                            color: Colors.white.withOpacity(0.9),
+                            size: 20,
+                          ),
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+
+                SizedBox(height: 10.h),
+
+                Expanded(
+                  child: ListView.builder(
+                    controller: widget.scrollController,
+                    physics: const BouncingScrollPhysics(),
+                    padding: EdgeInsets.only(bottom: 8.h, left: 5.w, right: 5.w),
+                    itemCount: widget.videos.length,
+                    itemBuilder: (context, index) {
+                      final item = widget.videos[index];
+                      final isPlaying = index == playingIndex;
+
+                      return _PlaylistTileNoThumb(
+                        entity: item,
+                        isPlaying: isPlaying,
+                        onTap: () {
+                          setState(() => playingIndex = index); // ✅ UI update instantly
+                          widget.onVideoSelected?.call(index);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _PlaylistTileNoThumb extends StatelessWidget {
+  final AssetEntity entity;
+  final bool isPlaying;
+  final VoidCallback onTap;
+
+  const _PlaylistTileNoThumb({
+    required this.entity,
+    required this.isPlaying,
+    required this.onTap,
+  });
+
+  String _formatDuration(Duration d) {
+    final total = d.inSeconds;
+    final h = total ~/ 3600;
+    final m = (total % 3600) ~/ 60;
+    final s = total % 60;
+
+    String two(int n) => n.toString().padLeft(2, '0');
+    if (h > 0) return "${two(h)}:${two(m)}:${two(s)}";
+    return "${two(m)}:${two(s)}";
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 220),
+      curve: Curves.easeOutCubic,
+      margin: EdgeInsets.symmetric(vertical: 6.h),
+      decoration: BoxDecoration(
+        color: isPlaying ? Colors.orange.withOpacity(0.13) : Colors.white.withOpacity(0.06),
+        borderRadius: BorderRadius.circular(5),
+        border: Border.all(
+          color: isPlaying ? Colors.orangeAccent.withOpacity(0.95) : Colors.white.withOpacity(0.06),
+          width: 1.2,
+        ),
+        boxShadow: [
+          if (isPlaying)
+            BoxShadow(
+              color: Colors.orange.withOpacity(0.22),
+              blurRadius: 18,
+              offset: const Offset(0, 10),
+            ),
+        ],
+      ),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Padding(
+          padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 5.h),
+          child: Row(
+            children: [
+              Container(
+                height: 35,
+                width: 35,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: isPlaying
+                      ? const LinearGradient(
+                    colors: [Color(0xFFFFB703), Color(0xFFFF6A00)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  )
+                      : LinearGradient(
+                    colors: [Colors.white.withOpacity(0.12), Colors.white.withOpacity(0.06)],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  border: Border.all(color: Colors.white.withOpacity(0.10)),
+                ),
+                child: Icon(
+                  isPlaying ? Icons.play_arrow_rounded : Icons.videocam_rounded,
+                  color: isPlaying ? Colors.black : Colors.white.withOpacity(0.85),
+                  size: 26,
+                ),
+              ),
+              SizedBox(width: 8.w),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      entity.title.toString(),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: isPlaying ? Colors.orangeAccent : Colors.white.withOpacity(0.88),
+                        fontWeight: isPlaying ? FontWeight.w800 : FontWeight.w700,
+                        fontSize: 13.5,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                    SizedBox(height: 4.h),
+                    Text(
+                      _formatDuration(entity.videoDuration),
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.55),
+                        fontSize: 10.5,
+                        fontWeight: FontWeight.w600,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(width: 5.w),
+              if (isPlaying)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFFFFB703), Color(0xFFFF6A00)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Text(
+                    "PLAYING",
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 0.6,
+                      decoration: TextDecoration.none,
+                    ),
+                  ),
+                )
+              else
+                Icon(
+                  Icons.play_circle_outline_rounded,
+                  color: Colors.white.withOpacity(0.55),
+                  size: 26,
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
