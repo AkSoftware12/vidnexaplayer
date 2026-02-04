@@ -1,4 +1,5 @@
 import 'package:country_codes/country_codes.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
@@ -159,8 +160,11 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
       body: RefreshIndicator(
         onRefresh: forceRefresh,
         child: isLoading
-            ? const Center(
-          child: CircularProgressIndicator(color: Colors.redAccent),
+            ?  Center(
+          child:CupertinoActivityIndicator(
+            radius: 20,
+            color: Colors.blue,
+          ),
         )
             : (categories.isEmpty
             ? ListView(

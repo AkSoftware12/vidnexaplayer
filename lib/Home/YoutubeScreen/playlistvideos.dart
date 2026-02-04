@@ -1,3 +1,4 @@
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'dart:convert';
@@ -216,17 +217,18 @@ class _YouTubePlaylistVideosState extends State<YouTubePlaylistVideos> {
         onRefresh: forceRefresh,
         child: isLoading
             ? ListView(
-          children: const [
-            SizedBox(height: 220),
+          children: [
+            const SizedBox(height: 220),
             Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CircularProgressIndicator(
-                    valueColor: AlwaysStoppedAnimation<Color>(Colors.redAccent),
+                  CupertinoActivityIndicator(
+                    radius: 20,
+                    color: Colors.blue,
                   ),
-                  SizedBox(height: 16),
-                  Text(
+                  const SizedBox(height: 16),
+                  const Text(
                     'Loading videos...',
                     style: TextStyle(color: Colors.grey),
                   ),

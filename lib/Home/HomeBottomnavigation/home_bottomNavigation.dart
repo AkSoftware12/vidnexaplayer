@@ -506,7 +506,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/video_svg.svg',color: Colors.grey,),
+          icon: SvgPicture.asset('assets/online_video.svg',color: Colors.grey,),
           label: 'Online',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -516,7 +516,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
               shape: BoxShape.circle,
             ),
             child: SvgPicture.asset(
-              'assets/video_svg.svg',
+              'assets/online_video.svg',
               color: Colors.white,
             ),
           ),
