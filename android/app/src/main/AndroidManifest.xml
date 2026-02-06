@@ -43,8 +43,12 @@ tools:ignore="Instantiatable"
     android:requestLegacyExternalStorage="true"
     android:enableOnBackInvokedCallback="true"
     tools:targetApi="m">
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-6478840988045325~8601941258"/>
 
-    <activity
+
+        <activity
         android:name="com.ryanheise.audioservice.AudioServiceActivity"
         android:launchMode="singleTop"
         android:theme="@style/LaunchTheme"

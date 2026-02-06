@@ -9,6 +9,7 @@ import 'package:videoplayer/Utils/string.dart';
 import '../HexColorCode/HexColor.dart';
 import '../Home/HomeBottomnavigation/home_bottomNavigation.dart';
 import '../OnboardScreen/onboarding_screen.dart';
+import '../ads/app_open_ad_manager.dart';
 
 
 class SplashScreen extends StatefulWidget {
@@ -19,29 +20,42 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  final AppOpenAdManager _adManager = AppOpenAdManager();
+
   bool isLoggedIn = false;
 
   @override
   void initState() {
     super.initState();
-    checkLoginStatus();
+    _adManager.init();
+
+    Future.delayed(const Duration(seconds: 3), () {
+      _adManager.showAdIfAvailable(() {
+        checkLoginStatus();
+      });
+    });
+  }
+  @override
+  void dispose() {
+    _adManager.dispose();
+    super.dispose();
   }
 
   Future<void> checkLoginStatus() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool loggedIn = prefs.getBool('isLoggedIn') ?? false;
-    await Future.delayed(const Duration(seconds: 4)); // splash delay
+    final prefs = await SharedPreferences.getInstance();
+    final loggedIn = prefs.getBool('isLoggedIn') ?? false;
 
-    if (loggedIn) {
-      Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) =>  HomeBottomNavigation()));
-    } else {
-      Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => OnboardingScreen()));
-    }
+    if (!mounted) return;
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) =>
+        loggedIn ? HomeBottomNavigation() : OnboardingScreen(),
+      ),
+    );
   }
+
 
   @override
   Widget build(BuildContext context) {

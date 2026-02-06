@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_portal/flutter_portal.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
@@ -16,6 +17,7 @@ import 'NotifyListeners/UserData/user_data.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'SplashScreen/splash_screen.dart';
+import 'ads/app_open_ad_manager.dart';
 
 
 
@@ -26,6 +28,15 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AudioServiceInit.init();
   MediaKit.ensureInitialized();
+  await MobileAds.instance.initialize();
+  // ✅ MARK DEVICE AS TEST (PRODUCTION IDS SAFE)
+  // MobileAds.instance.updateRequestConfiguration(
+  //   RequestConfiguration(
+  //     testDeviceIds: [
+  //       '05B5C242534D4508DE3D9FF83044AED8',
+  //     ],
+  //   ),
+  // );
   await Hive.initFlutter();
   await Hive.openBox('yt_cache'); // ✅ box open once
   // 🔒 Lock entire app in Portrait

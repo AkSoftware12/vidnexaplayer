@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:videoplayer/OnboardScreen/size_config.dart';
 import 'package:videoplayer/Utils/color.dart';
@@ -21,7 +22,8 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   late PageController _controller;
   int _currentPage = 0;
-
+  static const String _adUnitId =
+      'ca-app-pub-6478840988045325/7764390357'; // ✅ TEST ID
   List colors = [
     HexColor('#081740'),
     HexColor('#081740'),
@@ -35,6 +37,20 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
 
   }
 
+  BannerAd banner = BannerAd(
+    adUnitId: _adUnitId, // TEST BANNER
+    size: AdSize.banner,
+    request: const AdRequest(),
+    listener: BannerAdListener(
+      onAdLoaded: (ad) {
+        debugPrint('✅ Banner loaded');
+        debugPrint('✅ bannerId $_adUnitId');
+      },
+      onAdFailedToLoad: (ad, error) {
+        debugPrint('❌ Banner failed: $error');
+      },
+    ),
+  )..load();
 
 
 
@@ -361,9 +377,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                   ],
                 ),
               ),
+
               SizedBox(
-                height: 50.sp,
+                height: 50,
+                child: AdWidget(ad: banner),
               )
+
             ],
           ),
         );
