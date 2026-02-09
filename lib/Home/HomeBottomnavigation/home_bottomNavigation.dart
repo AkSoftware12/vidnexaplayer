@@ -23,7 +23,6 @@ import '../../NotifyListeners/UserData/user_data.dart';
 import '../../SplashScreen/splash_screen.dart';
 import '../../Utils/textSize.dart';
 import '../../app_store/app_store.dart';
-import '../Downloader/downloader.dart';
 import '../HomeScreen/home2.dart' hide navigatorKey;
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
@@ -385,7 +384,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       case 0:
         return DemoHomeScreen();
       case 1:
-        return VidBrowserApp();
+        return Container();
       case 2:
         return OfflineMusicTabScreen();
       case 3:
