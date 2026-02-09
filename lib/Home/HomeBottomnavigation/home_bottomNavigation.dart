@@ -23,6 +23,7 @@ import '../../NotifyListeners/UserData/user_data.dart';
 import '../../SplashScreen/splash_screen.dart';
 import '../../Utils/textSize.dart';
 import '../../app_store/app_store.dart';
+import '../Downloader/downloader.dart';
 import '../HomeScreen/home2.dart' hide navigatorKey;
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
@@ -384,10 +385,12 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       case 0:
         return DemoHomeScreen();
       case 1:
-        return OfflineMusicTabScreen();
+        return VidBrowserApp();
       case 2:
-        return YouTubeTopPlaylists();
+        return OfflineMusicTabScreen();
       case 3:
+        return YouTubeTopPlaylists();
+      case 4:
         return UserProfilePage();
       default:
         return DemoHomeScreen(); // Fallback to HomeScreen
@@ -460,7 +463,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
       ),
       items: [
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/home.svg',color: Colors.grey,),
+          icon: SvgPicture.asset('assets/home.svg',color: Colors.grey,height: 20,width: 20,),
           label: 'Home',
 
           activeIcon: Container(
@@ -473,13 +476,34 @@ class CustomBottomBarState extends State<CustomBottomBar> {
             child: SvgPicture.asset(
               'assets/home.svg',
               color: Colors.white,
+              height: 20,width: 20,
             ),
 
             // Icon(Icons.account_circle, color: Colors.white),
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/music.svg',color: Colors.grey,),
+          icon: SvgPicture.asset('assets/downloader.svg',color: Colors.grey,height: 20,width: 20,),
+          label: 'Downloader',
+          activeIcon: Container(
+            padding: EdgeInsets.all(5.sp),
+            decoration: BoxDecoration(
+              color: ColorSelect.maineColor,
+              // Grey background for selected icon
+              shape: BoxShape.circle,
+            ),
+            child: SvgPicture.asset(
+              'assets/downloader.svg',
+              color: Colors.white,
+              height: 20,width: 20,
+            ),
+
+            // Icon(Icons.account_circle, color: Colors.white),
+          ),
+        ),
+
+        BottomNavigationBarItem(
+          icon: SvgPicture.asset('assets/music.svg',color: Colors.grey,height: 20,width: 20,),
           label: 'Music',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -490,11 +514,12 @@ class CustomBottomBarState extends State<CustomBottomBar> {
             child: SvgPicture.asset(
               'assets/music.svg',
               color: Colors.white,
+              height: 20,width: 20,
             ),
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/online_video.svg',color: Colors.grey,),
+          icon: SvgPicture.asset('assets/online_video.svg',color: Colors.grey,height: 20,width: 20,),
           label: 'Online',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -506,11 +531,12 @@ class CustomBottomBarState extends State<CustomBottomBar> {
             child: SvgPicture.asset(
               'assets/online_video.svg',
               color: Colors.white,
+              height: 20,width: 20,
             ),
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/account.svg',color: Colors.grey,),
+          icon: SvgPicture.asset('assets/account.svg',color: Colors.grey,height: 20,width: 20,),
           label: 'Profile',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -522,6 +548,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
             child: SvgPicture.asset(
               'assets/account.svg',
               color: Colors.white,
+              height: 20,width: 20,
             ),
 
             // Icon(Icons.account_circle, color: Colors.white),

@@ -30,13 +30,13 @@ Future<void> main() async {
   MediaKit.ensureInitialized();
   await MobileAds.instance.initialize();
   // ✅ MARK DEVICE AS TEST (PRODUCTION IDS SAFE)
-  // MobileAds.instance.updateRequestConfiguration(
-  //   RequestConfiguration(
-  //     testDeviceIds: [
-  //       '05B5C242534D4508DE3D9FF83044AED8',
-  //     ],
-  //   ),
-  // );
+  MobileAds.instance.updateRequestConfiguration(
+    RequestConfiguration(
+      testDeviceIds: [
+        '05B5C242534D4508DE3D9FF83044AED8',
+      ],
+    ),
+  );
   await Hive.initFlutter();
   await Hive.openBox('yt_cache'); // ✅ box open once
   // 🔒 Lock entire app in Portrait

@@ -107,6 +107,9 @@ dependencies:
   disk_space_plus: ^0.2.6
   rxdart: ^0.27.7
   google_mobile_ads: ^7.0.0
+  flutter_inappwebview: ^6.1.5
+  dio: ^5.9.1
+  flutter_inappwebview_android: ^1.1.3
 
 
 
