@@ -208,7 +208,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
           ),
 
           SizedBox(
-            height: 80.h,
+            height: 60.h,
             child: ListView.separated(
               padding: EdgeInsets.symmetric(horizontal: 5.w),
               scrollDirection: Axis.horizontal,
@@ -231,7 +231,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                         /// 🎬 Thumbnail
                         SizedBox(
                           width: 140.w,
-                          height: 80.h,
+                          height: 60.h,
                           child: FutureBuilder<Uint8List?>(
                             future: entity.thumbnailDataWithSize(
                               const ThumbnailSize(320, 220),

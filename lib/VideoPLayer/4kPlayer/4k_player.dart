@@ -369,7 +369,10 @@ class _FullScreenVideoPlayerSystemVolumeState
     // ✅ RECENT ADD (AssetEntity.id save)
     try {
       final id = widget.videos[_currentIndex].id;
-      Provider.of<VideoProvider>(context, listen: false).addToRecentlyPlayed(id);
+      Provider.of<VideoProvider>(
+        context,
+        listen: false,
+      ).addToRecentlyPlayed(id);
     } catch (_) {}
 
     final file = await widget.videos[_currentIndex].file;
@@ -1122,6 +1125,670 @@ class _FullScreenVideoPlayerSystemVolumeState
     });
   }
 
+// ✅ Landscape me "more" click par right-side se panel (sheet) aayega
+// ✅ Portrait me normal bottom sheet hi aayega
+// Paste this inside your State class
+
+  void openControlsSheetSmart() {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
+    if (isLandscape) {
+      _openRightControlsSheet();
+    } else {
+      _openControlsBottomSheet(); // aapka existing bottom sheet
+    }
+  }
+
+  /// ✅ RIGHT SIDE SHEET (Landscape)
+  void _openRightControlsSheet() {
+    if (_isLocked) return;
+
+    final size = MediaQuery.of(context).size;
+    final double panelWidth = (size.width * 0.42).clamp(280.0, 420.0);
+
+    showGeneralDialog(
+      context: context,
+      barrierLabel: "Controls",
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.55),
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (_, __, ___) {
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: panelWidth,
+                height: double.infinity,
+                margin: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.92),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.10)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.7),
+                      blurRadius: 30,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 8),
+
+                    // ✅ Header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              "Player Controls",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon:
+                            const Icon(Icons.close, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Divider(color: Colors.white.withOpacity(0.12), height: 1),
+
+                    // ✅ Scroll Body
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _sheetTitle("Quick Actions"),
+                            const SizedBox(height: 10),
+
+                            // ✅ same controls
+                            _controlGrid([
+                              _controlItem(
+                                icon: Icons.camera_alt,
+                                label: "Screenshot",
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  await _takeScreenshot();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.screen_rotation,
+                                label: "Rotate",
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _toggleOrientation();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.headphones,
+                                label: _audioOnly ? "Video On" : "Audio Only",
+                                active: _audioOnly,
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  await _toggleAudioOnly();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.color_lens,
+                                label: "Filters",
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  FilterPopup.show(
+                                    context,
+                                    selectedKey: _selectedFilter,
+                                    onSelected: (key) =>
+                                        setState(() => _selectedFilter = key),
+                                  );
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.hdr_auto_select_sharp,
+                                label: "HDR",
+                                active: _selectedFilter == 'hdr',
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  await toggleHdr();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.volume_up,
+                                label: "Volume",
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _openVolumeDialog();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.speed,
+                                label: "Speed",
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _openSpeedDialog();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.picture_in_picture_alt,
+                                label: "PIP",
+                                disabled: !_hasLocalList,
+                                onTap: !_hasLocalList
+                                    ? null
+                                    : () {
+                                  Navigator.pop(context);
+                                  FloatingVideoManager.show(
+                                    context,
+                                    _player,
+                                    _controller,
+                                    widget.videos,
+                                    _currentIndex,
+                                  );
+                                  Navigator.pop(context);
+                                },
+                              ),
+                            ]),
+
+                            const SizedBox(height: 14),
+                            Divider(color: Colors.white.withOpacity(0.12)),
+                            const SizedBox(height: 12),
+
+                            _sheetTitle("Playback"),
+                            const SizedBox(height: 10),
+
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                _pillButton(
+                                  icon: _isLocked ? Icons.lock : Icons.lock_open,
+                                  label: _isLocked ? "Locked" : "Lock",
+                                  active: _isLocked,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _toggleLock();
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: Icons.replay_10,
+                                  label: "-10s",
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _seekBy(const Duration(seconds: -10));
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: globalPlayPause.isPlaying
+                                      ? Icons.pause_circle_filled
+                                      : Icons.play_circle_fill,
+                                  label:
+                                  globalPlayPause.isPlaying ? "Pause" : "Play",
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _togglePlayPause();
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: Icons.forward_10,
+                                  label: "+10s",
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _seekBy(const Duration(seconds: 10));
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: Icons.skip_previous,
+                                  label: "Prev",
+                                  disabled: !_hasLocalList,
+                                  onTap: !_hasLocalList
+                                      ? null
+                                      : () async {
+                                    Navigator.pop(context);
+                                    await _playPrevious();
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: Icons.skip_next,
+                                  label: "Next",
+                                  disabled: !_hasLocalList,
+                                  onTap: !_hasLocalList
+                                      ? null
+                                      : () async {
+                                    Navigator.pop(context);
+                                    await _playNext();
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: _resizeMode == VideoResizeMode.fit
+                                      ? Icons.fit_screen
+                                      : _resizeMode == VideoResizeMode.fill
+                                      ? Icons.crop
+                                      : Icons.zoom_in_map,
+                                  label: "Resize",
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _toggleResizeMode();
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (_, anim, __, child) {
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+              .animate(curved),
+          child: child,
+        );
+      },
+    );
+  }
+
+  void _openControlsBottomSheet() {
+    if (_isLocked) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) {
+        final h = MediaQuery.of(context).size.height;
+        final maxH = h * 0.4; // ✅ fixed height (change 0.60..0.75)
+
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.all(0),
+            constraints: BoxConstraints(maxHeight: maxH), // ✅ fixed height
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.92),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.10)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.6),
+                  blurRadius: 30,
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+
+                // ✅ handle
+                Container(
+                  height: 5,
+                  width: 45,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                ),
+
+                // ✅ header row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          "Player Controls",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Divider(color: Colors.white.withOpacity(0.12), height: 1),
+
+                // ✅ scrollable body
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _sheetTitle("Quick Actions"),
+                        const SizedBox(height: 10),
+
+                        // ✅ SAME ICONS (fixed size portrait/landscape)
+                        _controlGrid([
+                          _controlItem(
+                            icon: Icons.camera_alt,
+                            label: "Screenshot",
+                            onTap: () async {
+                              Navigator.pop(context);
+                              await _takeScreenshot();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.screen_rotation,
+                            label: "Rotate",
+                            onTap: () {
+                              Navigator.pop(context);
+                              _toggleOrientation();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.headphones,
+                            label: _audioOnly ? "Video On" : "Audio Only",
+                            active: _audioOnly,
+                            onTap: () async {
+                              Navigator.pop(context);
+                              await _toggleAudioOnly();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.color_lens,
+                            label: "Filters",
+                            onTap: () {
+                              Navigator.pop(context);
+                              FilterPopup.show(
+                                context,
+                                selectedKey: _selectedFilter,
+                                onSelected: (key) =>
+                                    setState(() => _selectedFilter = key),
+                              );
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.hdr_auto_select_sharp,
+                            label: "HDR",
+                            active: _selectedFilter == 'hdr',
+                            onTap: () async {
+                              Navigator.pop(context);
+                              await toggleHdr();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.volume_up,
+                            label: "Volume",
+                            onTap: () {
+                              Navigator.pop(context);
+                              _openVolumeDialog();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.speed,
+                            label: "Speed",
+                            onTap: () {
+                              Navigator.pop(context);
+                              _openSpeedDialog();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.picture_in_picture_alt,
+                            label: "PIP",
+                            disabled: !_hasLocalList,
+                            onTap: !_hasLocalList
+                                ? null
+                                : () {
+                              Navigator.pop(context);
+                              FloatingVideoManager.show(
+                                context,
+                                _player,
+                                _controller,
+                                widget.videos,
+                                _currentIndex,
+                              );
+                              Navigator.pop(context);
+                            },
+                          ),
+                        ]),
+
+                        const SizedBox(height: 14),
+                        Divider(color: Colors.white.withOpacity(0.12)),
+                        const SizedBox(height: 12),
+
+                        _sheetTitle("Playback"),
+                        const SizedBox(height: 10),
+
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            _pillButton(
+                              icon: _isLocked ? Icons.lock : Icons.lock_open,
+                              label: _isLocked ? "Locked" : "Lock",
+                              active: _isLocked,
+                              onTap: () {
+                                Navigator.pop(context);
+                                _toggleLock();
+                              },
+                            ),
+                            _pillButton(
+                              icon: Icons.replay_10,
+                              label: "-10s",
+                              onTap: () {
+                                Navigator.pop(context);
+                                _seekBy(const Duration(seconds: -10));
+                              },
+                            ),
+                            _pillButton(
+                              icon: globalPlayPause.isPlaying
+                                  ? Icons.pause_circle_filled
+                                  : Icons.play_circle_fill,
+                              label: globalPlayPause.isPlaying ? "Pause" : "Play",
+                              onTap: () {
+                                Navigator.pop(context);
+                                _togglePlayPause();
+                              },
+                            ),
+                            _pillButton(
+                              icon: Icons.forward_10,
+                              label: "+10s",
+                              onTap: () {
+                                Navigator.pop(context);
+                                _seekBy(const Duration(seconds: 10));
+                              },
+                            ),
+                            _pillButton(
+                              icon: Icons.skip_previous,
+                              label: "Prev",
+                              disabled: !_hasLocalList,
+                              onTap: !_hasLocalList
+                                  ? null
+                                  : () async {
+                                Navigator.pop(context);
+                                await _playPrevious();
+                              },
+                            ),
+                            _pillButton(
+                              icon: Icons.skip_next,
+                              label: "Next",
+                              disabled: !_hasLocalList,
+                              onTap: !_hasLocalList
+                                  ? null
+                                  : () async {
+                                Navigator.pop(context);
+                                await _playNext();
+                              },
+                            ),
+                            _pillButton(
+                              icon: _resizeMode == VideoResizeMode.fit
+                                  ? Icons.fit_screen
+                                  : _resizeMode == VideoResizeMode.fill
+                                  ? Icons.crop
+                                  : Icons.zoom_in_map,
+                              label: "Resize",
+                              onTap: () {
+                                Navigator.pop(context);
+                                _toggleResizeMode();
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _sheetTitle(String text) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Widget _controlGrid(List<Widget> children) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 4,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.2,
+      children: children,
+    );
+  }
+
+  Widget _controlItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    bool active = false,
+    bool disabled = false,
+  }) {
+    final isDisabled = disabled || onTap == null;
+
+    return GestureDetector(
+      onTap: isDisabled ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: active
+              ? Colors.white.withOpacity(0.18)
+              : Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: active
+                ? Colors.white.withOpacity(0.22)
+                : Colors.white.withOpacity(0.10),
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 24, // ✅ fixed size (portrait/landscape same)
+              color: isDisabled
+                  ? Colors.white24
+                  : active
+                  ? Colors.greenAccent
+                  : Colors.white,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: isDisabled ? Colors.white24 : Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pillButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    bool active = false,
+    bool disabled = false,
+  }) {
+    final isDisabled = disabled || onTap == null;
+
+    return InkWell(
+      onTap: isDisabled ? null : onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: active
+              ? Colors.white.withOpacity(0.18)
+              : Colors.white.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18, // ✅ fixed size (portrait/landscape same)
+              color: isDisabled
+                  ? Colors.white24
+                  : active
+                  ? Colors.greenAccent
+                  : Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isDisabled ? Colors.white24 : Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+
   // =================== BUILD (UI SAME) =====================
   @override
   Widget build(BuildContext context) {
@@ -1666,6 +2333,12 @@ class _FullScreenVideoPlayerSystemVolumeState
                                           },
                                           isLandscape: isLandscape,
                                           videos: widget.videos,
+                                          onBackPressedMore: () {
+                                            print('click more');
+                                            openControlsSheetSmart();
+
+
+                                          },
                                         )
                                         : Container(
                                           child: _StreamTopBar(
@@ -1937,10 +2610,7 @@ class _StreamTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return
-
-
-      Padding(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 0),
       child: Row(
         children: [

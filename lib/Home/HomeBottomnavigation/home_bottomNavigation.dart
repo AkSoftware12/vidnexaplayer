@@ -1,5 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
+import 'package:advanced_in_app_review/advanced_in_app_review.dart';
+import 'package:advanced_in_app_review/in_app_review_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
@@ -21,6 +23,7 @@ import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
 import '../../SplashScreen/splash_screen.dart';
+import '../../Utils/rating_popup.dart';
 import '../../Utils/textSize.dart';
 import '../../app_store/app_store.dart';
 import '../HomeScreen/home2.dart' hide navigatorKey;
@@ -40,6 +43,8 @@ class HomeBottomNavigation extends StatefulWidget {
 class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   final GlobalKey<CustomBottomBarState> bottomNavigationKey =
       GlobalKey<CustomBottomBarState>();
+  final AdvancedInAppReview _review = AdvancedInAppReview();
+
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int currentPage = 0;
@@ -62,24 +67,39 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   @override
   void initState() {
     super.initState();
+
     checkForVersion(context);
 
     _getUsername();
     currentPage = widget.bottomIndex;
 
     final newVersion = NewVersionPlus(
-      iOSId: 'com.vidnexa.videoplayer', androidId: 'com.vidnexa.videoplayer', androidPlayStoreCountry: "es_ES", androidHtmlReleaseNotes: true, //support country code
+      iOSId: 'com.vidnexa.videoplayer',
+      androidId: 'com.vidnexa.videoplayer',
+      androidPlayStoreCountry: "in",
+      androidHtmlReleaseNotes: true,
     );
-    final ver = VersionStatus(
-      appStoreLink: '',
-      localVersion: '',
-      storeVersion: '',
-      releaseNotes: '',
-      originalStoreVersion: '',
-    );
+
     advancedStatusCheck(newVersion);
 
+    // ✅ Rating popup (auto conditions) - safest place
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) return;
+
+      // update dialog ko chance dene ke liye
+      await Future.delayed(const Duration(seconds: 2));
+      if (!mounted) return;
+
+      _review
+          .setMinDaysBeforeRemind(15)     // remind after 15 days
+          .setMinDaysAfterInstall(2)      // install ke 2 days baad
+          .setMinLaunchTimes(5)           // 5 launches ke baad
+          .setMinSecondsBeforeShowDialog(4) // conditions met => 4 sec wait
+          .monitor();                     // ✅ auto trigger
+    });
   }
+
+
 
 
   basicStatusCheck(NewVersionPlus newVersion) async {
@@ -383,13 +403,13 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     switch (page) {
       case 0:
         return DemoHomeScreen();
+      // case 1:
+      //   return Container();
       case 1:
-        return Container();
-      case 2:
         return OfflineMusicTabScreen();
-      case 3:
+      case 2:
         return YouTubeTopPlaylists();
-      case 4:
+      case 3:
         return UserProfilePage();
       default:
         return DemoHomeScreen(); // Fallback to HomeScreen
@@ -481,25 +501,25 @@ class CustomBottomBarState extends State<CustomBottomBar> {
             // Icon(Icons.account_circle, color: Colors.white),
           ),
         ),
-        BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/downloader.svg',color: Colors.grey,height: 20,width: 20,),
-          label: 'Downloader',
-          activeIcon: Container(
-            padding: EdgeInsets.all(5.sp),
-            decoration: BoxDecoration(
-              color: ColorSelect.maineColor,
-              // Grey background for selected icon
-              shape: BoxShape.circle,
-            ),
-            child: SvgPicture.asset(
-              'assets/downloader.svg',
-              color: Colors.white,
-              height: 20,width: 20,
-            ),
-
-            // Icon(Icons.account_circle, color: Colors.white),
-          ),
-        ),
+        // BottomNavigationBarItem(
+        //   icon: SvgPicture.asset('assets/downloader.svg',color: Colors.grey,height: 20,width: 20,),
+        //   label: 'Downloader',
+        //   activeIcon: Container(
+        //     padding: EdgeInsets.all(5.sp),
+        //     decoration: BoxDecoration(
+        //       color: ColorSelect.maineColor,
+        //       // Grey background for selected icon
+        //       shape: BoxShape.circle,
+        //     ),
+        //     child: SvgPicture.asset(
+        //       'assets/downloader.svg',
+        //       color: Colors.white,
+        //       height: 20,width: 20,
+        //     ),
+        //
+        //     // Icon(Icons.account_circle, color: Colors.white),
+        //   ),
+        // ),
 
         BottomNavigationBarItem(
           icon: SvgPicture.asset('assets/music.svg',color: Colors.grey,height: 20,width: 20,),
@@ -577,6 +597,8 @@ class SettingsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final user = Provider.of<UserModel>(context);
+    final InAppReviewManager _mgr = InAppReviewManager();
+
 
     return Scaffold(
       body: Column(
@@ -769,7 +791,7 @@ class SettingsScreen extends StatelessWidget {
                     Navigator.of(context).pop();
                   },
                 ),
-                // SizedBox(height: 10.sp),
+                SizedBox(height: 10.sp),
                 // ListTile(
                 //   leading: Container(
                 //     height: 35.sp,
@@ -814,16 +836,16 @@ class SettingsScreen extends StatelessWidget {
                 //       ),
                 //     ],
                 //   ),
-                //   onTap: () {
-                //     Navigator.push(
-                //       context,
-                //       MaterialPageRoute(
-                //         builder: (context) => AllVideosScreen(icon: 'AppBar',),
-                //       ),
-                //     );
+                //   onTap: () async {
+                //     AdvancedInAppReview()
+                //         .setMinDaysBeforeRemind(0)
+                //         .setMinDaysAfterInstall(0)
+                //         .setMinLaunchTimes(1)
+                //         .setMinSecondsBeforeShowDialog(0)
+                //         .monitor();
                 //   },
                 // ),
-                SizedBox(height: 10.sp),
+                // SizedBox(height: 10.sp),
                 ListTile(
                   leading: Container(
                     height: 35.sp,

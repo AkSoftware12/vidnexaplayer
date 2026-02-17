@@ -1,12 +1,13 @@
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
+
 import 'package:videoplayer/Utils/color.dart';
 import '../../Utils/textSize.dart';
+
 import 'OfflineSongs/presentation/pages/home/views/albums_view.dart';
 import 'OfflineSongs/presentation/pages/home/views/artists_view.dart';
 import 'OfflineSongs/presentation/pages/home/views/genres_view.dart';
@@ -16,192 +17,139 @@ class OfflineMusicTabScreen extends StatefulWidget {
   const OfflineMusicTabScreen({super.key});
 
   @override
-  _DashBoardScreenState createState() => _DashBoardScreenState();
+  State<OfflineMusicTabScreen> createState() => _OfflineMusicTabScreenState();
 }
 
-class _DashBoardScreenState extends State<OfflineMusicTabScreen>
+class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   late PageController _pageController;
   int _selectedIndex = 0;
+
+  /// ✅ cache to prevent flicker when coming back to this screen
+  static bool? _lastKnownGranted;
+
+  /// ✅ when false => permission status is still being checked (NO card)
+  bool _permissionChecked = false;
+
   bool _hasPermissions = false;
-  bool _isLoading = true;
+  bool _isPermanentlyDenied = false;
 
   @override
   void initState() {
     super.initState();
     _pageController = PageController(initialPage: 0);
-    WidgetsBinding.instance.addObserver(this); // Add observer for lifecycle changes
-    _checkPermissions();
+    WidgetsBinding.instance.addObserver(this);
+
+    // ✅ instant UI based on last known status (prevents flash)
+    if (_lastKnownGranted != null) {
+      _hasPermissions = _lastKnownGranted!;
+    }
+
+    // ✅ silent re-check in background
+    _checkPermissionStatusOnly();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     super.didChangeAppLifecycleState(state);
     if (state == AppLifecycleState.resumed) {
-      // When app resumes, recheck permissions
-      _checkPermissions();
+      _checkPermissionStatusOnly();
     }
   }
 
   Future<int> _getAndroidSdkInt() async {
-    if (Platform.isAndroid) {
-      final deviceInfo = DeviceInfoPlugin();
-      final androidInfo = await deviceInfo.androidInfo;
-      return androidInfo.version.sdkInt;
-    }
-    return 0; // Non-Android
+    final info = DeviceInfoPlugin();
+    final android = await info.androidInfo;
+    return android.version.sdkInt;
   }
 
-  Future<void> _checkPermissions() async {
-    bool hasAudioPermission = false;
-    int sdkInt = await _getAndroidSdkInt();
-
+  Future<PermissionStatus> _currentPermissionStatus() async {
     if (Platform.isAndroid) {
+      final sdkInt = await _getAndroidSdkInt();
       if (sdkInt >= 33) {
-        // Android 13+: Granular media permission
-        PermissionStatus status = await Permission.audio.status;
-        if (!status.isGranted) {
-          status = await Permission.audio.request();
-        }
-        hasAudioPermission = status.isGranted;
+        return Permission.audio.status; // READ_MEDIA_AUDIO
       } else {
-        // Android 12 aur neeche: Storage permission
-        PermissionStatus status = await Permission.storage.status;
-        if (!status.isGranted) {
-          status = await Permission.storage.request();
-        }
-        hasAudioPermission = status.isGranted;
+        return Permission.storage.status; // READ_EXTERNAL_STORAGE
       }
     } else if (Platform.isIOS) {
-      // iOS: Media library for music files
-      PermissionStatus status = await Permission.mediaLibrary.status;
-      if (!status.isGranted) {
-        status = await Permission.mediaLibrary.request();
-      }
-      hasAudioPermission = status.isGranted;
-    } else {
-      hasAudioPermission = false;
+      return Permission.mediaLibrary.status;
     }
+    return PermissionStatus.granted;
+  }
 
-    if (mounted) {
-      setState(() {
-        _hasPermissions = hasAudioPermission;
-        _isLoading = false;
-      });
-
-      if (_hasPermissions) {
-        await _loadMusic(); // Load music if granted
+  Future<PermissionStatus> _requestPermission() async {
+    if (Platform.isAndroid) {
+      final sdkInt = await _getAndroidSdkInt();
+      if (sdkInt >= 33) {
+        return Permission.audio.request();
       } else {
-        // Optional: User ko alert dikhao ya settings open karo
-        print('Audio access denied');
-        // if (await Permission.audio.shouldShowRequestRationale) { /* Show rationale */ }
-        // await openAppSettings(); // Settings open karne ke liye
+        return Permission.storage.request();
       }
+    } else if (Platform.isIOS) {
+      return Permission.mediaLibrary.request();
     }
-  }
-  // Request audio permission for Android 14 (API 34)
-  Future<void> _requestPermissions() async {
-    final status = await Permission.audio.request();
-
-    bool audioGranted = status.isGranted;
-
-    if (mounted) {
-      setState(() {
-        _hasPermissions = audioGranted;
-        _isLoading = false;
-      });
-
-      if (_hasPermissions) {
-        await _loadMusic(); // Load music data when permission is granted
-      } else if (status.isPermanentlyDenied) {
-        // Open app settings if permission is permanently denied
-        await openAppSettings();
-      }
-    }
+    return PermissionStatus.granted;
   }
 
-  // Function to load music data and refresh the screen
-  Future<void> _loadMusic() async {
+  /// ✅ no dialog, only check status (silent)
+  Future<void> _checkPermissionStatusOnly() async {
+    bool granted = false;
+    bool permanentDenied = false;
+
     try {
-      if (mounted) {
-        setState(() {
-          _isLoading = true; // Show loading indicator while fetching songs
-        });
-      }
-      await Future.delayed(const Duration(seconds: 2));
-
-      if (mounted) {
-        setState(() {
-          _isLoading = false; // Hide loading indicator and refresh UI
-          _hasPermissions = true; // Ensure UI shows the music tabs
-        });
-      }
-    } catch (e) {
-      print('Error loading music: $e');
-      if (mounted) {
-        setState(() {
-          _isLoading = false; // Hide loading indicator even on error
-        });
-      }
+      final status = await _currentPermissionStatus();
+      granted = status.isGranted;
+      permanentDenied = status.isPermanentlyDenied;
+    } catch (_) {
+      // keep existing state if something fails
+      granted = _hasPermissions;
+      permanentDenied = false;
     }
+
+    if (!mounted) return;
+
+    setState(() {
+      _hasPermissions = granted;
+      _isPermanentlyDenied = permanentDenied;
+      _permissionChecked = true;
+    });
+
+    _lastKnownGranted = granted;
+  }
+
+  Future<void> _handlePermissionButton() async {
+    final status = await _requestPermission();
+    if (!mounted) return;
+
+    setState(() {
+      _hasPermissions = status.isGranted;
+      _isPermanentlyDenied = status.isPermanentlyDenied;
+      _permissionChecked = true;
+    });
+
+    _lastKnownGranted = status.isGranted;
   }
 
   void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-      _pageController.animateToPage(
-        index,
-        duration: const Duration(milliseconds: 300),
-        curve: Curves.ease,
-      );
-    });
+    setState(() => _selectedIndex = index);
+    _pageController.jumpToPage(index);
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.background,
-      body: _isLoading
-          ? Center(
-        child:  CupertinoActivityIndicator(
-          radius: 25,
-          color: ColorSelect.maineColor,
-          animating: true,
-        ),
-      )
-          : ScrollConfiguration(
+      body: ScrollConfiguration(
         behavior: const ConstantScrollBehavior(),
         child: Column(
           children: [
-            _buildAppBar(),
+            _buildTopTabs(),
+
             Expanded(
               child: _hasPermissions
-                  ? PageView(
-                controller: _pageController,
-                onPageChanged: (index) {
-                  setState(() {
-                    _selectedIndex = index;
-                  });
-                },
-                children: [
-                  SongsView(
-                    color: Theme.of(context).colorScheme.background,
-                    colortext: Theme.of(context).colorScheme.secondary,
-                  ),
-                  ArtistsView(
-                    color: Theme.of(context).colorScheme.background,
-                    colortext: Theme.of(context).colorScheme.secondary,
-                  ),
-                  AlbumsView(
-                    color: Theme.of(context).colorScheme.background,
-                    colortext: Theme.of(context).colorScheme.secondary,
-                  ),
-                  GenresView(
-                    color: Theme.of(context).colorScheme.background,
-                    colortext: Theme.of(context).colorScheme.secondary,
-                  ),
-                ],
-              )
+                  ? _buildTabsPageView()
+                  : (!_permissionChecked)
+                  ? const SizedBox() // ✅ NO permission card flash
                   : _buildPermissionDeniedCard(),
             ),
           ],
@@ -210,7 +158,7 @@ class _DashBoardScreenState extends State<OfflineMusicTabScreen>
     );
   }
 
-  Widget _buildAppBar() {
+  Widget _buildTopTabs() {
     return AppBar(
       backgroundColor: Theme.of(context).colorScheme.background,
       automaticallyImplyLeading: false,
@@ -259,6 +207,31 @@ class _DashBoardScreenState extends State<OfflineMusicTabScreen>
     );
   }
 
+  Widget _buildTabsPageView() {
+    return PageView(
+      controller: _pageController,
+      onPageChanged: (index) => setState(() => _selectedIndex = index),
+      children: [
+        SongsView(
+          color: Theme.of(context).colorScheme.background,
+          colortext: Theme.of(context).colorScheme.secondary,
+        ),
+        ArtistsView(
+          color: Theme.of(context).colorScheme.background,
+          colortext: Theme.of(context).colorScheme.secondary,
+        ),
+        AlbumsView(
+          color: Theme.of(context).colorScheme.background,
+          colortext: Theme.of(context).colorScheme.secondary,
+        ),
+        GenresView(
+          color: Theme.of(context).colorScheme.background,
+          colortext: Theme.of(context).colorScheme.secondary,
+        ),
+      ],
+    );
+  }
+
   Widget _buildPermissionDeniedCard() {
     return Padding(
       padding: EdgeInsets.all(16.sp),
@@ -272,17 +245,13 @@ class _DashBoardScreenState extends State<OfflineMusicTabScreen>
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(
-                Icons.lock_outline,
-                color: Colors.red,
-                size: 48.sp,
-              ),
+              Icon(Icons.music_off_rounded, color: Colors.red, size: 48.sp),
               SizedBox(height: 16.sp),
               Text(
-                'Music Access Permission Required',
+                'Music Permission Required',
                 style: GoogleFonts.poppins(
                   textStyle: TextStyle(
-                    fontSize: 20.sp,
+                    fontSize: 18.sp,
                     fontWeight: FontWeight.bold,
                     color: Colors.black,
                   ),
@@ -291,37 +260,53 @@ class _DashBoardScreenState extends State<OfflineMusicTabScreen>
               ),
               SizedBox(height: 8.sp),
               Text(
-                'This app requires access to your music files to display offline songs. Please grant the necessary permissions.',
+                'Offline songs show karne ke liye audio/storage permission chahiye.',
                 style: GoogleFonts.poppins(
-                  textStyle: TextStyle(
-                    fontSize: 12.sp,
-                    color: Colors.grey[600],
-                  ),
+                  textStyle: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
                 ),
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 16.sp),
-              ElevatedButton(
-                onPressed: () async {
-                  await _requestPermissions();
-                },
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: ColorSelect.maineColor,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
+              if (_isPermanentlyDenied)
+                ElevatedButton(
+                  onPressed: () => openAppSettings(),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.black,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
-                ),
-                child: Text(
-                  'Allow Permissions',
-                  style: GoogleFonts.poppins(
-                    textStyle: TextStyle(
-                      fontSize: 16.sp,
-                      fontWeight: FontWeight.w600,
+                  child: Text(
+                    'Open Settings',
+                    style: GoogleFonts.poppins(
+                      textStyle: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                ElevatedButton(
+                  onPressed: _handlePermissionButton,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: ColorSelect.maineColor,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    'Allow Permission',
+                    style: GoogleFonts.poppins(
+                      textStyle: TextStyle(
+                        fontSize: 14.sp,
+                        fontWeight: FontWeight.w600,
+                      ),
                     ),
                   ),
                 ),
-              ),
             ],
           ),
         ),
@@ -331,7 +316,7 @@ class _DashBoardScreenState extends State<OfflineMusicTabScreen>
 
   @override
   void dispose() {
-    WidgetsBinding.instance.removeObserver(this); // Remove observer
+    WidgetsBinding.instance.removeObserver(this);
     _pageController.dispose();
     super.dispose();
   }

@@ -157,7 +157,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
         ),
 
         SizedBox(
-          height: 80.sp,
+          height: 60.sp,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: items.length,
@@ -241,8 +241,8 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                             Align(
                               alignment: Alignment.topRight,
                               child: Container(
-                                height: 35.sp,
-                                width: 35.sp,
+                                height: 30.sp,
+                                width: 30.sp,
                                 decoration: BoxDecoration(
                                   color: Colors.white.withOpacity(0.15),
                                   shape: BoxShape.circle,
