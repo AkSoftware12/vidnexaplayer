@@ -22,9 +22,11 @@ import 'LocalMusic/AudioServiceInit/audio_service_init.dart';
 import 'NotifyListeners/AppBar/app_bar_color.dart';
 import 'NotifyListeners/LanguageProvider/language_provider.dart';
 import 'NotifyListeners/UserData/user_data.dart';
+import 'ads/app_open_ad_manager.dart';
 
 // If you have these globals in some other file, keep using yours
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+final AppOpenAdManager appOpenManager = AppOpenAdManager();
 
 
 // adb uninstall com.vidnexa.videoplayer
@@ -47,6 +49,7 @@ Future<void> main() async {
   // Any other init you do before Firebase is fine
   await AudioServiceInit.init();
   MediaKit.ensureInitialized();
+  appOpenManager.init(); // ✅ start ads manager
 
   // ✅ Firebase init FIRST (before messaging setup)
   if (Platform.isAndroid) {

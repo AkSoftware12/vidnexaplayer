@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -7,19 +8,62 @@ class AppOpenAdManager with WidgetsBindingObserver {
   bool _isShowingAd = false;
 
   static const String _adUnitId =
-      'ca-app-pub-6478840988045325/9137962029'; // ✅ TEST ID
+      'ca-app-pub-6478840988045325/9137962029'; // ✅ APP OPEN ID (aapka)
 
   static const int _dailyLimit = 2;
   static const int _cooldownMinutes = 10;
 
+  // =========================
+  // ✅ BANNER
+  // =========================
+  static const String _bannerUnitId =
+      'ca-app-pub-6478840988045325/7764390357'; // ✅ Banner ID (aapka)
+
+  BannerAd? banner;
+  final ValueNotifier<BannerAd?> bannerNotifier = ValueNotifier<BannerAd?>(null);
+
+  // =========================
+  // ✅ INTERSTITIAL (ADDED)
+  // =========================
+  static const String _interstitialUnitId =
+      'ca-app-pub-6478840988045325/2955697053'; // ✅ Interstitial ID (yaha apna lagao)
+
+  InterstitialAd? _interstitialAd;
+  bool _isInterstitialLoading = false;
+
+  // ✅ Frequency control (har click pe nahi)
+  int interstitialShowAfterActions = 3; // every 3 actions
+  int _actionCount = 0;
+
+  // ✅ Cooldown control
+  Duration interstitialCooldown = const Duration(seconds: 35);
+  DateTime _lastInterstitialShown = DateTime.fromMillisecondsSinceEpoch(0);
+
+  // =========================
+  // INIT / DISPOSE
+  // =========================
   void init() {
     WidgetsBinding.instance.addObserver(this);
+
+    // ✅ AppOpen
     loadAd();
+
+    // ✅ Banner
+    _loadBanner();
+
+    // ✅ Interstitial (preload)
+    _loadInterstitial();
   }
 
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+
     _appOpenAd?.dispose();
+    banner?.dispose();
+    bannerNotifier.dispose();
+
+    _interstitialAd?.dispose();
+    _interstitialAd = null;
   }
 
   /// 🔁 App resume listener
@@ -30,6 +74,9 @@ class AppOpenAdManager with WidgetsBindingObserver {
     }
   }
 
+  // =========================
+  // ✅ APP OPEN
+  // =========================
   void loadAd() {
     AppOpenAd.load(
       adUnitId: _adUnitId,
@@ -37,7 +84,6 @@ class AppOpenAdManager with WidgetsBindingObserver {
       adLoadCallback: AppOpenAdLoadCallback(
         onAdLoaded: (ad) {
           debugPrint('✅ App Open Ad Loaded');
-          debugPrint('✅ _adUnitId:$_adUnitId');
           _appOpenAd = ad;
         },
         onAdFailedToLoad: (error) {
@@ -107,5 +153,181 @@ class AppOpenAdManager with WidgetsBindingObserver {
     );
 
     _appOpenAd!.show();
+  }
+
+  // =========================
+  // ✅ INTERSTITIAL (ADDED)
+  // =========================
+  void _loadInterstitial() {
+    if (_isInterstitialLoading || _interstitialAd != null) return;
+    _isInterstitialLoading = true;
+
+    InterstitialAd.load(
+      adUnitId: _interstitialUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          debugPrint('✅ Interstitial Loaded');
+          _isInterstitialLoading = false;
+          _interstitialAd = ad;
+
+          _interstitialAd!.fullScreenContentCallback = FullScreenContentCallback(
+            onAdDismissedFullScreenContent: (ad) {
+              ad.dispose();
+              _interstitialAd = null;
+              _loadInterstitial(); // reload for next time
+            },
+            onAdFailedToShowFullScreenContent: (ad, err) {
+              ad.dispose();
+              _interstitialAd = null;
+              _loadInterstitial();
+            },
+          );
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('❌ Interstitial failed to load: $error');
+          _isInterstitialLoading = false;
+          _interstitialAd = null;
+
+          // light retry
+          Future.delayed(const Duration(seconds: 25), () {
+            _loadInterstitial();
+          });
+        },
+      ),
+    );
+  }
+
+  bool _canShowInterstitialNow() {
+    final now = DateTime.now();
+    final gapOk = now.difference(_lastInterstitialShown) >= interstitialCooldown;
+    final countOk = (_actionCount % interstitialShowAfterActions == 0);
+    return gapOk && countOk && _interstitialAd != null && !_isShowingAd;
+  }
+
+  /// ✅ Use this on Play / Open detail
+  /// Example: appOpenManager.showInterstitialIfAllowed(onContinue: (){...});
+  void showInterstitialIfAllowed({required VoidCallback onContinue}) {
+    _actionCount++;
+
+    if (_interstitialAd == null) {
+      _loadInterstitial();
+      onContinue();
+      return;
+    }
+
+    if (!_canShowInterstitialNow()) {
+      onContinue();
+      return;
+    }
+
+    final ad = _interstitialAd!;
+    _interstitialAd = null;
+    _lastInterstitialShown = DateTime.now();
+
+    ad.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _loadInterstitial();
+        onContinue();
+      },
+      onAdFailedToShowFullScreenContent: (ad, err) {
+        ad.dispose();
+        _loadInterstitial();
+        onContinue();
+      },
+    );
+
+    ad.show();
+  }
+
+  // =========================
+  // ✅ BANNER
+  // =========================
+  void _loadBanner() {
+    banner?.dispose();
+    banner = BannerAd(
+      adUnitId: _bannerUnitId,
+      size: AdSize.banner,
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          debugPrint('✅ Banner loaded');
+          bannerNotifier.value = banner;
+        },
+        onAdFailedToLoad: (ad, error) {
+          debugPrint('❌ Banner failed: $error');
+          ad.dispose();
+          banner = null;
+          bannerNotifier.value = null;
+        },
+      ),
+    )..load();
+  }
+
+  Widget bannerWidgetBottomScreen() {
+    return ValueListenableBuilder<BannerAd?>(
+      valueListenable: bannerNotifier,
+      builder: (context, ad, _) {
+        if (ad == null) return const SizedBox.shrink();
+        return SizedBox(
+          width: ad.size.width.toDouble(),
+          height: ad.size.height.toDouble(),
+          child: AdWidget(ad: ad),
+        );
+      },
+    );
+  }
+
+  Widget bannerWidget({EdgeInsets? margin}) {
+    return ValueListenableBuilder<BannerAd?>(
+      valueListenable: bannerNotifier,
+      builder: (context, ad, _) {
+        if (ad == null) return const SizedBox.shrink();
+
+        return Container(
+          margin: margin ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.08),
+                blurRadius: 10,
+                spreadRadius: 2,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Align(
+                alignment: Alignment.centerRight,
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 4, right: 4),
+                  child: Text(
+                    "Sponsored",
+                    style: TextStyle(
+                      fontSize: 10,
+                      color: Colors.grey.shade600,
+                    ),
+                  ),
+                ),
+              ),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(12),
+                child: SizedBox(
+                  width: ad.size.width.toDouble(),
+                  height: ad.size.height.toDouble(),
+                  child: AdWidget(ad: ad),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 }

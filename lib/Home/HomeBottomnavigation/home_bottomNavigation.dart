@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:new_version_plus/new_version_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -25,6 +26,7 @@ import '../../NotifyListeners/UserData/user_data.dart';
 import '../../SplashScreen/splash_screen.dart';
 import '../../Utils/rating_popup.dart';
 import '../../Utils/textSize.dart';
+import '../../ads/app_open_ad_manager.dart';
 import '../../app_store/app_store.dart';
 import '../HomeScreen/home2.dart' hide navigatorKey;
 import '../Me/me.dart';
@@ -44,6 +46,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   final GlobalKey<CustomBottomBarState> bottomNavigationKey =
       GlobalKey<CustomBottomBarState>();
   final AdvancedInAppReview _review = AdvancedInAppReview();
+  final appOpenManager = AppOpenAdManager();
+
+
 
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
@@ -67,6 +72,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   @override
   void initState() {
     super.initState();
+    appOpenManager.init();
+
 
     checkForVersion(context);
 
@@ -99,8 +106,12 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     });
   }
 
+  @override
+  void dispose() {
+    appOpenManager.dispose();
+    super.dispose();
 
-
+  }
 
   basicStatusCheck(NewVersionPlus newVersion) async {
     final version = await newVersion.getVersionStatus();
@@ -376,15 +387,35 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
             const MiniPlayer(),   // 👈 YAHI ADD KARNA HAI
           ],
         ),
-        bottomNavigationBar: CustomBottomBar(
-          initialSelection: widget.bottomIndex,
-          key: bottomNavigationKey,
-          onTabChangedListener: (position) {
-            setState(() {
-              currentPage = position;
-            });
-          },
+
+        bottomNavigationBar: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+
+            /// 🔥 Bottom Navigation
+            CustomBottomBar(
+              initialSelection: widget.bottomIndex,
+              key: bottomNavigationKey,
+              onTabChangedListener: (position) {
+                setState(() {
+                  currentPage = position;
+                });
+              },
+            ),
+
+            appOpenManager.bannerWidgetBottomScreen(),
+          ],
         ),
+
+        // bottomNavigationBar: CustomBottomBar(
+        //   initialSelection: widget.bottomIndex,
+        //   key: bottomNavigationKey,
+        //   onTabChangedListener: (position) {
+        //     setState(() {
+        //       currentPage = position;
+        //     });
+        //   },
+        // ),
         drawer: Drawer(
             shape: const RoundedRectangleBorder(
               borderRadius: BorderRadius.zero,

@@ -3,10 +3,32 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:videoplayer/Utils/color.dart';
 
+import '../ads/app_open_ad_manager.dart';
 
-class NotificationScreen extends StatelessWidget {
+
+class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
 
+  @override
+  State<NotificationScreen> createState() => _NotificationScreenState();
+}
+
+class _NotificationScreenState extends State<NotificationScreen> {
+  final appOpenManager = AppOpenAdManager();
+
+
+  @override
+  void initState() {
+    super.initState();
+    appOpenManager.init();
+  }
+
+
+  @override
+  void dispose() {
+    appOpenManager.dispose();
+    super.dispose();
+  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -82,6 +104,8 @@ class NotificationScreen extends StatelessWidget {
           ],
         ),
       ),
+      bottomNavigationBar:appOpenManager.bannerWidget(),
+
     );
   }
 }

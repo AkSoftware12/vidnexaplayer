@@ -12,6 +12,8 @@ import '../../Photo/image_album.dart';
 import '../../RecentlyVideos/RecentlyPlayedScreen/recently_played_screen.dart';
 import '../../VideoPLayer/4kPlayer/4k_player.dart';
 import '../../VideoPLayer/VideoList/video_list.dart';
+import '../../ads/BannerAdsList/banner_ad_list.dart';
+import '../../ads/app_open_ad_manager.dart';
 import 'BannerSlider/banner_slider.dart';
 import 'BottomsheetHomeScreen/bottomsheet_menu_button.dart';
 import 'HorizontalGridList/horizontal_gridlist.dart';
@@ -96,6 +98,8 @@ class DemoHomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<DemoHomeScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   List<AssetPathEntity> _albums = [];
+  final appOpenManager = AppOpenAdManager();
+
   bool _isLoading = true;
   bool _hasPermission = false;
 
@@ -108,6 +112,8 @@ class _HomeScreenState extends State<DemoHomeScreen>
   @override
   void initState() {
     super.initState();
+    appOpenManager.init();
+
     WidgetsBinding.instance.addObserver(this);
 
     _controller = AnimationController(
@@ -151,7 +157,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-
+    appOpenManager.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -319,13 +325,6 @@ class _HomeScreenState extends State<DemoHomeScreen>
 
                                 Row(
                                   children: [
-                                    // IconButton(
-                                    //   icon: Icon(Icons.refresh, color: Colors.black),
-                                    //   onPressed: () async {
-                                    //     await _requestPermissionAndLoadAlbums();
-                                    //   },
-                                    //   tooltip: 'Refresh Videos',
-                                    // ),
                                     Container(
                                       height: 32.sp,
                                       decoration: BoxDecoration(
@@ -411,20 +410,48 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                   switchOutCurve: Curves.easeIn,
                                   child:
                                       _isListView
-                                          ? ListView.builder(
-                                            key: ValueKey('listView'),
-                                            shrinkWrap: true,
-                                            physics:
-                                                NeverScrollableScrollPhysics(),
-                                            itemCount: _albums.length,
-                                            itemBuilder: (context, index) {
-                                              return AlbumTile(
-                                                album: _albums[index],
-                                                index: index,
-                                              );
-                                            },
-                                          )
-                                          : _isGridView
+                                          ? InlineBannerList(
+                                        key: const ValueKey('listView'),
+                                        items: _albums,
+                                        adUnitId: 'ca-app-pub-6478840988045325/7764390357',
+                                        itemsPerAd: 9, // ✅ 6 items ke baad ad
+                                        physics: const NeverScrollableScrollPhysics(),
+                                        shrinkWrap: true,
+                                        itemBuilder: (context, index, album) {
+                                          return AlbumTile(
+                                            album: album,
+                                            index: index,
+                                          );
+                                        },
+                                      )
+
+
+
+                                      // ListView.builder(
+                                      //   key: ValueKey('listView'),
+                                      //   shrinkWrap: true,
+                                      //   physics: NeverScrollableScrollPhysics(),
+                                      //
+                                      //   // 👉 total count = albums + ads
+                                      //   itemCount: _albums.length + (_albums.length ~/ 6),
+                                      //
+                                      //   itemBuilder: (context, index) {
+                                      //     // 👉 Check: kya ye ad position hai?
+                                      //     if ((index + 1) % 7 == 0) {
+                                      //       return appOpenManager.bannerWidget(); // 👈 Banner widget
+                                      //     }
+                                      //
+                                      //     // 👉 actual album index calculate karo
+                                      //     final int albumIndex = index - (index ~/ 7);
+                                      //
+                                      //     return AlbumTile(
+                                      //       album: _albums[albumIndex],
+                                      //       index: albumIndex,
+                                      //     );
+                                      //   },
+                                      // )
+
+                                        : _isGridView
                                           ? GridView.builder(
                                             key: ValueKey('gridView'),
                                             padding: EdgeInsets.symmetric(
