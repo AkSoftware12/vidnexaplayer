@@ -286,11 +286,11 @@ class AppOpenAdManager with WidgetsBindingObserver {
         if (ad == null) return const SizedBox.shrink();
 
         return Container(
-          margin: margin ?? const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-          padding: const EdgeInsets.all(6),
+          margin: margin ?? const EdgeInsets.symmetric(horizontal: 0, vertical: 0),
+          padding: const EdgeInsets.all(0),
           decoration: BoxDecoration(
             color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(0),
             boxShadow: [
               BoxShadow(
                 color: Colors.black.withOpacity(0.08),
@@ -306,7 +306,7 @@ class AppOpenAdManager with WidgetsBindingObserver {
               Align(
                 alignment: Alignment.centerRight,
                 child: Padding(
-                  padding: const EdgeInsets.only(bottom: 4, right: 4),
+                  padding: const EdgeInsets.only(bottom: 0, right: 2),
                   child: Text(
                     "Sponsored",
                     style: TextStyle(

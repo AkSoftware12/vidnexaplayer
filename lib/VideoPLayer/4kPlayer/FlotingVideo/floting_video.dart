@@ -177,11 +177,26 @@ class FloatingVideoManager {
     _showControlsTemporarily();
   }
 
-  static void hide() {
+  // static void hide() {
+  //   _playingSub?.cancel();
+  //   _hideTimer?.cancel();
+  //   _entry?.remove();
+  //   _entry = null;
+  // }
+
+  static Future<void> hide() async {
     _playingSub?.cancel();
     _hideTimer?.cancel();
+
+    try {
+      await _player?.dispose();
+    } catch (_) {}
+
     _entry?.remove();
     _entry = null;
+
+    _player = null;
+    _controller = null;
   }
 
   static bool get isActive => _entry != null;

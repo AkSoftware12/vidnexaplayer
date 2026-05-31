@@ -2,9 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
-
 import '../../../NetWork Stream/stream_video.dart';
 import '../../../Photo/image_album.dart';
+import '../../../StatusSaverScreen/whatsapp_download.dart';
 import '../../../VideoPLayer/VideoList/video_list.dart';
 import '../../HomeBottomnavigation/home_bottomNavigation.dart'; // for AssetPathEntity
 
@@ -77,6 +77,15 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
           color2: Colors.purpleAccent,
           mb: '2.2 GB',
           count: 312,
+        ),
+        PropertyTypeModel(
+          imageUrl: 'assets/downloadlist.png',
+          text: 'Status Saver',
+          color:Color(0xFF25D366),
+          color2:Color(0xFF7ED89F),
+          mb: '3.2 GB',
+          count: 27,
+
         ),
         PropertyTypeModel(
           imageUrl: 'assets/link.img.png',
@@ -197,6 +206,13 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
+                        builder: (context) => StatusSaverHomePage(),
+                      ),
+                    );
+                  }else if (index == 4) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
                         builder: (context) => VideoPlayerStream(),
                       ),
                     );
@@ -209,7 +225,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                     horizontal: 3.sp,
                     vertical: 0.sp,
                   ),
-                  width: 120.sp,
+                  width: 80.sp,
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [item.color, item.color2],
@@ -236,10 +252,10 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                       Padding(
                         padding: EdgeInsets.all(5.sp),
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                          crossAxisAlignment: CrossAxisAlignment.center,
                           children: [
                             Align(
-                              alignment: Alignment.topRight,
+                              alignment: Alignment.topCenter,
                               child: Container(
                                 height: 30.sp,
                                 width: 30.sp,
@@ -251,17 +267,17 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                                   padding: EdgeInsets.all(6.sp),
                                   child: Image.asset(
                                     item.imageUrl,
-                                    color: Colors.white,
+                                    // color: Colors.white,
                                     fit: BoxFit.contain,
                                   ),
                                 ),
                               ),
                             ),
-                            const Spacer(),
+                            Spacer(),
                             Text(
                               item.text,
                               style: GoogleFonts.poppins(
-                                fontSize: 12.sp,
+                                fontSize: 10.sp,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
                               ),

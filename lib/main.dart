@@ -14,6 +14,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
+import 'package:videoplayer/video_intent_service.dart';
 
 import 'DarkMode/dark_mode.dart';
 import 'Home/HomeScreen/home2.dart';
@@ -22,6 +23,7 @@ import 'LocalMusic/AudioServiceInit/audio_service_init.dart';
 import 'NotifyListeners/AppBar/app_bar_color.dart';
 import 'NotifyListeners/LanguageProvider/language_provider.dart';
 import 'NotifyListeners/UserData/user_data.dart';
+import 'VideoPLayer/4kPlayer/4k_player.dart';
 import 'ads/app_open_ad_manager.dart';
 
 // If you have these globals in some other file, keep using yours
@@ -101,10 +103,44 @@ Future<void> main() async {
   );
 }
 
-class MyApp extends StatelessWidget {
+
+
+
+class MyApp extends StatefulWidget {
+  const MyApp({super.key});
+
+  @override
+  State<MyApp> createState() => _MyAppState();
+}
+
+class _MyAppState extends State<MyApp> {
   final RouteObserver<PageRoute> _routeObserver = RouteObserver<PageRoute>();
 
-  MyApp({super.key});
+  @override
+  void initState() {
+    super.initState();
+    _openVideoIfNeeded();
+  }
+
+  Future<void> _openVideoIfNeeded() async {
+    final path = await VideoIntentService.getVideoPath();
+    if (path == null || path.isEmpty) return;
+    if (!mounted) return;
+
+    debugPrint('OPEN WITH PATH => $path');
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      navigatorKey.currentState?.push(
+        MaterialPageRoute(
+          builder: (_) => FullScreenVideoPlayerFixed(
+            videos: const [],
+            initialIndex: 0,
+            initialUrl: Uri.file(path).toString(),
+          ),
+        ),
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -126,8 +162,8 @@ class MyApp extends StatelessWidget {
                   theme: Provider.of<ThemeProvider>(context).themeDataStyle,
                   locale: localeProvider.locale,
                   supportedLocales: const [
-                    Locale('en', ''), // English
-                    Locale('hi', ''), // Hindi
+                    Locale('en', ''),
+                    Locale('hi', ''),
                   ],
                   home: const Scaffold(
                     body: SplashScreen(),

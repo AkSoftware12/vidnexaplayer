@@ -1,6 +1,7 @@
 import 'dart:ui';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 import 'package:rxdart/rxdart.dart';
@@ -85,12 +86,12 @@ class MiniPlayer extends StatelessWidget {
                               children: [
                                 // ================= PLAYER ROW =================
                                 SizedBox(
-                                  height: 60,
+                                  height: 38.sp,
                                   child: Row(
                                     children: [
                                       SongArtwork(
                                         songId: int.tryParse(mediaItem.id) ?? 0,
-                                        size: 70,
+                                        size: 40,
                                         borderRadius: BorderRadius.circular(0),
                                       ),
                                       // ✅ safer parse (avoid crash)
@@ -108,19 +109,19 @@ class MiniPlayer extends StatelessWidget {
                                               mediaItem.title,
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
+                                              style:  TextStyle(
                                                 color: Colors.white,
                                                 fontWeight: FontWeight.w600,
-                                                fontSize: 15,
+                                                fontSize: 10.sp,
                                               ),
                                             ),
                                             Text(
                                               mediaItem.artist ?? '',
                                               maxLines: 1,
                                               overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
+                                              style:  TextStyle(
                                                 color: Colors.white60,
-                                                fontSize: 12,
+                                                fontSize: 8.sp,
                                               ),
                                             ),
                                           ],
@@ -131,7 +132,7 @@ class MiniPlayer extends StatelessWidget {
                                         icon: const Icon(
                                           Icons.skip_previous_rounded,
                                           color: Colors.white,
-                                          size: 32,
+                                          size: 30,
                                         ),
                                         onPressed: audio.previous, // ✅ handler based
                                       ),
@@ -142,7 +143,7 @@ class MiniPlayer extends StatelessWidget {
                                               ? Icons.pause_circle_filled_rounded
                                               : Icons.play_circle_fill_rounded,
                                           color: Colors.white,
-                                          size: 38,
+                                          size: 32,
                                         ),
                                         onPressed: () {
                                           (state?.playing ?? false)
@@ -155,7 +156,7 @@ class MiniPlayer extends StatelessWidget {
                                         icon: const Icon(
                                           Icons.skip_next_rounded,
                                           color: Colors.white,
-                                          size: 32,
+                                          size: 30,
                                         ),
                                         onPressed: audio.next, // ✅ handler based
                                       ),
@@ -196,7 +197,7 @@ class MiniPlayer extends StatelessWidget {
 
                                     return SliderTheme(
                                       data: SliderTheme.of(context).copyWith(
-                                        trackHeight: 2,
+                                        trackHeight: 1,
                                         thumbShape: const RoundSliderThumbShape(
                                             enabledThumbRadius: 0),
                                         overlayShape:

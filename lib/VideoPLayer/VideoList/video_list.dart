@@ -12,6 +12,7 @@ import '../../Utils/color.dart';
 import '../../ads/app_open_ad_manager.dart';
 import '../../main.dart';
 import '../4kPlayer/4k_player.dart';
+import '../4kPlayer/FlotingVideo/floting_video.dart';
 
 
 
@@ -547,6 +548,7 @@ class PhotoTile extends StatelessWidget {
       onTap: () {
         appOpenManager.showInterstitialIfAllowed(
           onContinue: () {
+            FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -742,6 +744,8 @@ class PhotoTile extends StatelessWidget {
                     if (value == "Play") {
                       appOpenManager.showInterstitialIfAllowed(
                         onContinue: () {
+                          FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
+
                           Navigator.push(
                             context,
                             MaterialPageRoute(
@@ -846,6 +850,7 @@ class GridviewList extends StatelessWidget {
       onTap: () {
         appOpenManager.showInterstitialIfAllowed(
           onContinue: () {
+            FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
             Navigator.push(
               context,
               MaterialPageRoute(
@@ -1014,6 +1019,8 @@ class GridviewList extends StatelessWidget {
                         if (value == "Play") {
                           appOpenManager.showInterstitialIfAllowed(
                             onContinue: () {
+                              FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
+
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
