@@ -60,6 +60,9 @@ class _FullScreenVideoPlayerSystemVolumeState
   late final VideoController _controller;
   VideoResizeMode _resizeMode = VideoResizeMode.fit;
 
+  // ✅ true only if WE created the player (so we may dispose it)
+  bool _ownsPlayer = false;
+
   bool get _hasLocalList => widget.videos.isNotEmpty;
 
   bool get _hasUrl =>
@@ -122,9 +125,10 @@ class _FullScreenVideoPlayerSystemVolumeState
   // Track playback position & duration for the progress bar.
   Duration _currentPosition = Duration.zero;
   Duration _totalDuration = Duration.zero;
-  late final StreamSubscription<Duration> _positionSub;
-  late final StreamSubscription<Duration> _durationSub;
+  StreamSubscription<Duration>? _positionSub;
+  StreamSubscription<Duration>? _durationSub;
   StreamSubscription<bool>? _playingSub;
+  StreamSubscription<bool>? _completedSub; // ✅ store to cancel later
 
   // =========================================================
   // ✅ MX PLAYER PAN ENGINE + SEEK OVERLAY + BUBBLE + HAPTIC
@@ -149,6 +153,13 @@ class _FullScreenVideoPlayerSystemVolumeState
   // throttle system volume set
   Timer? _volThrottle;
 
+  // ✅ throttle seek during horizontal pan (avoid stutter)
+  Timer? _seekThrottle;
+  Duration? _pendingSeekPos;
+
+  // ✅ remember offset at pan start (for zoomed reposition)
+  Offset _panStartOffset = Offset.zero;
+
   // seek overlay + bubble
   bool _showSeekOverlay = false;
   String _seekOverlayText = '';
@@ -162,19 +173,43 @@ class _FullScreenVideoPlayerSystemVolumeState
   int _lastHapticEdge = -1; // -1 none, 0 min, 1 max
   DateTime _lastHapticAt = DateTime.fromMillisecondsSinceEpoch(0);
 
+  // =========================================================
+  // ✅ PINCH TO ZOOM (2-finger)
+  // =========================================================
+  double _videoScale = 1.0;
+  double _baseScaleOnGesture = 1.0;
+  bool _isZooming = false;
+  Offset _videoOffset = Offset.zero;
+  static const double _minScale = 1.0;
+  static const double _maxScale = 4.0;
+
+  bool _showZoomBadge = false;
+  Timer? _zoomBadgeTimer;
+
+  void _clampOffset() {
+    final size = MediaQuery.of(context).size;
+    final maxX = (size.width * (_videoScale - 1)) / 2;
+    final maxY = (size.height * (_videoScale - 1)) / 2;
+    _videoOffset = Offset(
+      _videoOffset.dx.clamp(-maxX, maxX),
+      _videoOffset.dy.clamp(-maxY, maxY),
+    );
+  }
+
   @override
   void initState() {
     super.initState();
 
     _currentIndex =
-        _hasLocalList
-            ? widget.initialIndex.clamp(0, widget.videos.length - 1)
-            : 0;
+    _hasLocalList
+        ? widget.initialIndex.clamp(0, widget.videos.length - 1)
+        : 0;
 
     // ✅ Reuse external player/controller if coming from floating
     if (widget.externalPlayer != null && widget.externalController != null) {
       _player = widget.externalPlayer!;
       _controller = widget.externalController!;
+      _ownsPlayer = false; // ✅ someone else owns it -> never dispose here
       _isLoading = false;
 
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -191,6 +226,7 @@ class _FullScreenVideoPlayerSystemVolumeState
     } else {
       _player = Player();
       _controller = VideoController(_player);
+      _ownsPlayer = true; // ✅ we created it -> safe to dispose
 
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
@@ -221,8 +257,8 @@ class _FullScreenVideoPlayerSystemVolumeState
     });
 
     _volumeSubscription = VolumeController.instance.addListener((
-      double volume,
-    ) {
+        double volume,
+        ) {
       if (!mounted) return;
       setState(() {
         _systemVolume = volume * 100;
@@ -258,7 +294,7 @@ class _FullScreenVideoPlayerSystemVolumeState
     });
 
     // Completed listener (only for local list)
-    _player.stream.completed.listen((completed) async {
+    _completedSub = _player.stream.completed.listen((completed) async {
       if (!completed) return;
 
       if (!_hasLocalList) {
@@ -302,6 +338,8 @@ class _FullScreenVideoPlayerSystemVolumeState
       setState(() {
         _isLoading = true;
         _showLogo = false;
+        _videoScale = 1.0; // ✅ reset zoom
+        _videoOffset = Offset.zero;
       });
 
       await _player.open(Media(url), play: true);
@@ -364,12 +402,17 @@ class _FullScreenVideoPlayerSystemVolumeState
     setState(() {
       _isLoading = true;
       _showLogo = false;
+      _videoScale = 1.0; // ✅ reset zoom
+      _videoOffset = Offset.zero;
     });
 
     // ✅ RECENT ADD (AssetEntity.id save)
     try {
       final id = widget.videos[_currentIndex].id;
-      Provider.of<VideoProvider>(context, listen: false).addToRecentlyPlayed(id);
+      Provider.of<VideoProvider>(
+        context,
+        listen: false,
+      ).addToRecentlyPlayed(id);
     } catch (_) {}
 
     final file = await widget.videos[_currentIndex].file;
@@ -438,38 +481,38 @@ class _FullScreenVideoPlayerSystemVolumeState
     final OverlayEntry entry = OverlayEntry(
       builder:
           (context) => Center(
-            child: Material(
-              color: Colors.transparent,
-              child: AnimatedScale(
-                scale: 1,
-                duration: const Duration(milliseconds: 150),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    vertical: 12,
-                    horizontal: 20,
+        child: Material(
+          color: Colors.transparent,
+          child: AnimatedScale(
+            scale: 1,
+            duration: const Duration(milliseconds: 150),
+            child: Container(
+              padding: const EdgeInsets.symmetric(
+                vertical: 12,
+                horizontal: 20,
+              ),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.85),
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 10,
                   ),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.85),
-                    borderRadius: BorderRadius.circular(14),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.3),
-                        blurRadius: 10,
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    message,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                ],
+              ),
+              child: Text(
+                message,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ),
           ),
+        ),
+      ),
     );
 
     Overlay.of(context).insert(entry);
@@ -679,10 +722,10 @@ class _FullScreenVideoPlayerSystemVolumeState
   }
 
   Widget _buildSlider(
-    String label,
-    double value,
-    ValueChanged<double> onChanged,
-  ) {
+      String label,
+      double value,
+      ValueChanged<double> onChanged,
+      ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -717,17 +760,56 @@ class _FullScreenVideoPlayerSystemVolumeState
   Future<void> _takeScreenshot() async {
     try {
       final Uint8List? data = await _player.screenshot(format: 'image/png');
-      if (data != null) {
+
+      if (data == null) {
         if (context.mounted) {
           Fluttertoast.showToast(
-            msg: 'Screenshot captured',
+            msg: 'Screenshot failed: empty frame',
             toastLength: Toast.LENGTH_SHORT,
             gravity: ToastGravity.CENTER,
-            backgroundColor: Colors.green,
+            backgroundColor: Colors.red,
             textColor: Colors.white,
             fontSize: 14,
           );
         }
+        return;
+      }
+
+      // ✅ Ask for gallery permission before saving
+      final ps = await PhotoManager.requestPermissionExtend();
+      if (!ps.hasAccess) {
+        if (context.mounted) {
+          Fluttertoast.showToast(
+            msg: 'Storage permission denied',
+            toastLength: Toast.LENGTH_SHORT,
+            gravity: ToastGravity.CENTER,
+            backgroundColor: Colors.red,
+            textColor: Colors.white,
+            fontSize: 14,
+          );
+        }
+        return;
+      }
+
+      // ✅ Actually save the bytes to the gallery
+      final fileName =
+          'screenshot_${DateTime.now().millisecondsSinceEpoch}.png';
+      final AssetEntity? saved = await PhotoManager.editor.saveImage(
+        data,
+        filename: fileName,
+      );
+
+      if (context.mounted) {
+        Fluttertoast.showToast(
+          msg: saved != null
+              ? 'Screenshot saved to gallery'
+              : 'Screenshot save failed',
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.CENTER,
+          backgroundColor: saved != null ? Colors.green : Colors.red,
+          textColor: Colors.white,
+          fontSize: 14,
+        );
       }
     } catch (e) {
       if (context.mounted) {
@@ -760,7 +842,10 @@ class _FullScreenVideoPlayerSystemVolumeState
 
     await Future.delayed(const Duration(seconds: 3));
 
-    if (!mounted) return;
+    if (!mounted) {
+      _hdrChanging = false; // ✅ don't leave it stuck
+      return;
+    }
 
     setState(() {
       _hdrOn = !_hdrOn;
@@ -832,47 +917,126 @@ class _FullScreenVideoPlayerSystemVolumeState
   }
 
   void _onUserInteractionFromBottom(
-    DragUpdateDetails details,
-    BuildContext context,
-  ) {
+      Offset localPosition,
+      Offset delta,
+      BuildContext context,
+      ) {
     final screenHeight = MediaQuery.of(context).size.height;
-    if (details.localPosition.dy > screenHeight * 1 && details.delta.dy < -5) {
+    // ✅ #6: trigger when the touch starts near the BOTTOM edge (bottom ~12%)
+    // and the finger is moving UP. Old check (dy > height*1) was impossible.
+    if (localPosition.dy > screenHeight * 0.88 && delta.dy < -5) {
       _showBottomBarTemporarily();
     }
   }
 
   // =========================================================
-  // ✅ MX PAN ENGINE: Seek + Volume/Brightness + overlays
+  // ✅ SCALE ENGINE: 1 finger = MX pan, 2 finger = ZOOM
   // =========================================================
-  void _onPanStart(DragStartDetails details) async {
+  void _onScaleStart(ScaleStartDetails details) {
     if (_isLocked) return;
 
+    if (details.pointerCount >= 2) {
+      _isZooming = true;
+      _baseScaleOnGesture = _videoScale;
+      _panActive = false;
+      _panIsHorizontal = false;
+      _panIsVertical = false;
+      _hideSeekOverlay(immediate: true);
+      _hideSeekBubble(immediate: true);
+      return;
+    }
+
+    _isZooming = false;
+    _panStartLogic(details.localFocalPoint);
+  }
+
+  Future<void> _onScaleUpdate(ScaleUpdateDetails details) async {
+    if (_isLocked) return;
+
+    // ---------- 2 FINGER ZOOM ----------
+    if (details.pointerCount >= 2) {
+      if (!_isZooming) {
+        _isZooming = true;
+        _baseScaleOnGesture = _videoScale;
+        _panActive = false;
+        _panIsHorizontal = false;
+        _panIsVertical = false;
+        _hideSeekOverlay(immediate: true);
+        _hideSeekBubble(immediate: true);
+      }
+
+      final newScale =
+      (_baseScaleOnGesture * details.scale).clamp(_minScale, _maxScale);
+
+      setState(() {
+        _videoScale = newScale;
+        if (_videoScale > 1.0) {
+          _videoOffset += details.focalPointDelta; // zoom me drag-reposition
+          _clampOffset();
+        } else {
+          _videoOffset = Offset.zero;
+        }
+        _showZoomBadge = true;
+      });
+
+      _zoomBadgeTimer?.cancel();
+      _zoomBadgeTimer = Timer(const Duration(milliseconds: 800), () {
+        if (mounted) setState(() => _showZoomBadge = false);
+      });
+      return;
+    }
+
+    // ---------- 1 FINGER (MX pan) ----------
+    if (_isZooming) return; // pinch ke baad bacha hua single finger ignore
+    await _panUpdateLogic(details.localFocalPoint, details.focalPointDelta);
+  }
+
+  void _onScaleEnd(ScaleEndDetails details) {
+    if (_isZooming) {
+      _isZooming = false;
+      return;
+    }
+    _panEndLogic();
+  }
+
+  // ----- pan logic (same as before, sirf Offset based) -----
+  void _panStartLogic(Offset localPosition) async {
     _panActive = true;
     _panIsHorizontal = false;
     _panIsVertical = false;
 
-    _panStart = details.localPosition;
+    _panStart = localPosition;
     _panStartPos = _player.state.position;
-
     _panStartVolume = _systemVolume;
+    _panStartOffset = _videoOffset;
 
+    // ✅ immediate default so first swipe has no jitter
+    _panStartBrightness = _brightness;
     try {
       _panStartBrightness = await ScreenBrightness().current;
-    } catch (_) {
-      _panStartBrightness = _brightness;
-    }
+    } catch (_) {}
 
     _hideSeekOverlay(immediate: true);
     _hideSeekBubble(immediate: true);
   }
 
-  Future<void> _onPanUpdate(DragUpdateDetails details) async {
-    _onUserInteractionFromBottom(details, context);
+  Future<void> _panUpdateLogic(Offset localPosition, Offset delta) async {
     if (!_panActive || _isLocked) return;
 
+    // ✅ Zoomed in -> single finger drags/repositions the video
+    if (_videoScale > 1.0) {
+      setState(() {
+        _videoOffset += delta;
+        _clampOffset();
+      });
+      return;
+    }
+
+    _onUserInteractionFromBottom(localPosition, delta, context);
+
     final size = MediaQuery.of(context).size;
-    final dxTotal = details.localPosition.dx - _panStart.dx;
-    final dyTotal = details.localPosition.dy - _panStart.dy;
+    final dxTotal = localPosition.dx - _panStart.dx;
+    final dyTotal = localPosition.dy - _panStart.dy;
 
     // Axis lock decide (MX style)
     if (!_panIsHorizontal && !_panIsVertical) {
@@ -900,13 +1064,13 @@ class _FullScreenVideoPlayerSystemVolumeState
 
       final relative = dxTotal / size.width;
       final offsetMs =
-          (duration.inMilliseconds * relative * _seekSpeed).toInt();
+      (duration.inMilliseconds * relative * _seekSpeed).toInt();
 
       int newMs = _panStartPos.inMilliseconds + offsetMs;
       newMs = newMs.clamp(0, duration.inMilliseconds);
 
       final newPos = Duration(milliseconds: newMs);
-      _player.seek(newPos);
+      _throttledSeek(newPos);
 
       setState(() {
         _currentPosition = newPos;
@@ -923,10 +1087,10 @@ class _FullScreenVideoPlayerSystemVolumeState
     // ---------- VERTICAL BRIGHTNESS / VOLUME ----------
     if (_panIsVertical) {
       final h = size.height;
-      final delta = (-dyTotal / h); // swipe up => +ve
+      final dragDelta = (-dyTotal / h); // swipe up => +ve
 
       if (_verticalDragLeft) {
-        final b = (_panStartBrightness + delta * _briSpeed).clamp(0.0, 1.0);
+        final b = (_panStartBrightness + dragDelta * _briSpeed).clamp(0.0, 1.0);
         _brightness = b;
 
         try {
@@ -940,7 +1104,7 @@ class _FullScreenVideoPlayerSystemVolumeState
           if (mounted) setState(() => _showBrightnessOverlay = false);
         });
       } else if (_verticalDragRight) {
-        final v = (_panStartVolume + delta * _volSpeed).clamp(0.0, 100.0);
+        final v = (_panStartVolume + dragDelta * _volSpeed).clamp(0.0, 100.0);
 
         setState(() {
           _systemVolume = v;
@@ -962,15 +1126,34 @@ class _FullScreenVideoPlayerSystemVolumeState
     }
   }
 
-  void _onPanEnd(DragEndDetails details) {
+  void _panEndLogic() {
     _panActive = false;
     _panIsHorizontal = false;
     _panIsVertical = false;
     _verticalDragLeft = false;
     _verticalDragRight = false;
 
+    // ✅ make sure final seek position is applied
+    if (_pendingSeekPos != null) {
+      _player.seek(_pendingSeekPos!);
+      _pendingSeekPos = null;
+    }
+
     _hideSeekOverlay(immediate: false);
     _hideSeekBubble(immediate: false);
+  }
+
+  // ✅ Throttled seek: instant first seek, then at most every 80ms
+  void _throttledSeek(Duration pos) {
+    _pendingSeekPos = pos;
+    if (_seekThrottle?.isActive ?? false) return;
+
+    _player.seek(pos);
+    _seekThrottle = Timer(const Duration(milliseconds: 80), () {
+      if (_pendingSeekPos != null) {
+        _player.seek(_pendingSeekPos!);
+      }
+    });
   }
 
   void _handleVolumeEdgeHaptic(double v) {
@@ -1088,25 +1271,36 @@ class _FullScreenVideoPlayerSystemVolumeState
 
   @override
   void dispose() {
-    // if floating is active you may not want to dispose player
-    if (!FloatingVideoManager.isActive) {
+    // ✅ Dispose ONLY if we created the player AND floating isn't using it.
+    // (External/reused players are owned by someone else.)
+    if (_ownsPlayer && !FloatingVideoManager.isActive) {
       _player.dispose();
     }
 
-    _positionSub.cancel();
-    _durationSub.cancel();
+    _positionSub?.cancel();
+    _durationSub?.cancel();
+    _completedSub?.cancel();
+    _hideTimer?.cancel();
     _systemUiTimer?.cancel();
     _skipOverlayTimer?.cancel();
     _brightnessTimer?.cancel();
     _volumeTimer?.cancel();
-    _volumeSubscription?.cancel();
     _volThrottle?.cancel();
+    _seekThrottle?.cancel();
     _seekOverlayTimer?.cancel();
     _seekBubbleTimer?.cancel();
-
-    VolumeController.instance.removeListener();
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    _zoomBadgeTimer?.cancel();
     _playingSub?.cancel();
+
+    // ✅ #5: cancelling our own subscription is enough to detach OUR listener.
+    // Avoid the global removeListener() which can wipe listeners app-wide.
+    _volumeSubscription?.cancel();
+
+    // ✅ #4: always restore the system brightness when leaving the player,
+    // otherwise the screen can stay stuck at the brightness we set.
+    ScreenBrightness().resetScreenBrightness();
+
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
     super.dispose();
   }
@@ -1121,6 +1315,668 @@ class _FullScreenVideoPlayerSystemVolumeState
       }
     });
   }
+
+// ✅ Landscape me "more" click par right-side se panel (sheet) aayega
+// ✅ Portrait me normal bottom sheet hi aayega
+// Paste this inside your State class
+
+  void openControlsSheetSmart() {
+    final isLandscape =
+        MediaQuery.of(context).orientation == Orientation.landscape;
+
+    if (isLandscape) {
+      _openRightControlsSheet();
+    } else {
+      _openControlsBottomSheet(); // aapka existing bottom sheet
+    }
+  }
+
+  /// ✅ RIGHT SIDE SHEET (Landscape)
+  void _openRightControlsSheet() {
+    if (_isLocked) return;
+
+    final size = MediaQuery.of(context).size;
+    final double panelWidth = (size.width * 0.42).clamp(280.0, 420.0);
+
+    showGeneralDialog(
+      context: context,
+      barrierLabel: "Controls",
+      barrierDismissible: true,
+      barrierColor: Colors.black.withOpacity(0.55),
+      transitionDuration: const Duration(milliseconds: 220),
+      pageBuilder: (_, __, ___) {
+        return SafeArea(
+          child: Align(
+            alignment: Alignment.centerRight,
+            child: Material(
+              color: Colors.transparent,
+              child: Container(
+                width: panelWidth,
+                height: double.infinity,
+                margin: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.92),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.10)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.7),
+                      blurRadius: 30,
+                    ),
+                  ],
+                ),
+                child: Column(
+                  children: [
+                    const SizedBox(height: 8),
+
+                    // ✅ Header
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        children: [
+                          const Expanded(
+                            child: Text(
+                              "Player Controls",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                          IconButton(
+                            onPressed: () => Navigator.pop(context),
+                            icon:
+                            const Icon(Icons.close, color: Colors.white70),
+                          ),
+                        ],
+                      ),
+                    ),
+
+                    Divider(color: Colors.white.withOpacity(0.12), height: 1),
+
+                    // ✅ Scroll Body
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            _sheetTitle("Quick Actions"),
+                            const SizedBox(height: 10),
+
+                            // ✅ same controls
+                            _controlGrid([
+                              _controlItem(
+                                icon: Icons.camera_alt,
+                                label: "Screenshot",
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  await _takeScreenshot();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.screen_rotation,
+                                label: "Rotate",
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _toggleOrientation();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.headphones,
+                                label: _audioOnly ? "Video On" : "Audio Only",
+                                active: _audioOnly,
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  await _toggleAudioOnly();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.color_lens,
+                                label: "Filters",
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  FilterPopup.show(
+                                    context,
+                                    selectedKey: _selectedFilter,
+                                    onSelected: (key) =>
+                                        setState(() => _selectedFilter = key),
+                                  );
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.hdr_auto_select_sharp,
+                                label: "HDR",
+                                active: _selectedFilter == 'hdr',
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  await toggleHdr();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.volume_up,
+                                label: "Volume",
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _openVolumeDialog();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.speed,
+                                label: "Speed",
+                                onTap: () {
+                                  Navigator.pop(context);
+                                  _openSpeedDialog();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.picture_in_picture_alt,
+                                label: "PIP",
+                                disabled: !_hasLocalList,
+                                onTap: !_hasLocalList
+                                    ? null
+                                    : () {
+                                  Navigator.pop(context); // close sheet only
+                                  FloatingVideoManager.show(
+                                    context,
+                                    _player,
+                                    _controller,
+                                    widget.videos,
+                                    _currentIndex,
+                                  );
+                                },
+                              ),
+                            ]),
+
+                            const SizedBox(height: 14),
+                            Divider(color: Colors.white.withOpacity(0.12)),
+                            const SizedBox(height: 12),
+
+                            _sheetTitle("Playback"),
+                            const SizedBox(height: 10),
+
+                            Wrap(
+                              spacing: 10,
+                              runSpacing: 10,
+                              alignment: WrapAlignment.center,
+                              children: [
+                                _pillButton(
+                                  icon: _isLocked ? Icons.lock : Icons.lock_open,
+                                  label: _isLocked ? "Locked" : "Lock",
+                                  active: _isLocked,
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _toggleLock();
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: Icons.replay_10,
+                                  label: "-10s",
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _seekBy(const Duration(seconds: -10));
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: globalPlayPause.isPlaying
+                                      ? Icons.pause_circle_filled
+                                      : Icons.play_circle_fill,
+                                  label:
+                                  globalPlayPause.isPlaying ? "Pause" : "Play",
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _togglePlayPause();
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: Icons.forward_10,
+                                  label: "+10s",
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _seekBy(const Duration(seconds: 10));
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: Icons.skip_previous,
+                                  label: "Prev",
+                                  disabled: !_hasLocalList,
+                                  onTap: !_hasLocalList
+                                      ? null
+                                      : () async {
+                                    Navigator.pop(context);
+                                    await _playPrevious();
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: Icons.skip_next,
+                                  label: "Next",
+                                  disabled: !_hasLocalList,
+                                  onTap: !_hasLocalList
+                                      ? null
+                                      : () async {
+                                    Navigator.pop(context);
+                                    await _playNext();
+                                  },
+                                ),
+                                _pillButton(
+                                  icon: _resizeMode == VideoResizeMode.fit
+                                      ? Icons.fit_screen
+                                      : _resizeMode == VideoResizeMode.fill
+                                      ? Icons.crop
+                                      : Icons.zoom_in_map,
+                                  label: "Resize",
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _toggleResizeMode();
+                                  },
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+      transitionBuilder: (_, anim, __, child) {
+        final curved = CurvedAnimation(parent: anim, curve: Curves.easeOutCubic);
+        return SlideTransition(
+          position: Tween<Offset>(begin: const Offset(1, 0), end: Offset.zero)
+              .animate(curved),
+          child: child,
+        );
+      },
+    );
+  }
+
+  void _openControlsBottomSheet() {
+    if (_isLocked) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) {
+        final h = MediaQuery.of(context).size.height;
+        final maxH = h * 0.4; // ✅ fixed height (change 0.60..0.75)
+
+        return SafeArea(
+          child: Container(
+            margin: const EdgeInsets.all(0),
+            constraints: BoxConstraints(maxHeight: maxH), // ✅ fixed height
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.92),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.10)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.6),
+                  blurRadius: 30,
+                ),
+              ],
+            ),
+            child: Column(
+              children: [
+                const SizedBox(height: 10),
+
+                // ✅ handle
+                Container(
+                  height: 5,
+                  width: 45,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(50),
+                  ),
+                ),
+
+                // ✅ header row
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  child: Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          "Player Controls",
+                          style: TextStyle(
+                            color: Colors.white,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: Colors.white70),
+                      ),
+                    ],
+                  ),
+                ),
+
+                Divider(color: Colors.white.withOpacity(0.12), height: 1),
+
+                // ✅ scrollable body
+                Expanded(
+                  child: SingleChildScrollView(
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 14),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _sheetTitle("Quick Actions"),
+                        const SizedBox(height: 10),
+
+                        // ✅ SAME ICONS (fixed size portrait/landscape)
+                        _controlGrid([
+                          _controlItem(
+                            icon: Icons.camera_alt,
+                            label: "Screenshot",
+                            onTap: () async {
+                              Navigator.pop(context);
+                              await _takeScreenshot();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.screen_rotation,
+                            label: "Rotate",
+                            onTap: () {
+                              Navigator.pop(context);
+                              _toggleOrientation();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.headphones,
+                            label: _audioOnly ? "Video On" : "Audio Only",
+                            active: _audioOnly,
+                            onTap: () async {
+                              Navigator.pop(context);
+                              await _toggleAudioOnly();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.color_lens,
+                            label: "Filters",
+                            onTap: () {
+                              Navigator.pop(context);
+                              FilterPopup.show(
+                                context,
+                                selectedKey: _selectedFilter,
+                                onSelected: (key) =>
+                                    setState(() => _selectedFilter = key),
+                              );
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.hdr_auto_select_sharp,
+                            label: "HDR",
+                            active: _selectedFilter == 'hdr',
+                            onTap: () async {
+                              Navigator.pop(context);
+                              await toggleHdr();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.volume_up,
+                            label: "Volume",
+                            onTap: () {
+                              Navigator.pop(context);
+                              _openVolumeDialog();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.speed,
+                            label: "Speed",
+                            onTap: () {
+                              Navigator.pop(context);
+                              _openSpeedDialog();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.picture_in_picture_alt,
+                            label: "PIP",
+                            disabled: !_hasLocalList,
+                            onTap: !_hasLocalList
+                                ? null
+                                : () {
+                              Navigator.pop(context); // close sheet only
+                              FloatingVideoManager.show(
+                                context,
+                                _player,
+                                _controller,
+                                widget.videos,
+                                _currentIndex,
+                              );
+                            },
+                          ),
+                        ]),
+
+                        const SizedBox(height: 14),
+                        Divider(color: Colors.white.withOpacity(0.12)),
+                        const SizedBox(height: 12),
+
+                        _sheetTitle("Playback"),
+                        const SizedBox(height: 10),
+
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          alignment: WrapAlignment.center,
+                          children: [
+                            _pillButton(
+                              icon: _isLocked ? Icons.lock : Icons.lock_open,
+                              label: _isLocked ? "Locked" : "Lock",
+                              active: _isLocked,
+                              onTap: () {
+                                Navigator.pop(context);
+                                _toggleLock();
+                              },
+                            ),
+                            _pillButton(
+                              icon: Icons.replay_10,
+                              label: "-10s",
+                              onTap: () {
+                                Navigator.pop(context);
+                                _seekBy(const Duration(seconds: -10));
+                              },
+                            ),
+                            _pillButton(
+                              icon: globalPlayPause.isPlaying
+                                  ? Icons.pause_circle_filled
+                                  : Icons.play_circle_fill,
+                              label: globalPlayPause.isPlaying ? "Pause" : "Play",
+                              onTap: () {
+                                Navigator.pop(context);
+                                _togglePlayPause();
+                              },
+                            ),
+                            _pillButton(
+                              icon: Icons.forward_10,
+                              label: "+10s",
+                              onTap: () {
+                                Navigator.pop(context);
+                                _seekBy(const Duration(seconds: 10));
+                              },
+                            ),
+                            _pillButton(
+                              icon: Icons.skip_previous,
+                              label: "Prev",
+                              disabled: !_hasLocalList,
+                              onTap: !_hasLocalList
+                                  ? null
+                                  : () async {
+                                Navigator.pop(context);
+                                await _playPrevious();
+                              },
+                            ),
+                            _pillButton(
+                              icon: Icons.skip_next,
+                              label: "Next",
+                              disabled: !_hasLocalList,
+                              onTap: !_hasLocalList
+                                  ? null
+                                  : () async {
+                                Navigator.pop(context);
+                                await _playNext();
+                              },
+                            ),
+                            _pillButton(
+                              icon: _resizeMode == VideoResizeMode.fit
+                                  ? Icons.fit_screen
+                                  : _resizeMode == VideoResizeMode.fill
+                                  ? Icons.crop
+                                  : Icons.zoom_in_map,
+                              label: "Resize",
+                              onTap: () {
+                                Navigator.pop(context);
+                                _toggleResizeMode();
+                              },
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _sheetTitle(String text) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 14,
+          fontWeight: FontWeight.w800,
+        ),
+      ),
+    );
+  }
+
+  Widget _controlGrid(List<Widget> children) {
+    return GridView.count(
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      crossAxisCount: 4,
+      mainAxisSpacing: 10,
+      crossAxisSpacing: 10,
+      childAspectRatio: 1.2,
+      children: children,
+    );
+  }
+
+  Widget _controlItem({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    bool active = false,
+    bool disabled = false,
+  }) {
+    final isDisabled = disabled || onTap == null;
+
+    return GestureDetector(
+      onTap: isDisabled ? null : onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+        decoration: BoxDecoration(
+          color: active
+              ? Colors.white.withOpacity(0.18)
+              : Colors.white.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: active
+                ? Colors.white.withOpacity(0.22)
+                : Colors.white.withOpacity(0.10),
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              icon,
+              size: 24, // ✅ fixed size (portrait/landscape same)
+              color: isDisabled
+                  ? Colors.white24
+                  : active
+                  ? Colors.greenAccent
+                  : Colors.white,
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                color: isDisabled ? Colors.white24 : Colors.white70,
+                fontSize: 11,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _pillButton({
+    required IconData icon,
+    required String label,
+    required VoidCallback? onTap,
+    bool active = false,
+    bool disabled = false,
+  }) {
+    final isDisabled = disabled || onTap == null;
+
+    return InkWell(
+      onTap: isDisabled ? null : onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+        decoration: BoxDecoration(
+          color: active
+              ? Colors.white.withOpacity(0.18)
+              : Colors.white.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withOpacity(0.12)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 18, // ✅ fixed size (portrait/landscape same)
+              color: isDisabled
+                  ? Colors.white24
+                  : active
+                  ? Colors.greenAccent
+                  : Colors.white,
+            ),
+            const SizedBox(width: 8),
+            Text(
+              label,
+              style: TextStyle(
+                color: isDisabled ? Colors.white24 : Colors.white70,
+                fontSize: 12,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
 
   // =================== BUILD (UI SAME) =====================
   @override
@@ -1138,25 +1994,32 @@ class _FullScreenVideoPlayerSystemVolumeState
     final posMs = _currentPosition.inMilliseconds.clamp(0, safeMax);
 
     final String appBarTitle =
-        _hasLocalList
-            ? (widget.videos[_currentIndex].title ?? '')
-            : (_hasUrl ? widget.initialUrl!.trim() : 'Streaming');
+    _hasLocalList
+        ? (widget.videos[_currentIndex].title ?? '')
+        : (_hasUrl ? widget.initialUrl!.trim() : 'Streaming');
 
-    final videoWidget = ColorFiltered(
-      colorFilter: ColorFilter.matrix(
-        _getColorMatrix(_selectedFilter, hdrIntensity: 0.8),
-      ),
-      child: Video(
-        controller: _controller,
-        fit:
-            _resizeMode == VideoResizeMode.fit
-                ? BoxFit.contain
-                : _resizeMode == VideoResizeMode.fill
-                ? BoxFit.cover
-                : _resizeMode == VideoResizeMode.zoom
-                ? BoxFit.fill
-                : BoxFit.none,
-        controls: null,
+    // ✅ Transform wrapper for pinch-to-zoom
+    final videoWidget = Transform(
+      alignment: Alignment.center,
+      transform: Matrix4.identity()
+        ..translate(_videoOffset.dx, _videoOffset.dy)
+        ..scale(_videoScale),
+      child: ColorFiltered(
+        colorFilter: ColorFilter.matrix(
+          _getColorMatrix(_selectedFilter, hdrIntensity: 0.8),
+        ),
+        child: Video(
+          controller: _controller,
+          fit:
+          _resizeMode == VideoResizeMode.fit
+              ? BoxFit.contain // whole frame, letterboxed
+              : _resizeMode == VideoResizeMode.fill
+              ? BoxFit.cover // fill screen, keep aspect, crop overflow
+              : _resizeMode == VideoResizeMode.zoom
+              ? BoxFit.fitWidth // zoom to width, crop top/bottom
+              : BoxFit.fill, // stretch: distort to exactly fill screen
+          controls: null,
+        ),
       ),
     );
 
@@ -1177,10 +2040,10 @@ class _FullScreenVideoPlayerSystemVolumeState
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
 
-        // ✅ ONLY ONE ENGINE (MX style)
-        onPanStart: _onPanStart,
-        onPanUpdate: _onPanUpdate,
-        onPanEnd: _onPanEnd,
+        // ✅ Scale engine (1 finger = pan, 2 finger = zoom)
+        onScaleStart: _onScaleStart,
+        onScaleUpdate: _onScaleUpdate,
+        onScaleEnd: _onScaleEnd,
 
         onTap: _onScreenTap,
         onDoubleTapDown: _onDoubleTapDown,
@@ -1188,725 +2051,764 @@ class _FullScreenVideoPlayerSystemVolumeState
         child: Scaffold(
           backgroundColor: Colors.black,
           body:
-              _isLoading
-                  ? const Center(
-                    child: CupertinoActivityIndicator(
-                      radius: 25,
-                      color: Colors.white,
-                      animating: true,
-                    ),
-                  )
-                  : Stack(
-                    children: [
-                      Positioned.fill(child: videoWidget),
+          _isLoading
+              ? const Center(
+            child: CupertinoActivityIndicator(
+              radius: 25,
+              color: Colors.white,
+              animating: true,
+            ),
+          )
+              : Stack(
+            children: [
+              Positioned.fill(child: videoWidget),
 
-                      // subtle vignette (same)
-                      IgnorePointer(
+              // subtle vignette (same)
+              IgnorePointer(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: RadialGradient(
+                      radius: 1.0,
+                      colors: [
+                        const Color(0x00000000),
+                        const Color(0x22000000),
+                      ],
+                      stops: const [0.65, 1.0],
+                    ),
+                  ),
+                ),
+              ),
+
+              // ✅ Center seek overlay
+              if (_showSeekOverlay)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Center(
+                      child: AnimatedScale(
+                        duration: const Duration(milliseconds: 120),
+                        scale: _showSeekOverlay ? 1 : 0.95,
                         child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 18,
+                            vertical: 12,
+                          ),
                           decoration: BoxDecoration(
-                            gradient: RadialGradient(
-                              radius: 1.0,
-                              colors: [
-                                const Color(0x00000000),
-                                const Color(0x22000000),
-                              ],
-                              stops: const [0.65, 1.0],
+                            color: Colors.black.withOpacity(0.70),
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(
+                              color: Colors.white.withOpacity(0.10),
+                            ),
+                          ),
+                          child: Text(
+                            _seekOverlayText,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              letterSpacing: 0.5,
                             ),
                           ),
                         ),
                       ),
+                    ),
+                  ),
+                ),
 
-                      // ✅ Center seek overlay
-                      if (_showSeekOverlay)
-                        Positioned.fill(
-                          child: IgnorePointer(
-                            child: Center(
-                              child: AnimatedScale(
-                                duration: const Duration(milliseconds: 120),
-                                scale: _showSeekOverlay ? 1 : 0.95,
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 18,
-                                    vertical: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.70),
-                                    borderRadius: BorderRadius.circular(16),
-                                    border: Border.all(
-                                      color: Colors.white.withOpacity(0.10),
-                                    ),
-                                  ),
-                                  child: Text(
-                                    _seekOverlayText,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.w800,
-                                      letterSpacing: 0.5,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+              // ✅ Zoom level badge
+              if (_showZoomBadge)
+                Positioned(
+                  top: 70,
+                  left: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.72),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.10),
                           ),
                         ),
-
-                      // ✅ Seek bubble (time preview)
-                      if (_showSeekBubble)
-                        Positioned(
-                          top: 70,
-                          left: 0,
-                          right: 0,
-                          child: IgnorePointer(
-                            child: Center(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 14,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withOpacity(0.72),
-                                  borderRadius: BorderRadius.circular(14),
-                                  border: Border.all(
-                                    color: Colors.white.withOpacity(0.10),
-                                  ),
-                                ),
-                                child: Text(
-                                  "${_formatDuration(_bubblePos)} / ${_formatDuration(_totalDuration)}",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 13,
-                                    fontWeight: FontWeight.w700,
-                                  ),
-                                ),
-                              ),
-                            ),
+                        child: Text(
+                          "${(_videoScale * 100).round()}%",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
+                      ),
+                    ),
+                  ),
+                ),
 
-                      // brightness overlay (same)
-                      if (_showBrightnessOverlay)
-                        Builder(
-                          builder: (context) {
-                            final screenHeight =
-                                MediaQuery.of(context).size.height;
-                            final barHeight = screenHeight * 0.3;
-                            final brightnessValue = (_brightness * 100).round();
-                            return Positioned(
-                              left: 20,
-                              top: screenHeight / 2 - barHeight / 2,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Container(
-                                    width: 20,
-                                    height: barHeight,
-                                    decoration: BoxDecoration(
-                                      color: Colors.white,
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Align(
-                                      alignment: Alignment.bottomCenter,
-                                      child: Container(
-                                        width: double.infinity,
-                                        height: barHeight * _brightness,
-                                        decoration: BoxDecoration(
-                                          color: ColorSelect.maineColor2,
-                                          borderRadius:
-                                              const BorderRadius.vertical(
-                                                top: Radius.circular(20),
-                                                bottom: Radius.circular(20),
-                                              ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 8),
-                                  Row(
-                                    children: [
-                                      const Icon(
-                                        Icons.brightness_6,
-                                        color: Colors.white,
-                                        size: 32,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        brightnessValue.toString(),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
+              // ✅ Seek bubble (time preview)
+              if (_showSeekBubble)
+                Positioned(
+                  top: 70,
+                  left: 0,
+                  right: 0,
+                  child: IgnorePointer(
+                    child: Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
                         ),
-
-                      // volume overlay
-                      if (_showVolumeOverlay)
-                        Builder(
-                          builder: (context) {
-                            final screenHeight =
-                                MediaQuery.of(context).size.height;
-                            final barHeight = screenHeight * 0.3;
-                            final volValue = _systemVolume.round();
-                            final frac = (_systemVolume / 100).clamp(0.0, 1.0);
-
-                            return Positioned(
-                              right: 20,
-                              top: screenHeight / 2 - barHeight / 2,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.center,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        volValue == 0
-                                            ? Icons.volume_off
-                                            : Icons.volume_up,
-                                        color: Colors.white,
-                                        size: 32,
-                                      ),
-                                      const SizedBox(width: 6),
-                                      Text(
-                                        volValue.toString(),
-                                        style: const TextStyle(
-                                          color: Colors.white,
-                                          fontSize: 28,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Container(
-                                    width: 22,
-                                    height: barHeight,
-                                    decoration: BoxDecoration(
-                                      color: Colors.black54,
-                                      borderRadius: BorderRadius.circular(14),
-                                    ),
-                                    child: Align(
-                                      alignment: Alignment.bottomCenter,
-                                      child: AnimatedContainer(
-                                        duration: const Duration(
-                                          milliseconds: 120,
-                                        ),
-                                        curve: Curves.easeOutCubic,
-                                        width: 22,
-                                        height: barHeight * frac,
-                                        decoration: const BoxDecoration(
-                                          gradient: LinearGradient(
-                                            begin: Alignment.bottomCenter,
-                                            end: Alignment.topCenter,
-                                            colors: [
-                                              Colors.greenAccent,
-                                              Colors.green,
-                                            ],
-                                          ),
-                                          borderRadius: BorderRadius.vertical(
-                                            bottom: Radius.circular(14),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            );
-                          },
-                        ),
-
-                      // ✅ HDR overlay (same - premium)
-                      if (_showHdrOverlay)
-                        Positioned.fill(
-                          child: AnimatedOpacity(
-                            opacity: _showHdrOverlay ? 1 : 0,
-                            duration: const Duration(milliseconds: 180),
-                            child: BackdropFilter(
-                              filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                              child: Container(
-                                color: Colors.black.withOpacity(0.45),
-                                alignment: Alignment.center,
-                                child: TweenAnimationBuilder<double>(
-                                  tween: Tween(begin: 0.85, end: 1),
-                                  duration: const Duration(milliseconds: 260),
-                                  curve: Curves.easeOutBack,
-                                  builder: (context, scale, child) {
-                                    return Transform.scale(
-                                      scale: scale,
-                                      child: child,
-                                    );
-                                  },
-                                  child: Container(
-                                    width: 280,
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 22,
-                                      vertical: 24,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      borderRadius: BorderRadius.circular(26),
-                                      gradient: LinearGradient(
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                        colors:
-                                            _hdrOn
-                                                ? const [
-                                                  Color(0xFF0F172A),
-                                                  Color(0xFF1E293B),
-                                                ]
-                                                : const [
-                                                  Color(0xFFFFC857),
-                                                  Color(0xFFFF8A00),
-                                                ],
-                                      ),
-                                      boxShadow: [
-                                        BoxShadow(
-                                          color: Colors.black.withOpacity(0.65),
-                                          blurRadius: 35,
-                                          spreadRadius: 4,
-                                        ),
-                                      ],
-                                      border: Border.all(
-                                        color: Colors.white.withOpacity(0.12),
-                                      ),
-                                    ),
-                                    child: Column(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        TweenAnimationBuilder<double>(
-                                          tween: Tween(begin: 0, end: 1),
-                                          duration: const Duration(seconds: 1),
-                                          builder: (_, value, child) {
-                                            return Transform.rotate(
-                                              angle: value * 6.28,
-                                              child: child,
-                                            );
-                                          },
-                                          child: Container(
-                                            padding: const EdgeInsets.all(18),
-                                            decoration: BoxDecoration(
-                                              shape: BoxShape.circle,
-                                              gradient: RadialGradient(
-                                                colors: [
-                                                  Colors.white.withOpacity(
-                                                    0.35,
-                                                  ),
-                                                  Colors.white.withOpacity(
-                                                    0.05,
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            child: Icon(
-                                              Icons.hdr_on_rounded,
-                                              size: 40,
-                                              color:
-                                                  _hdrOn
-                                                      ? Colors.orangeAccent
-                                                      : Colors.black87,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(height: 18),
-                                        Text(
-                                          "HDR PROCESSING",
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w800,
-                                            letterSpacing: 1.6,
-                                            color:
-                                                _hdrOn
-                                                    ? Colors.white70
-                                                    : Colors.black87,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Text(
-                                          _hdrOn
-                                              ? "Turning HDR OFF"
-                                              : "Turning HDR ON",
-                                          textAlign: TextAlign.center,
-                                          style: TextStyle(
-                                            fontSize: 18,
-                                            fontWeight: FontWeight.w900,
-                                            color:
-                                                _hdrOn
-                                                    ? Colors.white
-                                                    : Colors.black,
-                                          ),
-                                        ),
-                                        const SizedBox(height: 20),
-                                        const SizedBox(
-                                          width: 34,
-                                          height: 34,
-                                          child: CupertinoActivityIndicator(
-                                            radius: 20,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.72),
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: Colors.white.withOpacity(0.10),
                           ),
                         ),
-
-                      // lock overlay (same)
-                      if (_isLocked)
-                        Center(
-                          child: GestureDetector(
-                            onTap: _toggleLock,
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: const BoxDecoration(
-                                color: Colors.black54,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.lock,
-                                color: Colors.green,
-                                size: 60,
-                              ),
-                            ),
+                        child: Text(
+                          "${_formatDuration(_bubblePos)} / ${_formatDuration(_totalDuration)}",
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
                           ),
                         ),
+                      ),
+                    ),
+                  ),
+                ),
 
-                      // equalizer (same)
-                      if (!_isLocked && _equalizerVisible)
-                        Positioned(
-                          bottom: equalizerBottom.toDouble(),
-                          left: 10,
-                          child: Container(
-                            width: 200,
-                            padding: const EdgeInsets.all(8),
+              // brightness overlay (same)
+              if (_showBrightnessOverlay)
+                Builder(
+                  builder: (context) {
+                    final screenHeight =
+                        MediaQuery.of(context).size.height;
+                    final barHeight = screenHeight * 0.3;
+                    final brightnessValue = (_brightness * 100).round();
+                    return Positioned(
+                      left: 20,
+                      top: screenHeight / 2 - barHeight / 2,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Container(
+                            width: 20,
+                            height: barHeight,
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.5),
-                              borderRadius: BorderRadius.circular(12),
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: Container(
+                                width: double.infinity,
+                                height: barHeight * _brightness,
+                                decoration: BoxDecoration(
+                                  color: ColorSelect.maineColor2,
+                                  borderRadius:
+                                  const BorderRadius.vertical(
+                                    top: Radius.circular(20),
+                                    bottom: Radius.circular(20),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Row(
+                            children: [
+                              const Icon(
+                                Icons.brightness_6,
+                                color: Colors.white,
+                                size: 32,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                brightnessValue.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
+              // volume overlay
+              if (_showVolumeOverlay)
+                Builder(
+                  builder: (context) {
+                    final screenHeight =
+                        MediaQuery.of(context).size.height;
+                    final barHeight = screenHeight * 0.3;
+                    final volValue = _systemVolume.round();
+                    final frac = (_systemVolume / 100).clamp(0.0, 1.0);
+
+                    return Positioned(
+                      right: 20,
+                      top: screenHeight / 2 - barHeight / 2,
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.center,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                volValue == 0
+                                    ? Icons.volume_off
+                                    : Icons.volume_up,
+                                color: Colors.white,
+                                size: 32,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                volValue.toString(),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(width: 10),
+                          Container(
+                            width: 22,
+                            height: barHeight,
+                            decoration: BoxDecoration(
+                              color: Colors.black54,
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: Align(
+                              alignment: Alignment.bottomCenter,
+                              child: AnimatedContainer(
+                                duration: const Duration(
+                                  milliseconds: 120,
+                                ),
+                                curve: Curves.easeOutCubic,
+                                width: 22,
+                                height: barHeight * frac,
+                                decoration: const BoxDecoration(
+                                  gradient: LinearGradient(
+                                    begin: Alignment.bottomCenter,
+                                    end: Alignment.topCenter,
+                                    colors: [
+                                      Colors.greenAccent,
+                                      Colors.green,
+                                    ],
+                                  ),
+                                  borderRadius: BorderRadius.vertical(
+                                    bottom: Radius.circular(14),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+
+              // ✅ HDR overlay (same - premium)
+              if (_showHdrOverlay)
+                Positioned.fill(
+                  child: AnimatedOpacity(
+                    opacity: _showHdrOverlay ? 1 : 0,
+                    duration: const Duration(milliseconds: 180),
+                    child: BackdropFilter(
+                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
+                      child: Container(
+                        color: Colors.black.withOpacity(0.45),
+                        alignment: Alignment.center,
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween(begin: 0.85, end: 1),
+                          duration: const Duration(milliseconds: 260),
+                          curve: Curves.easeOutBack,
+                          builder: (context, scale, child) {
+                            return Transform.scale(
+                              scale: scale,
+                              child: child,
+                            );
+                          },
+                          child: Container(
+                            width: 280,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 22,
+                              vertical: 24,
+                            ),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(26),
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors:
+                                _hdrOn
+                                    ? const [
+                                  Color(0xFF0F172A),
+                                  Color(0xFF1E293B),
+                                ]
+                                    : const [
+                                  Color(0xFFFFC857),
+                                  Color(0xFFFF8A00),
+                                ],
+                              ),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.black.withOpacity(0.65),
+                                  blurRadius: 35,
+                                  spreadRadius: 4,
+                                ),
+                              ],
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.12),
+                              ),
                             ),
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                _buildSlider(
-                                  'Bass (60Hz)',
-                                  bassGain,
-                                  (v) => setState(() => bassGain = v),
+                                TweenAnimationBuilder<double>(
+                                  tween: Tween(begin: 0, end: 1),
+                                  duration: const Duration(seconds: 1),
+                                  builder: (_, value, child) {
+                                    return Transform.rotate(
+                                      angle: value * 6.28,
+                                      child: child,
+                                    );
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.all(18),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      gradient: RadialGradient(
+                                        colors: [
+                                          Colors.white.withOpacity(
+                                            0.35,
+                                          ),
+                                          Colors.white.withOpacity(
+                                            0.05,
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    child: Icon(
+                                      Icons.hdr_on_rounded,
+                                      size: 40,
+                                      color:
+                                      _hdrOn
+                                          ? Colors.orangeAccent
+                                          : Colors.black87,
+                                    ),
+                                  ),
                                 ),
-                                _buildSlider(
-                                  'Mid (1kHz)',
-                                  midGain,
-                                  (v) => setState(() => midGain = v),
+                                const SizedBox(height: 18),
+                                Text(
+                                  "HDR PROCESSING",
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w800,
+                                    letterSpacing: 1.6,
+                                    color:
+                                    _hdrOn
+                                        ? Colors.white70
+                                        : Colors.black87,
+                                  ),
                                 ),
-                                _buildSlider(
-                                  'Treble (10kHz)',
-                                  trebleGain,
-                                  (v) => setState(() => trebleGain = v),
+                                const SizedBox(height: 8),
+                                Text(
+                                  _hdrOn
+                                      ? "Turning HDR OFF"
+                                      : "Turning HDR ON",
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.w900,
+                                    color:
+                                    _hdrOn
+                                        ? Colors.white
+                                        : Colors.black,
+                                  ),
+                                ),
+                                const SizedBox(height: 20),
+                                const SizedBox(
+                                  width: 34,
+                                  height: 34,
+                                  child: CupertinoActivityIndicator(
+                                    radius: 20,
+                                    color: Colors.white,
+                                  ),
                                 ),
                               ],
                             ),
                           ),
                         ),
+                      ),
+                    ),
+                  ),
+                ),
 
-                      // ✅ controls
-                      if (!_isLocked && _controlsVisible)
-                        Column(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              // lock overlay (same)
+              if (_isLocked)
+                Center(
+                  child: GestureDetector(
+                    onTap: _toggleLock,
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: const BoxDecoration(
+                        color: Colors.black54,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.lock,
+                        color: Colors.green,
+                        size: 60,
+                      ),
+                    ),
+                  ),
+                ),
+
+              // equalizer (same)
+              if (!_isLocked && _equalizerVisible)
+                Positioned(
+                  bottom: equalizerBottom.toDouble(),
+                  left: 10,
+                  child: Container(
+                    width: 200,
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        _buildSlider(
+                          'Bass (60Hz)',
+                          bassGain,
+                              (v) => setState(() => bassGain = v),
+                        ),
+                        _buildSlider(
+                          'Mid (1kHz)',
+                          midGain,
+                              (v) => setState(() => midGain = v),
+                        ),
+                        _buildSlider(
+                          'Treble (10kHz)',
+                          trebleGain,
+                              (v) => setState(() => trebleGain = v),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+              // ✅ controls
+              if (!_isLocked && _controlsVisible)
+                Column(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Container(
+                      color: Colors.black.withOpacity(0.4),
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          top: isLandscape ? 0.sp : 40.sp,
+                        ),
+                        child:
+                        _hasLocalList
+                            ? CustomVideoAppBar(
+                          title: appBarTitle,
+                          onBackPressed: () {
+                            if (isLandscape) {
+                              SystemChrome.setPreferredOrientations(
+                                [
+                                  DeviceOrientation.portraitUp,
+                                  DeviceOrientation
+                                      .portraitDown,
+                                ],
+                              );
+                              SystemChrome.setEnabledSystemUIMode(
+                                SystemUiMode.manual,
+                                overlays:
+                                SystemUiOverlay.values,
+                              );
+                            } else {
+                              ScreenBrightness()
+                                  .resetScreenBrightness();
+                              Navigator.pop(context);
+                            }
+                          },
+                          currentIndex: _currentIndex,
+                          onVideoSelected: (index) async {
+                            if (index == _currentIndex) {
+                              if (!_player.state.playing) {
+                                await _player.play();
+                              }
+                              return;
+                            }
+
+                            setState(() {
+                              _currentIndex = index;
+                            });
+
+                            await _player.stop();
+                            await _loadVideo();
+                          },
+                          isLandscape: isLandscape,
+                          videos: widget.videos,
+                          onBackPressedMore: () {
+                            print('click more');
+                            openControlsSheetSmart();
+
+
+                          },
+                        )
+                            : Container(
+                          child: _StreamTopBar(
+                            title: appBarTitle,
+                            onBack: () {
+                              ScreenBrightness()
+                                  .resetScreenBrightness();
+                              Navigator.pop(context);
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+
+                    Column(
+                      children: [
+                        Stack(
                           children: [
-                            Container(
-                              color: Colors.black.withOpacity(0.4),
-                              child: Padding(
-                                padding: EdgeInsets.only(
-                                  top: isLandscape ? 0.sp : 40.sp,
-                                ),
-                                child:
-                                    _hasLocalList
-                                        ? CustomVideoAppBar(
-                                          title: appBarTitle,
-                                          onBackPressed: () {
-                                            if (isLandscape) {
-                                              SystemChrome.setPreferredOrientations(
-                                                [
-                                                  DeviceOrientation.portraitUp,
-                                                  DeviceOrientation
-                                                      .portraitDown,
-                                                ],
-                                              );
-                                              SystemChrome.setEnabledSystemUIMode(
-                                                SystemUiMode.manual,
-                                                overlays:
-                                                    SystemUiOverlay.values,
-                                              );
-                                            } else {
-                                              ScreenBrightness()
-                                                  .resetScreenBrightness();
-                                              Navigator.pop(context);
-                                            }
-                                          },
-                                          currentIndex: _currentIndex,
-                                          onVideoSelected: (index) async {
-                                            if (index == _currentIndex) {
-                                              if (!_player.state.playing) {
-                                                await _player.play();
-                                              }
-                                              return;
-                                            }
-
-                                            setState(() {
-                                              _currentIndex = index;
-                                            });
-
-                                            await _player.stop();
-                                            await _loadVideo();
-                                          },
-                                          isLandscape: isLandscape,
-                                          videos: widget.videos,
-                                        )
-                                        : Container(
-                                          child: _StreamTopBar(
-                                            title: appBarTitle,
-                                            onBack: () {
-                                              ScreenBrightness()
-                                                  .resetScreenBrightness();
-                                              Navigator.pop(context);
-                                            },
-                                          ),
-                                        ),
+                            Align(
+                              alignment: Alignment.bottomLeft,
+                              child: Column(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(Icons.camera_alt),
+                                    color: Colors.white,
+                                    onPressed: _takeScreenshot,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.screen_rotation,
+                                    ),
+                                    color: Colors.white,
+                                    onPressed: _toggleOrientation,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.headphones),
+                                    color:
+                                    _audioOnly
+                                        ? Colors.greenAccent
+                                        : Colors.white,
+                                    onPressed: _toggleAudioOnly,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.color_lens),
+                                    color: Colors.white,
+                                    onPressed: () {
+                                      FilterPopup.show(
+                                        context,
+                                        selectedKey: _selectedFilter,
+                                        onSelected: (key) {
+                                          setState(
+                                                () => _selectedFilter = key,
+                                          );
+                                        },
+                                      );
+                                    },
+                                  ),
+                                ],
                               ),
                             ),
-
-                            Column(
-                              children: [
-                                Stack(
-                                  children: [
-                                    Align(
-                                      alignment: Alignment.bottomLeft,
-                                      child: Column(
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(Icons.camera_alt),
-                                            color: Colors.white,
-                                            onPressed: _takeScreenshot,
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.screen_rotation,
-                                            ),
-                                            color: Colors.white,
-                                            onPressed: _toggleOrientation,
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.headphones),
-                                            color:
-                                                _audioOnly
-                                                    ? Colors.greenAccent
-                                                    : Colors.white,
-                                            onPressed: _toggleAudioOnly,
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.color_lens),
-                                            color: Colors.white,
-                                            onPressed: () {
-                                              FilterPopup.show(
-                                                context,
-                                                selectedKey: _selectedFilter,
-                                                onSelected: (key) {
-                                                  setState(
-                                                    () => _selectedFilter = key,
-                                                  );
-                                                },
-                                              );
-                                            },
-                                          ),
-                                        ],
-                                      ),
+                            Align(
+                              alignment: Alignment.bottomRight,
+                              child: Column(
+                                children: [
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.hdr_auto_select_sharp,
+                                      size: 30,
                                     ),
-                                    Align(
-                                      alignment: Alignment.bottomRight,
-                                      child: Column(
-                                        children: [
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.hdr_auto_select_sharp,
-                                              size: 30,
-                                            ),
-                                            color:
-                                                _selectedFilter == 'hdr'
-                                                    ? Colors.pink
-                                                    : Colors.grey,
-                                            onPressed: toggleHdr,
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.volume_up),
-                                            color: Colors.white,
-                                            onPressed: _openVolumeDialog,
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(Icons.speed),
-                                            color: Colors.white,
-                                            onPressed: _openSpeedDialog,
-                                          ),
-                                          IconButton(
-                                            icon: const Icon(
-                                              Icons.picture_in_picture_alt,
-                                            ),
-                                            color: Colors.white,
-                                            onPressed:
-                                                _hasLocalList
-                                                    ? () {
-                                                      FloatingVideoManager.show(
-                                                        context,
-                                                        _player,
-                                                        _controller,
-                                                        widget.videos,
-                                                        _currentIndex,
-                                                      );
-                                                      Navigator.pop(context);
-                                                    }
-                                                    : null, // ✅ disable for URL mode
-                                          ),
-                                        ],
-                                      ),
+                                    color:
+                                    _selectedFilter == 'hdr'
+                                        ? Colors.pink
+                                        : Colors.grey,
+                                    onPressed: toggleHdr,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.volume_up),
+                                    color: Colors.white,
+                                    onPressed: _openVolumeDialog,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(Icons.speed),
+                                    color: Colors.white,
+                                    onPressed: _openSpeedDialog,
+                                  ),
+                                  IconButton(
+                                    icon: const Icon(
+                                      Icons.picture_in_picture_alt,
                                     ),
-                                  ],
-                                ),
-
-                                Row(
-                                  children: [
-                                    Text(
-                                      _formatDuration(_currentPosition),
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                    const SizedBox(width: 1),
-                                    Expanded(
-                                      child: Slider(
-                                        value:
-                                            posMs.clamp(0, safeMax).toDouble(),
-                                        min: 0.0,
-                                        max: safeMax.toDouble(),
-                                        activeColor: Colors.green,
-                                        inactiveColor: Colors.white54,
-
-                                        onChangeStart: (_) {
-                                          _isSeeking = true;
-                                        },
-
-                                        onChanged: (value) {
-                                          if (!_isSeeking) return;
-                                          setState(() {
-                                            _bubblePos = Duration(
-                                              milliseconds: value.round(),
-                                            );
-                                            _currentPosition = _bubblePos;
-                                          });
-                                        },
-
-                                        onChangeEnd: (value) {
-                                          final newPos = Duration(
-                                            milliseconds: value.round(),
-                                          );
-                                          _player.seek(newPos);
-
-                                          setState(() {
-                                            _currentPosition = newPos;
-                                            _bubblePos = newPos;
-                                            _isSeeking = false;
-                                          });
-                                        },
-                                      ),
-                                    ),
-                                    const SizedBox(width: 1),
-                                    Text(
-                                      _formatDuration(_totalDuration),
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    IconButton(
-                                      icon: const Icon(Icons.lock_open),
-                                      color: Colors.white,
-                                      onPressed: _toggleLock,
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.skip_previous),
-                                      color: Colors.white,
-                                      iconSize: sideSize + 4,
-                                      onPressed:
-                                          _hasLocalList ? _playPrevious : null,
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.replay_10),
-                                      color: Colors.white,
-                                      iconSize: sideSize + 4,
-                                      onPressed:
-                                          () => _seekBy(
-                                            const Duration(seconds: -10),
-                                          ),
-                                    ),
-                                    IconButton(
-                                      icon: Icon(
-                                        globalPlayPause.isPlaying
-                                            ? Icons.pause_circle_filled
-                                            : Icons.play_circle_fill,
-                                      ),
-                                      color: Colors.white,
-                                      iconSize: playSize + 8,
-                                      onPressed: _togglePlayPause,
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.forward_10),
-                                      color: Colors.white,
-                                      iconSize: sideSize + 4,
-                                      onPressed:
-                                          () => _seekBy(
-                                            const Duration(seconds: 10),
-                                          ),
-                                    ),
-                                    IconButton(
-                                      icon: const Icon(Icons.skip_next),
-                                      color: Colors.white,
-                                      iconSize: sideSize + 4,
-                                      onPressed:
-                                          _hasLocalList ? _playNext : null,
-                                    ),
-                                    IconButton(
-                                      icon: Icon(
-                                        _resizeMode == VideoResizeMode.fit
-                                            ? Icons.fit_screen
-                                            : _resizeMode ==
-                                                VideoResizeMode.fill
-                                            ? Icons.crop
-                                            : Icons.zoom_in_map,
-                                      ),
-                                      color: Colors.white,
-                                      onPressed: _toggleResizeMode,
-                                    ),
-                                  ],
-                                ),
-                                SizedBox(height: bottomPadding),
-                              ],
+                                    color: Colors.white,
+                                    onPressed:
+                                    _hasLocalList
+                                        ? () {
+                                      FloatingVideoManager.show(
+                                        context,
+                                        _player,
+                                        _controller,
+                                        widget.videos,
+                                        _currentIndex,
+                                      );
+                                      Navigator.pop(context);
+                                    }
+                                        : null, // ✅ disable for URL mode
+                                  ),
+                                ],
+                              ),
                             ),
                           ],
                         ),
-                    ],
-                  ),
+
+                        Row(
+                          children: [
+                            Text(
+                              _formatDuration(_currentPosition),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                            const SizedBox(width: 1),
+                            Expanded(
+                              child: Slider(
+                                value:
+                                posMs.clamp(0, safeMax).toDouble(),
+                                min: 0.0,
+                                max: safeMax.toDouble(),
+                                activeColor: Colors.green,
+                                inactiveColor: Colors.white54,
+
+                                onChangeStart: (_) {
+                                  _isSeeking = true;
+                                },
+
+                                onChanged: (value) {
+                                  if (!_isSeeking) return;
+                                  setState(() {
+                                    _bubblePos = Duration(
+                                      milliseconds: value.round(),
+                                    );
+                                    _currentPosition = _bubblePos;
+                                  });
+                                },
+
+                                onChangeEnd: (value) {
+                                  final newPos = Duration(
+                                    milliseconds: value.round(),
+                                  );
+                                  _player.seek(newPos);
+
+                                  setState(() {
+                                    _currentPosition = newPos;
+                                    _bubblePos = newPos;
+                                    _isSeeking = false;
+                                  });
+                                },
+                              ),
+                            ),
+                            const SizedBox(width: 1),
+                            Text(
+                              _formatDuration(_totalDuration),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            IconButton(
+                              icon: const Icon(Icons.lock_open),
+                              color: Colors.white,
+                              onPressed: _toggleLock,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.skip_previous),
+                              color: Colors.white,
+                              iconSize: sideSize + 4,
+                              onPressed:
+                              _hasLocalList ? _playPrevious : null,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.replay_10),
+                              color: Colors.white,
+                              iconSize: sideSize + 4,
+                              onPressed:
+                                  () => _seekBy(
+                                const Duration(seconds: -10),
+                              ),
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                globalPlayPause.isPlaying
+                                    ? Icons.pause_circle_filled
+                                    : Icons.play_circle_fill,
+                              ),
+                              color: Colors.white,
+                              iconSize: playSize + 8,
+                              onPressed: _togglePlayPause,
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.forward_10),
+                              color: Colors.white,
+                              iconSize: sideSize + 4,
+                              onPressed:
+                                  () => _seekBy(
+                                const Duration(seconds: 10),
+                              ),
+                            ),
+                            IconButton(
+                              icon: const Icon(Icons.skip_next),
+                              color: Colors.white,
+                              iconSize: sideSize + 4,
+                              onPressed:
+                              _hasLocalList ? _playNext : null,
+                            ),
+                            IconButton(
+                              icon: Icon(
+                                _resizeMode == VideoResizeMode.fit
+                                    ? Icons.fit_screen
+                                    : _resizeMode ==
+                                    VideoResizeMode.fill
+                                    ? Icons.crop
+                                    : Icons.zoom_in_map,
+                              ),
+                              color: Colors.white,
+                              onPressed: _toggleResizeMode,
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: bottomPadding),
+                      ],
+                    ),
+                  ],
+                ),
+            ],
+          ),
         ),
       ),
     );
@@ -1924,7 +2826,25 @@ class _FullScreenVideoPlayerSystemVolumeState
   }
 
   Future<void> _seekBy(Duration offset) async {
-    await _player.seek(_currentPosition + offset);
+    final duration = _player.state.duration;
+    final maxMs = duration.inMilliseconds;
+
+    var targetMs = (_currentPosition + offset).inMilliseconds;
+    // clamp only if we know the duration; else just guard against negative
+    if (maxMs > 0) {
+      targetMs = targetMs.clamp(0, maxMs);
+    } else if (targetMs < 0) {
+      targetMs = 0;
+    }
+
+    final newPos = Duration(milliseconds: targetMs);
+    await _player.seek(newPos);
+
+    if (!mounted) return;
+    setState(() {
+      _currentPosition = newPos;
+      _bubblePos = newPos;
+    });
   }
 }
 
@@ -1937,10 +2857,7 @@ class _StreamTopBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return
-
-
-      Padding(
+    return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 0),
       child: Row(
         children: [

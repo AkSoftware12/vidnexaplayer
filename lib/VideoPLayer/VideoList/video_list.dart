@@ -9,7 +9,12 @@ import 'package:share_plus/share_plus.dart';
 import 'package:path/path.dart' as path;
 import '../../Home/HomeScreen/home2.dart';
 import '../../Utils/color.dart';
+import '../../ads/app_open_ad_manager.dart';
+import '../../main.dart';
 import '../4kPlayer/4k_player.dart';
+import '../4kPlayer/FlotingVideo/floting_video.dart';
+
+
 
 class VideoFolderScreen extends StatefulWidget {
   final String folderName;
@@ -27,6 +32,9 @@ class VideoFolderScreen extends StatefulWidget {
 
 class _VideoFolderScreenState extends State<VideoFolderScreen>
     with SingleTickerProviderStateMixin {
+
+  final appOpenManager = AppOpenAdManager();
+
   bool _isGridView = false;
 
   List<AssetEntity> _photos = [];
@@ -37,6 +45,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
   @override
   void initState() {
     super.initState();
+    appOpenManager.init();
 
     _controller = AnimationController(
       duration: Duration(milliseconds: 800),
@@ -49,6 +58,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
   @override
   void dispose() {
     super.dispose();
+    appOpenManager.dispose();
     _controller.dispose();
   }
 
@@ -156,6 +166,8 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
         ],
       ),
       body: _isGridView ? _buildGridView() : _buildListView(),
+      bottomNavigationBar:appOpenManager.bannerWidget(),
+
     );
   }
 
@@ -534,17 +546,19 @@ class PhotoTile extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) =>  FullScreenVideoPlayerFixed(
+        appOpenManager.showInterstitialIfAllowed(
+          onContinue: () {
+            FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => FullScreenVideoPlayerFixed(
                   videos: photos,
                   initialIndex: initialIndex,
                 ),
-
-          ),
+              ),
+            );
+          },
         );
       },
       child: Card(
@@ -728,17 +742,20 @@ class PhotoTile extends StatelessWidget {
                     ],
                   ).then((value) async {
                     if (value == "Play") {
+                      appOpenManager.showInterstitialIfAllowed(
+                        onContinue: () {
+                          FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
 
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder:
-                              (context) =>  FullScreenVideoPlayerFixed(
-                            videos: photos,
-                            initialIndex: initialIndex,
-                          ),
-
-                        ),
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => FullScreenVideoPlayerFixed(
+                                videos: photos,
+                                initialIndex: initialIndex,
+                              ),
+                            ),
+                          );
+                        },
                       );
 
                     } else if (value == "Delete") {
@@ -831,16 +848,19 @@ class GridviewList extends StatelessWidget {
   Widget build(BuildContext context) {
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder:
-                (context) =>  FullScreenVideoPlayerFixed(
-              videos: photos,
-              initialIndex: initialIndex,
-            ),
-
-          ),
+        appOpenManager.showInterstitialIfAllowed(
+          onContinue: () {
+            FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => FullScreenVideoPlayerFixed(
+                  videos: photos,
+                  initialIndex: initialIndex,
+                ),
+              ),
+            );
+          },
         );
       },
       child: Card(
@@ -997,16 +1017,20 @@ class GridviewList extends StatelessWidget {
                         ],
                       ).then((value) async {
                         if (value == "Play") {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (context) =>  FullScreenVideoPlayerFixed(
-                                videos: photos,
-                                initialIndex: initialIndex,
-                              ),
+                          appOpenManager.showInterstitialIfAllowed(
+                            onContinue: () {
+                              FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
 
-                            ),
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (_) => FullScreenVideoPlayerFixed(
+                                    videos: photos,
+                                    initialIndex: initialIndex,
+                                  ),
+                                ),
+                              );
+                            },
                           );
                         } else if (value == "Delete") {
                           onDelete();

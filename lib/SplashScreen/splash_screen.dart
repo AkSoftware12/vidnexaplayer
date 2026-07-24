@@ -9,6 +9,7 @@ import 'package:videoplayer/Utils/string.dart';
 import '../HexColorCode/HexColor.dart';
 import '../Home/HomeBottomnavigation/home_bottomNavigation.dart';
 import '../OnboardScreen/onboarding_screen.dart';
+import '../Utils/rating_popup.dart';
 import '../ads/app_open_ad_manager.dart';
 
 
@@ -30,11 +31,21 @@ class _SplashScreenState extends State<SplashScreen> {
     _adManager.init();
 
     Future.delayed(const Duration(seconds: 3), () {
-      _adManager.showAdIfAvailable(() {
+      _adManager.showAdIfAvailable(() async {
+
+        // ⭐ STEP 1: rating popup show (agar conditions match hui)
+        await Future.delayed(const Duration(milliseconds: 300));
+        if (mounted) {
+          RatingPopup.onAppOpen(context);
+        }
+
+        // ⭐ STEP 2: login check
+        await Future.delayed(const Duration(milliseconds: 300));
         checkLoginStatus();
       });
     });
   }
+
   @override
   void dispose() {
     _adManager.dispose();

@@ -108,7 +108,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                         tag: 'app_logo',
                         child: Container(
                           height: MediaQuery.of(context).size.height * 0.4,
-                          width: double.infinity,
+                          width: MediaQuery.of(context).size.width * 0.5,
                           decoration: BoxDecoration(
                             shape: BoxShape.circle,
                             boxShadow: [
@@ -122,14 +122,6 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
 
                           child:Lottie.asset('assets/permisssion.json'),
 
-                          // child: ClipOval(
-                          //   child:Lottie.asset('assets/permission.json'),
-                          //
-                          //   // Image.asset(
-                          //   //   'assets/appblue.png',
-                          //   //   fit: BoxFit.cover,
-                          //   // ),
-                          // ),
                         ),
                       ),
 
@@ -143,7 +135,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                       'Grant Permissions',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.openSans(
-                        fontSize: 22.sp,
+                        fontSize: 18.sp,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                         letterSpacing: 0.5,
@@ -156,7 +148,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                       'Please grant access to all video files on your device for the best experience',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.openSans(
-                        fontSize: 14.sp,
+                        fontSize: 12.sp,
                         fontWeight: FontWeight.w400,
                         color: Colors.white70,
                         height: 1.4,
@@ -186,7 +178,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                         padding:  EdgeInsets.all(10.sp),
                         child: SizedBox(
                           width: double.infinity,
-                          height: 55.sp,
+                          height: 45.sp,
 
                           child: TextButton(
                             onPressed: requestPermissions,
@@ -201,12 +193,12 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.security, size: 20.sp),
+                                Icon(Icons.security, size: 17.sp),
                                 SizedBox(width: 8.sp),
                                 Text(
                                   'Grant All Permissions',
                                   style: GoogleFonts.openSans(
-                                    fontSize: 16.sp,
+                                    fontSize: 15.sp,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -219,7 +211,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
 
 
 
-                    SizedBox(height: 35.sp),
+                    SizedBox(height: 15.sp),
 
                     // Not Now Option
                     GestureDetector(
@@ -233,7 +225,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                       child: Text(
                         'Skip for now ',
                         style: GoogleFonts.openSans(
-                          fontSize: 16.sp,
+                          fontSize: 13.sp,
                           fontWeight: FontWeight.w500,
                           color: ColorSelect.subtextColor,
                           decoration: TextDecoration.underline,
@@ -273,7 +265,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
       child: Row(
         children: [
           Container(
-            padding: EdgeInsets.all(8.sp),
+            padding: EdgeInsets.all(7.sp),
             decoration: BoxDecoration(
               color: ColorSelect.maineColor.withOpacity(0.2),
               borderRadius: BorderRadius.circular(12.sp),
@@ -293,7 +285,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                 Text(
                   title,
                   style: GoogleFonts.openSans(
-                    fontSize: 14.sp,
+                    fontSize: 13.sp,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
@@ -301,7 +293,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                 Text(
                   subtitle,
                   style: GoogleFonts.openSans(
-                    fontSize: 12.sp,
+                    fontSize: 10.sp,
                     fontWeight: FontWeight.w400,
                     color: Colors.white60,
                   ),

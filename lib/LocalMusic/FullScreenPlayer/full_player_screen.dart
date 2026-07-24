@@ -13,6 +13,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../TextScroll/text_scroll.dart';
 import '../../Utils/color.dart';
 import '../../Utils/common.dart';
+import '../../ads/app_open_ad_manager.dart';
 import '../AUDIOCONTROLLER/global_audio_controller.dart';
 
 class PositionData {
@@ -30,6 +31,7 @@ class FullPlayerScreen extends StatefulWidget {
 
 class _FullPlayerScreenState extends State<FullPlayerScreen> {
   late final PageController _pageCtrl;
+  final appOpenManager = AppOpenAdManager();
 
   Duration? selectedTimer;
   bool _isDragging = false;
@@ -55,11 +57,13 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    appOpenManager.init();
     _pageCtrl = PageController(viewportFraction: .85);
   }
 
   @override
   void dispose() {
+    appOpenManager.dispose();
     _pageCtrl.dispose();
     super.dispose();
   }
@@ -403,7 +407,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                 // CONTROLS
                 Padding(
-                  padding: const EdgeInsets.only(bottom: 50, top: 10),
+                  padding: const EdgeInsets.only(bottom: 30, top: 10),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
@@ -452,6 +456,11 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
               ],
             ),
           ),
+          bottomNavigationBar: SizedBox(
+            height: 50,
+            child: appOpenManager.bannerWidgetBottomScreen() ?? const SizedBox(),
+          ),
+
         );
       },
     );

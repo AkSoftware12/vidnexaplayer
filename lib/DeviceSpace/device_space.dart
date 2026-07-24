@@ -6,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:videoplayer/Utils/color.dart';
 import '../DirectoryFolder/directory_folder.dart';
+import '../ads/app_open_ad_manager.dart';
 
 class DeviceSpaceScreen extends StatefulWidget {
   const DeviceSpaceScreen({super.key});
@@ -15,6 +16,8 @@ class DeviceSpaceScreen extends StatefulWidget {
 }
 
 class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
+  final appOpenManager = AppOpenAdManager();
+
   double _totalDiskSpaceGB = 0;
   double _freeDiskSpaceGB = 0;
   bool _loading = true;
@@ -22,9 +25,15 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
   @override
   void initState() {
     super.initState();
+    appOpenManager.init();
     _initDiskSpace();
   }
 
+  @override
+  void dispose() {
+    appOpenManager.dispose();
+    super.dispose();
+  }
   Future<void> _initDiskSpace() async {
     if (Platform.isAndroid) {
       await Permission.storage.request();
@@ -109,6 +118,9 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
           Divider(color: Colors.grey.shade300),
         ],
       ),
+
+      bottomNavigationBar:appOpenManager.bannerWidget(),
+
     );
   }
 }

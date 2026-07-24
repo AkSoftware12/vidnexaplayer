@@ -6,6 +6,7 @@ import 'package:photo_manager/photo_manager.dart';
 class CustomVideoAppBar extends StatelessWidget {
   final String title;
   final VoidCallback onBackPressed;
+  final VoidCallback onBackPressedMore;
   final bool isLandscape;
   final List<AssetEntity> videos;
   final int currentIndex;
@@ -19,6 +20,7 @@ class CustomVideoAppBar extends StatelessWidget {
     required this.isLandscape,
     this.currentIndex = 0,
     this.onVideoSelected,
+    required this.onBackPressedMore,
   });
 
   @override
@@ -91,6 +93,13 @@ class CustomVideoAppBar extends StatelessWidget {
                   icon: Icons.playlist_play_rounded,
                   tooltip: "Playlist",
                   onTap: () => _showVideoList(context),
+                  size: isLandscape ? 34 : 40,
+                ),
+                SizedBox(width: 10.w),
+                _glassIcon(
+                  icon: Icons.more_vert,
+                  tooltip: "All Item",
+                  onTap:onBackPressedMore,
                   size: isLandscape ? 34 : 40,
                 ),
               ],

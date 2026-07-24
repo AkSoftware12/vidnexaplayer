@@ -5,12 +5,17 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:videoplayer/Utils/color.dart';
 
+import '../ads/app_open_ad_manager.dart';
+
 class AlbumScreen extends StatefulWidget {
   @override
   _AlbumScreenState createState() => _AlbumScreenState();
 }
 
 class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStateMixin {
+
+  final appOpenManager = AppOpenAdManager();
+
   List<AssetPathEntity> _albums = [];
   bool _isLoading = true;
   late AnimationController _controller;
@@ -19,6 +24,8 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
+    appOpenManager.init();
+
     _controller = AnimationController(
       duration: Duration(milliseconds: 800),
       vsync: this,
@@ -29,6 +36,7 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
 
   @override
   void dispose() {
+    appOpenManager.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -94,6 +102,9 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
           },
         ),
       ),
+
+      bottomNavigationBar:appOpenManager.bannerWidget(),
+
     );
   }
 }

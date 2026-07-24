@@ -12,6 +12,8 @@ import '../../Photo/image_album.dart';
 import '../../RecentlyVideos/RecentlyPlayedScreen/recently_played_screen.dart';
 import '../../VideoPLayer/4kPlayer/4k_player.dart';
 import '../../VideoPLayer/VideoList/video_list.dart';
+import '../../ads/BannerAdsList/banner_ad_list.dart';
+import '../../ads/app_open_ad_manager.dart';
 import 'BannerSlider/banner_slider.dart';
 import 'BottomsheetHomeScreen/bottomsheet_menu_button.dart';
 import 'HorizontalGridList/horizontal_gridlist.dart';
@@ -96,6 +98,8 @@ class DemoHomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<DemoHomeScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   List<AssetPathEntity> _albums = [];
+  final appOpenManager = AppOpenAdManager();
+
   bool _isLoading = true;
   bool _hasPermission = false;
 
@@ -108,6 +112,8 @@ class _HomeScreenState extends State<DemoHomeScreen>
   @override
   void initState() {
     super.initState();
+    appOpenManager.init();
+
     WidgetsBinding.instance.addObserver(this);
 
     _controller = AnimationController(
@@ -151,7 +157,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-
+    appOpenManager.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -252,6 +258,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
 
 
 
+
               _isLoading
                   ? SizedBox()
                   : !_hasPermission
@@ -279,107 +286,105 @@ class _HomeScreenState extends State<DemoHomeScreen>
                           _albums.isNotEmpty
                               ? HorizontalGridList(album: _albums[0], index: 0)
                               : const SizedBox.shrink(),
-                          Padding(
-                            padding: EdgeInsets.symmetric(
-                              horizontal: 10.sp,
-                              vertical: 8.sp,
-                            ),
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: EdgeInsets.all(6.sp),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(
-                                          10.sp,
-                                        ),
-                                      ),
-                                      child: Icon(
-                                        Icons.folder_open_rounded,
-                                        color: Colors.blueAccent,
-                                        size: 18.sp,
-                                      ),
-                                    ),
-                                    SizedBox(width: 8.sp),
-                                    Text(
-                                      'Folders',
-                                      style: GoogleFonts.poppins(
-                                        textStyle: TextStyle(
-                                          color: Colors.black87,
-                                          fontSize: 15.sp,
-                                          fontWeight: FontWeight.w600,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
 
-                                Row(
+
+
+                          Column(
+                            children: [
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: 10.sp,
+                                  vertical: 8.sp,
+                                ),
+                                child: Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                   children: [
-                                    // IconButton(
-                                    //   icon: Icon(Icons.refresh, color: Colors.black),
-                                    //   onPressed: () async {
-                                    //     await _requestPermissionAndLoadAlbums();
-                                    //   },
-                                    //   tooltip: 'Refresh Videos',
-                                    // ),
-                                    Container(
-                                      height: 32.sp,
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue.withOpacity(0.1),
-                                        borderRadius: BorderRadius.circular(30),
-                                      ),
-                                      child: Row(
-                                        children: [
-                                          // 🔸 List View Button
-                                          _buildToggleButton(
-                                            icon: Icons.list,
-                                            isActive: _isListView,
-                                            onTap: () {
-                                              setState(() {
-                                                _isListView = true;
-                                                _isGridView = false;
-                                                _isCompactView = false;
-                                              });
-                                            },
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: EdgeInsets.all(6.sp),
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(
+                                              10.sp,
+                                            ),
                                           ),
-                                          // 🔸 Grid View Button
-                                          _buildToggleButton(
-                                            icon: Icons.grid_view_rounded,
-                                            isActive: _isGridView,
-                                            onTap: () {
-                                              setState(() {
-                                                _isListView = false;
-                                                _isGridView = true;
-                                                _isCompactView = false;
-                                              });
-                                            },
+                                          child: Icon(
+                                            Icons.folder_open_rounded,
+                                            color: Colors.blueAccent,
+                                            size: 18.sp,
                                           ),
-                                          // 🔸 Compact View Button
-                                          _buildToggleButton(
-                                            icon: Icons.view_agenda_rounded,
-                                            isActive: _isCompactView,
-                                            onTap: () {
-                                              setState(() {
-                                                _isListView = false;
-                                                _isGridView = false;
-                                                _isCompactView = true;
-                                              });
-                                            },
+                                        ),
+                                        SizedBox(width: 8.sp),
+                                        Text(
+                                          'Folders',
+                                          style: GoogleFonts.poppins(
+                                            textStyle: TextStyle(
+                                              color: Colors.black87,
+                                              fontSize: 15.sp,
+                                              fontWeight: FontWeight.w600,
+                                            ),
                                           ),
-                                        ],
-                                      ),
+                                        ),
+                                      ],
+                                    ),
+
+                                    Row(
+                                      children: [
+                                        Container(
+                                          height: 32.sp,
+                                          decoration: BoxDecoration(
+                                            color: Colors.blue.withOpacity(0.1),
+                                            borderRadius: BorderRadius.circular(30),
+                                          ),
+                                          child: Row(
+                                            children: [
+                                              // 🔸 List View Button
+                                              _buildToggleButton(
+                                                icon: Icons.list,
+                                                isActive: _isListView,
+                                                onTap: () {
+                                                  setState(() {
+                                                    _isListView = true;
+                                                    _isGridView = false;
+                                                    _isCompactView = false;
+                                                  });
+                                                },
+                                              ),
+                                              // 🔸 Grid View Button
+                                              _buildToggleButton(
+                                                icon: Icons.grid_view_rounded,
+                                                isActive: _isGridView,
+                                                onTap: () {
+                                                  setState(() {
+                                                    _isListView = false;
+                                                    _isGridView = true;
+                                                    _isCompactView = false;
+                                                  });
+                                                },
+                                              ),
+                                              // 🔸 Compact View Button
+                                              _buildToggleButton(
+                                                icon: Icons.view_agenda_rounded,
+                                                isActive: _isCompactView,
+                                                onTap: () {
+                                                  setState(() {
+                                                    _isListView = false;
+                                                    _isGridView = false;
+                                                    _isCompactView = true;
+                                                  });
+                                                },
+                                              ),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
                                     ),
                                   ],
                                 ),
-                              ],
-                            ),
-                          ),
-                          _isLoading
-                              ? Center(
+                              ),
+                              _isLoading
+                                  ? Center(
                                 child: Padding(
                                   padding: EdgeInsets.all(20.sp),
                                   child: CircularProgressIndicator(
@@ -387,8 +392,8 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                   ),
                                 ),
                               )
-                              : _albums.isEmpty
-                              ? Center(
+                                  : _albums.isEmpty
+                                  ? Center(
                                 child: Padding(
                                   padding: EdgeInsets.only(top: 50.sp),
                                   child: Text(
@@ -403,74 +408,105 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                   ),
                                 ),
                               )
-                              : FadeTransition(
+                                  : FadeTransition(
                                 opacity: _fadeAnimation,
                                 child: AnimatedSwitcher(
                                   duration: Duration(milliseconds: 000),
                                   switchInCurve: Curves.easeIn,
                                   switchOutCurve: Curves.easeIn,
                                   child:
-                                      _isListView
-                                          ? ListView.builder(
-                                            key: ValueKey('listView'),
-                                            shrinkWrap: true,
-                                            physics:
-                                                NeverScrollableScrollPhysics(),
-                                            itemCount: _albums.length,
-                                            itemBuilder: (context, index) {
-                                              return AlbumTile(
-                                                album: _albums[index],
-                                                index: index,
-                                              );
-                                            },
-                                          )
-                                          : _isGridView
-                                          ? GridView.builder(
-                                            key: ValueKey('gridView'),
-                                            padding: EdgeInsets.symmetric(
-                                              horizontal: 3.sp,
-                                              vertical: 0.sp,
-                                            ),
-                                            shrinkWrap: true,
-                                            physics:
-                                                NeverScrollableScrollPhysics(),
-                                            itemCount: _albums.length,
-                                            gridDelegate:
-                                                SliverGridDelegateWithFixedCrossAxisCount(
-                                                  crossAxisCount: 2,
-                                                  mainAxisSpacing: 2.sp,
-                                                  crossAxisSpacing: 2.sp,
-                                                  childAspectRatio: 2.5,
-                                                ),
-                                            itemBuilder: (context, index) {
-                                              return AlbumGridTile(
-                                                album: _albums[index],
-                                                index: index,
-                                              );
-                                            },
-                                          )
-                                          : GridView.builder(
-                                            padding: EdgeInsets.all(8.w),
-                                            itemCount: _albums.length,
-                                            shrinkWrap: true,
-                                            physics:
-                                                NeverScrollableScrollPhysics(),
-                                            gridDelegate:
-                                                SliverGridDelegateWithFixedCrossAxisCount(
-                                                  crossAxisCount: 3,
-                                                  crossAxisSpacing: 2.w,
-                                                  mainAxisSpacing: 2.h,
-                                                  childAspectRatio: 1,
-                                                ),
-                                            itemBuilder: (context, index) {
-                                              return AlbumGridTile3(
-                                                album: _albums[index],
-                                                index: index,
-                                              );
-                                            },
-                                          ),
+                                  _isListView
+                                      ? InlineBannerList(
+                                    key: const ValueKey('listView'),
+                                    items: _albums,
+                                    adUnitId: 'ca-app-pub-6478840988045325/7764390357',
+                                    itemsPerAd: 9, // ✅ 6 items ke baad ad
+                                    physics: const NeverScrollableScrollPhysics(),
+                                    shrinkWrap: true,
+                                    itemBuilder: (context, index, album) {
+                                      return AlbumTile(
+                                        album: album,
+                                        index: index,
+                                      );
+                                    },
+                                  )
+
+
+
+                                  // ListView.builder(
+                                  //   key: ValueKey('listView'),
+                                  //   shrinkWrap: true,
+                                  //   physics: NeverScrollableScrollPhysics(),
+                                  //
+                                  //   // 👉 total count = albums + ads
+                                  //   itemCount: _albums.length + (_albums.length ~/ 6),
+                                  //
+                                  //   itemBuilder: (context, index) {
+                                  //     // 👉 Check: kya ye ad position hai?
+                                  //     if ((index + 1) % 7 == 0) {
+                                  //       return appOpenManager.bannerWidget(); // 👈 Banner widget
+                                  //     }
+                                  //
+                                  //     // 👉 actual album index calculate karo
+                                  //     final int albumIndex = index - (index ~/ 7);
+                                  //
+                                  //     return AlbumTile(
+                                  //       album: _albums[albumIndex],
+                                  //       index: albumIndex,
+                                  //     );
+                                  //   },
+                                  // )
+
+                                      : _isGridView
+                                      ? GridView.builder(
+                                    key: ValueKey('gridView'),
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: 3.sp,
+                                      vertical: 0.sp,
+                                    ),
+                                    shrinkWrap: true,
+                                    physics:
+                                    NeverScrollableScrollPhysics(),
+                                    itemCount: _albums.length,
+                                    gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 2,
+                                      mainAxisSpacing: 2.sp,
+                                      crossAxisSpacing: 2.sp,
+                                      childAspectRatio: 2.5,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      return AlbumGridTile(
+                                        album: _albums[index],
+                                        index: index,
+                                      );
+                                    },
+                                  )
+                                      : GridView.builder(
+                                    padding: EdgeInsets.all(8.w),
+                                    itemCount: _albums.length,
+                                    shrinkWrap: true,
+                                    physics:
+                                    NeverScrollableScrollPhysics(),
+                                    gridDelegate:
+                                    SliverGridDelegateWithFixedCrossAxisCount(
+                                      crossAxisCount: 3,
+                                      crossAxisSpacing: 2.w,
+                                      mainAxisSpacing: 2.h,
+                                      childAspectRatio: 1,
+                                    ),
+                                    itemBuilder: (context, index) {
+                                      return AlbumGridTile3(
+                                        album: _albums[index],
+                                        index: index,
+                                      );
+                                    },
+                                  ),
                                 ),
                               ),
+                            ],
+                          )
+
                         ],
                       ),
                     ),
