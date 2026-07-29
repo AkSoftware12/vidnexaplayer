@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -23,27 +22,40 @@ class AppBarColorProvider extends ChangeNotifier {
 
   // Load saved color from SharedPreferences
   Future<void> loadColor() async {
-    final prefs = await SharedPreferences.getInstance();
-    final savedColor = prefs.getInt('appBarColor');
-    if (savedColor != null) {
-      _selectedColor = Color(savedColor);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final savedColor = prefs.getInt('appBarColor');
+      if (savedColor == null) return;
+      final restored = Color(savedColor);
+      if (restored == _selectedColor) return; // avoid a pointless rebuild
+      _selectedColor = restored;
       notifyListeners();
+    } catch (_) {
+      // Keep the default colour.
     }
   }
 
   // Save color to SharedPreferences
   Future<void> changeColor(Color color) async {
     _selectedColor = color;
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('appBarColor', color.value); // Save color value
     notifyListeners();
+    await _persist(color);
   }
 
   // Reset to default color
   Future<void> resetColor() async {
     _selectedColor = Colors.grey.shade100; // Default color
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('appBarColor', _selectedColor.value); // Save default
     notifyListeners();
+    await _persist(_selectedColor);
+  }
+
+  Future<void> _persist(Color color) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // `Color.value` is deprecated; `toARGB32()` is the explicit conversion.
+      await prefs.setInt('appBarColor', color.toARGB32());
+    } catch (_) {
+      // Non-fatal: the colour still changed for this session.
+    }
   }
 }

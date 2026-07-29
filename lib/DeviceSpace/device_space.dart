@@ -1,9 +1,7 @@
-import 'dart:io';
 import 'package:disk_space_plus/disk_space_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:videoplayer/Utils/color.dart';
 import '../DirectoryFolder/directory_folder.dart';
 import '../ads/app_open_ad_manager.dart';
@@ -25,24 +23,17 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
   @override
   void initState() {
     super.initState();
-    appOpenManager.init();
     _initDiskSpace();
   }
 
-  @override
-  void dispose() {
-    appOpenManager.dispose();
-    super.dispose();
-  }
   Future<void> _initDiskSpace() async {
-    if (Platform.isAndroid) {
-      await Permission.storage.request();
-      await Permission.manageExternalStorage.request();
-    }
-
+    // Reading free/total disk space needs no storage permission at all.
+    // The old code requested MANAGE_EXTERNAL_STORAGE (All-Files Access) here,
+    // which requires a Play Console declaration and is grounds for rejection.
     try {
-      final totalMB = await DiskSpacePlus().getTotalDiskSpace ?? 0;
-      final freeMB = await DiskSpacePlus().getFreeDiskSpace ?? 0;
+      final disk = DiskSpacePlus();
+      final totalMB = await disk.getTotalDiskSpace ?? 0;
+      final freeMB = await disk.getFreeDiskSpace ?? 0;
 
       if (!mounted) return;
 
@@ -53,6 +44,7 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
       });
     } catch (e) {
       debugPrint('Disk space error: $e');
+      if (!mounted) return;
       setState(() => _loading = false);
     }
   }
@@ -62,9 +54,9 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
-        backgroundColor: Theme.of(context).colorScheme.background,
+        backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(
           'Directory',
           style: GoogleFonts.radioCanada(

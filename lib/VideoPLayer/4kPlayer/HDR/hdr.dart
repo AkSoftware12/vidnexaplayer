@@ -15,7 +15,7 @@ class FilterPopup {
       context: context,
       barrierDismissible: true,
       barrierLabel: "filter",
-      barrierColor: Colors.black.withOpacity(.6),
+      barrierColor: Colors.black.withValues(alpha:.6),
       transitionDuration: const Duration(milliseconds: 300),
       pageBuilder: (_, __, ___) {
         return Material(
@@ -37,12 +37,12 @@ class FilterPopup {
                     borderRadius: BorderRadius.circular(22),
                     gradient: LinearGradient(
                       colors: [
-                        Colors.white.withOpacity(.1),
-                        Colors.white.withOpacity(.05),
+                        Colors.white.withValues(alpha:.1),
+                        Colors.white.withValues(alpha:.05),
                       ],
                     ),
                     border: Border.all(
-                      color: Colors.white.withOpacity(.25),
+                      color: Colors.white.withValues(alpha:.25),
                     ),
                   ),
                   child: Column(
@@ -200,8 +200,8 @@ class FilterPopup {
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
             color: selected
-                ? color.withOpacity(.25)
-                : Colors.white.withOpacity(.08),
+                ? color.withValues(alpha:.25)
+                : Colors.white.withValues(alpha:.08),
             border: Border.all(
               color: selected ? color : Colors.white24,
             ),

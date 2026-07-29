@@ -1,11 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart'
     show SongModel, AlbumModel, OnAudioQuery, AudiosFromType, ArtworkType, QueryArtworkWidget;
 import 'package:videoplayer/Utils/color.dart';
 import '../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
-import '../../song_repository.dart';
 
 class AlbumPage extends StatefulWidget {
   final AlbumModel album;
@@ -24,29 +22,42 @@ class AlbumPage extends StatefulWidget {
 }
 
 class _AlbumPageState extends State<AlbumPage> {
-  late List<SongModel> _songs;
-  late final SongRepository songRepository;
-  final AudioPlayer audioPlayer = AudioPlayer();
+  // Removed: an uninitialised `late final SongRepository` (LateInitializationError
+  // on first use) and a per-page `AudioPlayer` that was never disposed — one
+  // leaked native player for every album the user opened.
+  // Playback goes through the shared GlobalAudioController.
+  List<SongModel> _songs = const [];
   final audio = GlobalAudioController();
 
   @override
   void initState() {
     super.initState();
-    _songs = [];
     _getSongs();
   }
 
   Future<void> _getSongs() async {
-    final OnAudioQuery audioQuery = OnAudioQuery();
+    try {
+      final OnAudioQuery audioQuery = OnAudioQuery();
 
-    final List<SongModel> songs = await audioQuery.queryAudiosFrom(
-      AudiosFromType.ALBUM_ID,
-      widget.album.id,
-    );
+      final List<SongModel> songs = await audioQuery.queryAudiosFrom(
+        AudiosFromType.ALBUM_ID,
+        widget.album.id,
+      );
 
-    songs.removeWhere((song) => (song.duration ?? 0) < 10000);
+      // Drop ringtone/notification-length clips, but keep tracks whose duration
+      // the media store simply doesn't know (duration == null).
+      songs.removeWhere((song) {
+        final ms = song.duration;
+        return ms != null && ms < 10000;
+      });
 
-    setState(() => _songs = songs);
+      if (!mounted) return;
+      setState(() => _songs = songs);
+    } catch (e) {
+      debugPrint('Album songs query failed: $e');
+      if (!mounted) return;
+      setState(() => _songs = const []);
+    }
   }
 
   @override
@@ -91,8 +102,8 @@ class _AlbumPageState extends State<AlbumPage> {
                         gradient: LinearGradient(
                           colors: [
                             widget.color,
-                            widget.color.withOpacity(0.85),
-                            widget.color.withOpacity(0.6),
+                            widget.color.withValues(alpha:0.85),
+                            widget.color.withValues(alpha:0.6),
                           ],
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
@@ -109,7 +120,7 @@ class _AlbumPageState extends State<AlbumPage> {
                         height: 180,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: widget.colortext.withOpacity(0.10),
+                          color: widget.colortext.withValues(alpha:0.10),
                         ),
                       ),
                     ),
@@ -121,7 +132,7 @@ class _AlbumPageState extends State<AlbumPage> {
                         height: 220,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
-                          color: widget.colortext.withOpacity(0.08),
+                          color: widget.colortext.withValues(alpha:0.08),
                         ),
                       ),
                     ),
@@ -160,7 +171,7 @@ class _AlbumPageState extends State<AlbumPage> {
                                     style: TextStyle(
                                       fontSize: 13.5,
                                       fontWeight: FontWeight.w500,
-                                      color: widget.colortext.withOpacity(0.70),
+                                      color: widget.colortext.withValues(alpha:0.70),
                                     ),
                                   ),
                                   const SizedBox(height: 10),
@@ -244,7 +255,7 @@ class _AlbumPageState extends State<AlbumPage> {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
-                        color: widget.colortext.withOpacity(0.60),
+                        color: widget.colortext.withValues(alpha:0.60),
                       ),
                     ),
                   ],
@@ -299,7 +310,7 @@ class _AlbumPageState extends State<AlbumPage> {
         borderRadius: BorderRadius.circular(18),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.35),
+            color: Colors.black.withValues(alpha:0.35),
             blurRadius: 24,
             offset: const Offset(0, 10),
           ),
@@ -318,13 +329,13 @@ class _AlbumPageState extends State<AlbumPage> {
               artworkBorder: BorderRadius.zero,
               nullArtworkWidget: Container(
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha:0.06),
                   borderRadius: BorderRadius.circular(18),
                 ),
                 child: Icon(
                   Icons.music_note_rounded,
                   size: 56,
-                  color: widget.colortext.withOpacity(0.8),
+                  color: widget.colortext.withValues(alpha:0.8),
                 ),
               ),
             ),
@@ -337,8 +348,8 @@ class _AlbumPageState extends State<AlbumPage> {
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
                     colors: [
-                      Colors.black.withOpacity(0.00),
-                      Colors.black.withOpacity(0.45),
+                      Colors.black.withValues(alpha:0.00),
+                      Colors.black.withValues(alpha:0.45),
                     ],
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
@@ -356,9 +367,9 @@ class _AlbumPageState extends State<AlbumPage> {
                   width: 38,
                   height: 38,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.16),
+                    color: Colors.white.withValues(alpha:0.16),
                     borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white.withOpacity(0.18)),
+                    border: Border.all(color: Colors.white.withValues(alpha:0.18)),
                   ),
                   child: Icon(
                     Icons.play_arrow_rounded,
@@ -382,8 +393,8 @@ class _AlbumPageState extends State<AlbumPage> {
       margin: const EdgeInsets.only(bottom: 10),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        color: Colors.white.withOpacity(0.05),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: Colors.white.withValues(alpha:0.05),
+        border: Border.all(color: Colors.white.withValues(alpha:0.08)),
       ),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -404,10 +415,10 @@ class _AlbumPageState extends State<AlbumPage> {
                     artworkFit: BoxFit.cover,
                     artworkBorder: BorderRadius.zero,
                     nullArtworkWidget: Container(
-                      color: Colors.white.withOpacity(0.06),
+                      color: Colors.white.withValues(alpha:0.06),
                       child: Icon(
                         Icons.music_note_rounded,
-                        color: widget.colortext.withOpacity(0.7),
+                        color: widget.colortext.withValues(alpha:0.7),
                       ),
                     ),
                   ),
@@ -439,7 +450,7 @@ class _AlbumPageState extends State<AlbumPage> {
                       style: TextStyle(
                         fontSize: 12.5,
                         fontWeight: FontWeight.w500,
-                        color: widget.colortext.withOpacity(0.65),
+                        color: widget.colortext.withValues(alpha:0.65),
                       ),
                     ),
                   ],
@@ -452,16 +463,16 @@ class _AlbumPageState extends State<AlbumPage> {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.06),
+                  color: Colors.white.withValues(alpha:0.06),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.white.withOpacity(0.10)),
+                  border: Border.all(color: Colors.white.withValues(alpha:0.10)),
                 ),
                 child: Text(
                   "${index + 1}",
                   style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w800,
-                    color: widget.colortext.withOpacity(0.85),
+                    color: widget.colortext.withValues(alpha:0.85),
                   ),
                 ),
               ),
@@ -477,8 +488,8 @@ class _AlbumPageState extends State<AlbumPage> {
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(18),
-        color: Colors.white.withOpacity(0.05),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        color: Colors.white.withValues(alpha:0.05),
+        border: Border.all(color: Colors.white.withValues(alpha:0.08)),
       ),
       child: Row(
         children: [
@@ -486,12 +497,12 @@ class _AlbumPageState extends State<AlbumPage> {
             width: 44,
             height: 44,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.06),
+              color: Colors.white.withValues(alpha:0.06),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(
               Icons.music_off_rounded,
-              color: widget.colortext.withOpacity(0.75),
+              color: widget.colortext.withValues(alpha:0.75),
             ),
           ),
           const SizedBox(width: 12),
@@ -501,7 +512,7 @@ class _AlbumPageState extends State<AlbumPage> {
               style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w600,
-                color: widget.colortext.withOpacity(0.75),
+                color: widget.colortext.withValues(alpha:0.75),
               ),
             ),
           ),
@@ -519,7 +530,7 @@ class _AlbumPageState extends State<AlbumPage> {
       child: BackdropFilter(
         filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
         child: Material(
-          color: Colors.white.withOpacity(0.10),
+          color: Colors.white.withValues(alpha:0.10),
           child: InkWell(
             onTap: onTap,
             child: SizedBox(
@@ -538,20 +549,20 @@ class _AlbumPageState extends State<AlbumPage> {
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(14),
-        color: Colors.white.withOpacity(0.10),
-        border: Border.all(color: Colors.white.withOpacity(0.12)),
+        color: Colors.white.withValues(alpha:0.10),
+        border: Border.all(color: Colors.white.withValues(alpha:0.12)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: widget.colortext.withOpacity(0.85)),
+          Icon(icon, size: 16, color: widget.colortext.withValues(alpha:0.85)),
           const SizedBox(width: 6),
           Text(
             text,
             style: TextStyle(
               fontSize: 12.5,
               fontWeight: FontWeight.w700,
-              color: widget.colortext.withOpacity(0.85),
+              color: widget.colortext.withValues(alpha:0.85),
             ),
           ),
         ],
@@ -583,7 +594,7 @@ class _AlbumPageState extends State<AlbumPage> {
             ),
             boxShadow: [
               BoxShadow(
-                color: widget.colortext.withOpacity(0.22),
+                color: widget.colortext.withValues(alpha:0.22),
                 blurRadius: 18,
                 offset: const Offset(0, 10),
               ),
@@ -623,8 +634,8 @@ class _AlbumPageState extends State<AlbumPage> {
           height: 52,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(18),
-            color: Colors.white.withOpacity(0.06),
-            border: Border.all(color: Colors.white.withOpacity(0.10)),
+            color: Colors.white.withValues(alpha:0.06),
+            border: Border.all(color: Colors.white.withValues(alpha:0.10)),
           ),
           child: Row(
             mainAxisAlignment: MainAxisAlignment.center,

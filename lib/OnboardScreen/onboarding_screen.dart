@@ -1,11 +1,9 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
+import 'package:videoplayer/ads/app_open_ad_manager.dart';
 import 'package:videoplayer/OnboardScreen/size_config.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:animate_do/animate_do.dart';
@@ -22,9 +20,14 @@ class OnboardingScreen extends StatefulWidget {
 class _OnboardingScreenState extends State<OnboardingScreen> {
   late PageController _controller;
   int _currentPage = 0;
-  static const String _adUnitId =
-      'ca-app-pub-6478840988045325/7764390357'; // ✅ TEST ID
-  List colors = [HexColor('#081740'), HexColor('#081740'), HexColor('#081740')];
+
+  // NOTE: this is the LIVE production banner unit, despite the old
+  // "✅ TEST ID" comment. It now lives in AdUnits together with the others.
+  final List<Color> colors = [
+    HexColor('#081740'),
+    HexColor('#081740'),
+    HexColor('#081740'),
+  ];
 
   @override
   void initState() {
@@ -32,20 +35,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     _controller = PageController();
   }
 
-  BannerAd banner = BannerAd(
-    adUnitId: _adUnitId, // TEST BANNER
-    size: AdSize.banner,
-    request: const AdRequest(),
-    listener: BannerAdListener(
-      onAdLoaded: (ad) {
-        debugPrint('✅ Banner loaded');
-        debugPrint('✅ bannerId $_adUnitId');
-      },
-      onAdFailedToLoad: (ad, error) {
-        debugPrint('❌ Banner failed: $error');
-      },
-    ),
-  )..load();
+  // The banner used to be a field initializer holding its own `BannerAd` that
+  // `dispose()` never released — one leaked native ad per onboarding visit.
+  // `AdaptiveBannerAd` owns and disposes its ad itself.
+  Widget get banner => const AdaptiveBannerAd(bare: true);
 
   @override
   void dispose() {
@@ -153,7 +146,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             borderRadius: BorderRadius.circular(20.sp),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
+                                color: Colors.black.withValues(alpha:0.1),
                                 blurRadius: 10,
                                 offset: const Offset(0, 4),
                               ),
@@ -282,6 +275,16 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
+                // Page indicator. `_buildDots` existed but was never rendered,
+                // so there was no "which page am I on" cue at all.
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(
+                    contents.length,
+                    (i) => _buildDots(index: i),
+                  ),
+                ),
+
                 _currentPage + 1 == contents.length
                     ? Padding(
                       padding: EdgeInsets.all(10.sp),
@@ -354,7 +357,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             children: [
                               SvgPicture.asset(
                                 'assets/svgviewer-output.svg',
-                                color: Colors.white,
+                                colorFilter: const ColorFilter.mode(
+                                  Colors.white,
+                                  BlendMode.srcIn,
+                                ),
                                 width: 25.sp,
                                 height: 25.sp,
                               ),
@@ -377,8 +383,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             ),
           ),
 
-          SizedBox(height: 50.sp,
-              child: AdWidget(ad: banner)),
+          SizedBox(height: 50.sp, child: Center(child: banner)),
         ],
       ),
     );

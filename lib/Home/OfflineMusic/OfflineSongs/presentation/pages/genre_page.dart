@@ -79,14 +79,8 @@ class _GenrePageState extends State<GenrePage> {
                     padding: EdgeInsets.zero,
                     itemCount: _songs.length,
                     itemBuilder: (context, index) {
-                      final SongModel song = _songs[index];
-
                       return ListTile(
-                        onTap: () async {
-
-                          audio.playSongs(_songs, index);
-
-                        },
+                        onTap: () => audio.playSongs(_songs, index),
                         leading:  QueryArtworkWidget(
                           id: _songs[index].id,
                           type: ArtworkType.AUDIO,
@@ -108,7 +102,7 @@ class _GenrePageState extends State<GenrePage> {
                         //     height: 48,
                         //     decoration: BoxDecoration(
                         //       borderRadius: BorderRadius.circular(10),
-                        //       color: Colors.grey.withOpacity(0.1),
+                        //       color: Colors.grey.withValues(alpha:0.1),
                         //     ),
                         //     child: const Icon(
                         //       Icons.music_note_outlined,

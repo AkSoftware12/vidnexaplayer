@@ -14,11 +14,11 @@ class BannerSlider extends StatefulWidget {
 
 class _BannerSliderState extends State<BannerSlider> {
   final List<String> bannerImages = [
-    'https://img.freepik.com/free-vector/organic-flat-abstract-music-youtube-thumbnail_23-2148921130.jpg',
-    'https://img.freepik.com/free-vector/flat-design-banner-video-contest_52683-77575.jpg',
-    'https://img.freepik.com/free-vector/playlist-youtube-thumbnail_23-2148600115.jpg',
-    'https://images.squarespace-cdn.com/content/v1/6219238e0278bd045f89ac26/62b74316-0301-4636-a6fe-53be626fcc69/YouTube-banner-for-music-singers-channel-free.jpg',
-    'https://d1csarkz8obe9u.cloudfront.net/posterpreviews/music-review-blog-youtube-banner-design-template-0f6f36593959a5fe315a97e1b3e48534_screen.jpg?ts=1566568274',
+    'https://cdn.vidnexaplayer.com/images/img1.webp',
+    'https://cdn.vidnexaplayer.com/images/img2.webp',
+    'https://cdn.vidnexaplayer.com/images/img3.webp',
+    'https://cdn.vidnexaplayer.com/images/img4.webp',
+    'https://cdn.vidnexaplayer.com/images/img5.webp',
   ];
 
   int _currentIndex = 0;

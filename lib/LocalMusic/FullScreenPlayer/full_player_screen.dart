@@ -57,13 +57,11 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
   @override
   void initState() {
     super.initState();
-    appOpenManager.init();
     _pageCtrl = PageController(viewportFraction: .85);
   }
 
   @override
   void dispose() {
-    appOpenManager.dispose();
     _pageCtrl.dispose();
     super.dispose();
   }
@@ -137,7 +135,12 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           }, Icons.color_lens),
                           SizedBox(width: 10,),
                           _iconBtn(() {
-                            Share.share("${mediaItem.title}\n${mediaItem.artist}\n${mediaItem.artUri}");
+                            SharePlus.instance.share(
+                              ShareParams(
+                                text:
+                                    "${mediaItem.title}\n${mediaItem.artist}\n${mediaItem.artUri}",
+                              ),
+                            );
                           }, Icons.share),
                         ],
                       )
@@ -265,7 +268,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                                       decoration: BoxDecoration(
-                                        color: Colors.black.withOpacity(0.55),
+                                        color: Colors.black.withValues(alpha:0.55),
                                         borderRadius: BorderRadius.circular(999),
                                         border: Border.all(color: Colors.white24),
                                       ),
@@ -458,7 +461,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
           ),
           bottomNavigationBar: SizedBox(
             height: 50,
-            child: appOpenManager.bannerWidgetBottomScreen() ?? const SizedBox(),
+            child: appOpenManager.bannerWidgetBottomScreen(),
           ),
 
         );
@@ -521,7 +524,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                     margin: const EdgeInsets.symmetric(vertical: 6),
                     padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
                     decoration: BoxDecoration(
-                      color: isSelected ? Colors.blue.withOpacity(0.15) : Colors.white.withOpacity(0.05),
+                      color: isSelected ? Colors.blue.withValues(alpha:0.15) : Colors.white.withValues(alpha:0.05),
                       borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: isSelected ? Colors.blue : Colors.white24),
                     ),
@@ -632,13 +635,13 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                 decoration: BoxDecoration(
                                   color: isPlaying
                                       ? const Color(0xFF2EDFB4)
-                                      .withOpacity(0.08)
+                                      .withValues(alpha:0.08)
                                       : Colors.transparent,
                                   borderRadius: BorderRadius.circular(14),
                                   border: isPlaying
                                       ? Border.all(
                                     color: const Color(0xFF2EDFB4)
-                                        .withOpacity(0.35),
+                                        .withValues(alpha:0.35),
                                   )
                                       : null,
                                 ),
@@ -665,7 +668,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                       decoration: BoxDecoration(
                                         boxShadow: [
                                           BoxShadow(
-                                            color: Colors.black.withOpacity(0.4),
+                                            color: Colors.black.withValues(alpha:0.4),
                                             blurRadius: 8,
                                             offset: const Offset(0, 4),
                                           ),
@@ -817,7 +820,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                       decoration: BoxDecoration(
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.black.withOpacity(0.45),
+                            color: Colors.black.withValues(alpha:0.45),
                             blurRadius: 10,
                             offset: const Offset(0, 6),
                           ),
@@ -861,10 +864,10 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF2EDFB4).withOpacity(0.12),
+                          color: const Color(0xFF2EDFB4).withValues(alpha:0.12),
                           borderRadius: BorderRadius.circular(999),
                           border: Border.all(
-                            color: const Color(0xFF2EDFB4).withOpacity(0.35),
+                            color: const Color(0xFF2EDFB4).withValues(alpha:0.35),
                           ),
                         ),
                         child: Text(
@@ -908,22 +911,32 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                   subtitle: "Share audio file or song details",
                   onTap: () async {
                     try {
-                      final String? filePath = song.extras?['path']?.toString() ?? song.id;
+                      final String filePath =
+                          song.extras?['path']?.toString() ?? song.id;
 
-                      if (filePath == null || filePath.isEmpty) {
-                        await Share.share(
-                          '${song.title}\n${song.artist ?? ""}',
-                          subject: song.title,
+                      if (filePath.isEmpty) {
+                        await SharePlus.instance.share(
+                          ShareParams(
+                            text: '${song.title}\n${song.artist ?? ""}',
+                            subject: song.title,
+                          ),
                         );
                       } else {
-                        await Share.shareXFiles(
-                          [XFile(filePath)],
-                          text: '${song.title}\n${song.artist ?? ""}',
-                          subject: song.title,
+                        await SharePlus.instance.share(
+                          ShareParams(
+                            files: [XFile(filePath)],
+                            text: '${song.title}\n${song.artist ?? ""}',
+                            subject: song.title,
+                          ),
                         );
                       }
                     } catch (_) {
-                      await Share.share('${song.title}\n${song.artist ?? ""}', subject: song.title);
+                      await SharePlus.instance.share(
+                        ShareParams(
+                          text: '${song.title}\n${song.artist ?? ""}',
+                          subject: song.title,
+                        ),
+                      );
                     }
 
                     if (context.mounted) Navigator.pop(context);
@@ -975,9 +988,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
         margin: const EdgeInsets.only(bottom: 10),
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.06),
+          color: Colors.white.withValues(alpha:0.06),
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha:0.08)),
         ),
         child: Row(
           children: [
@@ -985,9 +998,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: c.withOpacity(0.12),
+                color: c.withValues(alpha:0.12),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: c.withOpacity(0.20)),
+                border: Border.all(color: c.withValues(alpha:0.20)),
               ),
               child: Icon(icon, color: c, size: 22),
             ),
@@ -1061,8 +1074,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
     if (confirmed != true) return;
 
     try {
+      // `song.id` is non-nullable, so `path` never is — only emptiness matters.
       final path = song.extras?['path']?.toString() ?? song.id;
-      if (path == null || path.isEmpty) throw "No file path";
+      if (path.isEmpty) throw StateError('No file path');
 
       // stop if this one is playing
       if (audio.currentIndex.value == index) {
@@ -1107,7 +1121,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
   void _showSongInfo(BuildContext context, MediaItem song) {
     showDialog(
       context: context,
-      barrierColor: Colors.black.withOpacity(0.6),
+      barrierColor: Colors.black.withValues(alpha:0.6),
       builder: (_) => Dialog(
         backgroundColor: Colors.transparent,
         insetPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
@@ -1117,7 +1131,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
             borderRadius: BorderRadius.circular(18),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.6),
+                color: Colors.black.withValues(alpha:0.6),
                 blurRadius: 20,
                 offset: const Offset(0, 8),
               )
@@ -1212,7 +1226,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                 width: double.infinity,
                 child: ElevatedButton(
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white.withOpacity(0.08),
+                    backgroundColor: Colors.white.withValues(alpha:0.08),
                     elevation: 0,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),

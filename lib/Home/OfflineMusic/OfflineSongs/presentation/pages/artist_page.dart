@@ -161,9 +161,9 @@ class _ArtistPageState extends State<ArtistPage> {
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    bg.withOpacity(0.95),
-                    bg.withOpacity(0.78),
-                    Colors.black.withOpacity(0.65),
+                    bg.withValues(alpha:0.95),
+                    bg.withValues(alpha:0.78),
+                    Colors.black.withValues(alpha:0.65),
                   ],
                 ),
                 borderRadius: const BorderRadius.vertical(
@@ -208,7 +208,7 @@ class _ArtistPageState extends State<ArtistPage> {
                     children: [
                       _ArtistArtwork(
                         artistId: widget.artist.id,
-                        borderColor: textColor.withOpacity(0.18),
+                        borderColor: textColor.withValues(alpha:0.18),
                       ),
                       const SizedBox(width: 14),
                       Expanded(
@@ -220,7 +220,7 @@ class _ArtistPageState extends State<ArtistPage> {
                                   ? "Loading..."
                                   : "${_songs.length} Songs",
                               style: TextStyle(
-                                color: textColor.withOpacity(0.75),
+                                color: textColor.withValues(alpha:0.75),
                                 fontWeight: FontWeight.w600,
                                 fontSize: 13,
                               ),
@@ -270,7 +270,7 @@ class _ArtistPageState extends State<ArtistPage> {
                 child: Text(
                   "No songs found",
                   style: TextStyle(
-                    color: textColor.withOpacity(0.75),
+                    color: textColor.withValues(alpha:0.75),
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -304,7 +304,7 @@ class _ArtistPageState extends State<ArtistPage> {
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.92),
+            color: Colors.black.withValues(alpha:0.92),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
           ),
           child: Column(
@@ -402,7 +402,7 @@ class _ArtistArtwork extends StatelessWidget {
         border: Border.all(color: borderColor),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.25),
+            color: Colors.black.withValues(alpha:0.25),
             blurRadius: 18,
             offset: const Offset(0, 10),
           ),
@@ -418,7 +418,7 @@ class _ArtistArtwork extends StatelessWidget {
               type: ArtworkType.ARTIST,
               artworkQuality: FilterQuality.high,
               nullArtworkWidget: Container(
-                color: Colors.white.withOpacity(0.08),
+                color: Colors.white.withValues(alpha:0.08),
                 child: const Icon(Icons.person, size: 40, color: Colors.white70),
               ),
             ),
@@ -429,7 +429,7 @@ class _ArtistArtwork extends StatelessWidget {
                   end: Alignment.bottomCenter,
                   colors: [
                     Colors.transparent,
-                    Colors.black.withOpacity(0.35),
+                    Colors.black.withValues(alpha:0.35),
                   ],
                 ),
               ),
@@ -455,7 +455,7 @@ class _SongTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withOpacity(0.06),
+      color: Colors.white.withValues(alpha:0.06),
       borderRadius: BorderRadius.circular(18),
       child: InkWell(
         borderRadius: BorderRadius.circular(18),
@@ -474,7 +474,7 @@ class _SongTile extends StatelessWidget {
                     type: ArtworkType.AUDIO,
                     artworkFit: BoxFit.cover,
                     nullArtworkWidget: Container(
-                      color: Colors.white.withOpacity(0.08),
+                      color: Colors.white.withValues(alpha:0.08),
                       child: const Icon(
                         Icons.music_note_rounded,
                         color: Colors.white70,
@@ -505,7 +505,7 @@ class _SongTile extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: textColor.withOpacity(0.7),
+                        color: textColor.withValues(alpha:0.7),
                         fontWeight: FontWeight.w500,
                         fontSize: 12,
                       ),
@@ -516,7 +516,7 @@ class _SongTile extends StatelessWidget {
               const SizedBox(width: 10),
               Icon(
                 Icons.chevron_right_rounded,
-                color: textColor.withOpacity(0.6),
+                color: textColor.withValues(alpha:0.6),
                 size: 26,
               ),
             ],
@@ -541,7 +541,7 @@ class _GlassIconButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withOpacity(0.12),
+      color: Colors.white.withValues(alpha:0.12),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -573,26 +573,26 @@ class _SearchField extends StatelessWidget {
     return Container(
       height: 42,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.10),
+        color: Colors.white.withValues(alpha:0.10),
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: Colors.white.withOpacity(0.08)),
+        border: Border.all(color: Colors.white.withValues(alpha:0.08)),
       ),
       child: TextField(
         controller: controller,
         style: TextStyle(color: textColor, fontSize: 13),
-        cursorColor: textColor.withOpacity(0.8),
+        cursorColor: textColor.withValues(alpha:0.8),
         decoration: InputDecoration(
           hintText: hint,
-          hintStyle: TextStyle(color: textColor.withOpacity(0.55)),
+          hintStyle: TextStyle(color: textColor.withValues(alpha:0.55)),
           border: InputBorder.none,
           prefixIcon: Icon(Icons.search_rounded,
-              color: textColor.withOpacity(0.75), size: 20),
+              color: textColor.withValues(alpha:0.75), size: 20),
           suffixIcon: controller.text.isEmpty
               ? null
               : IconButton(
             onPressed: onClear,
             icon: Icon(Icons.close_rounded,
-                color: textColor.withOpacity(0.75), size: 18),
+                color: textColor.withValues(alpha:0.75), size: 18),
           ),
           contentPadding: const EdgeInsets.symmetric(horizontal: 12),
         ),
@@ -617,7 +617,7 @@ class _SortButton extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Material(
-      color: Colors.white.withOpacity(0.12),
+      color: Colors.white.withValues(alpha:0.12),
       borderRadius: BorderRadius.circular(14),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
@@ -664,7 +664,7 @@ class _SortTile extends StatelessWidget {
       title: Text(
         title,
         style: TextStyle(
-          color: Colors.white.withOpacity(selected ? 1 : 0.75),
+          color: Colors.white.withValues(alpha:selected ? 1 : 0.75),
           fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
         ),
       ),

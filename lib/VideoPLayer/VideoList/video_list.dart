@@ -4,11 +4,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path/path.dart' as path;
-import '../../Home/HomeScreen/home2.dart';
 import '../../Utils/color.dart';
+import '../../Utils/video_thumb.dart';
 import '../../ads/app_open_ad_manager.dart';
 import '../../main.dart';
 import '../4kPlayer/4k_player.dart';
@@ -33,6 +32,7 @@ class VideoFolderScreen extends StatefulWidget {
 class _VideoFolderScreenState extends State<VideoFolderScreen>
     with SingleTickerProviderStateMixin {
 
+  // Singleton — initialised once in main.dart, never disposed by a screen.
   final appOpenManager = AppOpenAdManager();
 
   bool _isGridView = false;
@@ -45,10 +45,9 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
   @override
   void initState() {
     super.initState();
-    appOpenManager.init();
 
     _controller = AnimationController(
-      duration: Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
@@ -57,43 +56,63 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
 
   @override
   void dispose() {
-    super.dispose();
-    appOpenManager.dispose();
+    // `super.dispose()` must come LAST — the old order tore down the State
+    // first and then touched it, which trips a framework assertion.
     _controller.dispose();
+    super.dispose();
   }
 
+  /// Loads the whole folder in pages instead of silently stopping at 1000
+  /// items, which used to hide videos in large folders.
   Future<void> _loadPhotos() async {
-    final List<AssetEntity> photos = await widget.videos.getAssetListRange(
-      start: 0,
-      end: 1000,
-    );
-    setState(() {
-      _photos = photos;
-      _isLoading = false;
+    try {
+      const int pageSize = 200;
+      final total = await widget.videos.assetCountAsync;
+
+      final List<AssetEntity> photos = [];
+      for (int start = 0; start < total; start += pageSize) {
+        final end = (start + pageSize) > total ? total : start + pageSize;
+        photos.addAll(
+          await widget.videos.getAssetListRange(start: start, end: end),
+        );
+        if (!mounted) return;
+      }
+
+      if (!mounted) return;
+      setState(() {
+        _photos = photos;
+        _isLoading = false;
+      });
       _controller.forward();
-    });
+    } catch (e) {
+      debugPrint('Failed to load folder videos: $e');
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+    }
   }
 
-  Future<void> _onPhotoDeleted(BuildContext context, String videoPath) async {
+  /// Deletes [videoPath] from the device and refreshes the list.
+  ///
+  /// Returns `true` when the delete succeeded. Callers must NOT also remove the
+  /// item themselves — `_loadPhotos()` already rebuilds the list, and the old
+  /// extra `_photos.removeAt(index)` dropped a second, unrelated video.
+  Future<bool> _onPhotoDeleted(String videoPath) async {
+    final messenger = ScaffoldMessenger.of(context);
     try {
-      // 🧹 Delete the video file
       await deleteVideoFromDevice(context, videoPath);
-
-      // 🔄 Reload the photos list after deletion
       await _loadPhotos();
 
-      // 🪄 Refresh UI
-      setState(() {});
-
-      // ✅ Show confirmation
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return true;
+      messenger.showSnackBar(
         const SnackBar(content: Text('🗑️ Video deleted successfully')),
       );
+      return true;
     } catch (e) {
-      // ⚠️ Handle any error gracefully
-      ScaffoldMessenger.of(context).showSnackBar(
+      if (!mounted) return false;
+      messenger.showSnackBar(
         SnackBar(content: Text('❌ Failed to delete video: $e')),
       );
+      return false;
     }
   }
 
@@ -165,9 +184,17 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
           ),
         ],
       ),
-      body: _isGridView ? _buildGridView() : _buildListView(),
-      bottomNavigationBar:appOpenManager.bannerWidget(),
-
+      // `_isLoading` was tracked but never rendered, so a big folder looked
+      // like an empty one until the scan finished.
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _photos.isEmpty
+              ? const Center(child: Text('No videos in this folder'))
+              : FadeTransition(
+                  opacity: _fadeAnimation,
+                  child: _isGridView ? _buildGridView() : _buildListView(),
+                ),
+      bottomNavigationBar: appOpenManager.bannerWidget(),
     );
   }
 
@@ -185,20 +212,15 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
           },
           onDelete: () async {
             final file = await _photos[index].file;
-            if (file != null) {
-              // 🧹 Delete file from storage
-              await _onPhotoDeleted(context, file.path);
-
-              // 🪄 Remove it from the list & refresh UI
-              setState(() {
-                _photos.removeAt(index);
-              });
-
-            } else {
+            if (!mounted) return;
+            if (file == null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('❌ Unable to access video file')),
               );
+              return;
             }
+            // _onPhotoDeleted reloads the list itself — do not remove again.
+            await _onPhotoDeleted(file.path);
           },
           onShare: () async {
             // Wait for file to load
@@ -233,20 +255,15 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
           initialIndex: index,
           onDelete: () async {
             final file = await _photos[index].file;
-            if (file != null) {
-              // 🧹 Delete file from storage
-              await _onPhotoDeleted(context, file.path);
-
-              // 🪄 Remove it from the list & refresh UI
-              setState(() {
-                _photos.removeAt(index);
-              });
-
-            } else {
+            if (!mounted) return;
+            if (file == null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(content: Text('❌ Unable to access video file')),
               );
+              return;
             }
+            // _onPhotoDeleted reloads the list itself — do not remove again.
+            await _onPhotoDeleted(file.path);
           },
 
           onInfo: () {
@@ -377,9 +394,13 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
       // small artificial delay (ensure dialog paints)
       await Future.delayed(const Duration(milliseconds: 300));
 
-      await Share.shareXFiles(
-        [shareFile],
-        text: '🎥 Watch this video: ${path.basename(videoPath)}',
+      // share_plus 11: the static `Share.*` helpers are deprecated in favour of
+      // the `SharePlus.instance` + `ShareParams` API.
+      await SharePlus.instance.share(
+        ShareParams(
+          files: [shareFile],
+          text: '🎥 Watch this video: ${path.basename(videoPath)}',
+        ),
       );
 
     } catch (e, st) {
@@ -462,8 +483,9 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
                   _buildInfoRow('Duration', durationText),
                   SizedBox(height: 12),
                   _buildInfoRow(
+                    // `createDateTime` is non-nullable — the `?.`/`??` never fired.
                     'Last Modified',
-                    photo.createDateTime?.toString().split('.')[0] ?? 'Unknown',
+                    photo.createDateTime.toString().split('.').first,
                   ),
                 ],
               );
@@ -571,91 +593,52 @@ class PhotoTile extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 6.sp, vertical: 6.sp),
           child: Row(
             children: [
-              FutureBuilder<Widget>(
-                future: _buildThumbnail(context),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Container(
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10.sp),
+                    child: VideoThumb(
+                      // Keyed by asset so ListView recycling swaps the image
+                      // instead of showing the previous row's frame.
+                      key: ValueKey(photo.id),
+                      asset: photo,
                       width: 100.sp,
                       height: 70.sp,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(10.sp),
+                    ),
+                  ),
+                  Icon(
+                    Icons.play_circle_fill,
+                    color: Colors.white.withValues(alpha: 0.8),
+                    size: 28.sp,
+                  ),
+                  Positioned(
+                    bottom: 4,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
                       ),
-                      child: const Center(child: CupertinoActivityIndicator()),
-                    );
-                  }
-                  if (snapshot.hasData) {
-                    return Stack(
-                      alignment: Alignment.center,
-                      children: [
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(10.sp),
-                          child: SizedBox(
-                            width: 100.sp,
-                            height: 70.sp,
-                            child: snapshot.data!,
-                          ),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      // `videoDuration` comes straight off the already-loaded
+                      // AssetEntity; the old code awaited `photo.file` (which
+                      // materialises the whole file from MediaStore) purely to
+                      // decide whether to show it.
+                      child: Text(
+                        _formatDuration(photo.videoDuration),
+                        style: GoogleFonts.poppins(
+                          fontSize: 9.sp,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
                         ),
-                        Icon(
-                          Icons.play_circle_fill,
-                          color: Colors.white.withOpacity(0.8),
-                          size: 28.sp,
-                        ),
-                        Positioned(
-                          bottom: 4,
-                          right: 4,
-                          child: Container(
-                            padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(4),
-                            ),
-                            child: FutureBuilder<File?>(
-                              future: photo.file,
-                              builder: (context, snapshot) {
-                                // Initialize duration safely
-                                Duration? duration;
-                                if (snapshot.connectionState == ConnectionState.done &&
-                                    snapshot.hasData &&
-                                    snapshot.data != null) {
-                                  duration = photo.videoDuration;
-                                }
-
-                                // If duration is not yet available, show a loading indicator or nothing
-                                if (duration == null) {
-                                  return const SizedBox.shrink();
-                                }
-
-                                return Text(
-                                  _formatDuration(duration),
-                                  style: GoogleFonts.poppins(
-                                    fontSize: 9.sp,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  }
-                  return Container(
-                    width: 100.sp,
-                    height: 70.sp,
-                    decoration: BoxDecoration(
-                      color: Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(10.sp),
+                      ),
                     ),
-                    child: Icon(
-                      Icons.broken_image,
-                      color: Colors.grey,
-                      size: 30.sp,
-                    ),
-                  );
-                },
+                  ),
+                ],
               ),
               SizedBox(width: 10.sp),
               Expanded(
@@ -784,21 +767,6 @@ class PhotoTile extends StatelessWidget {
     );
   }
 
-  /// Builds high-quality thumbnail from AssetEntity
-  Future<Widget> _buildThumbnail(BuildContext context) async {
-    final thumbSize = ThumbnailSize(512, 512);
-    final thumbData = await photo.thumbnailDataWithSize(thumbSize, quality: 90);
-    if (thumbData == null) {
-      return Container(color: Colors.grey.shade300);
-    }
-    return Image.memory(
-      thumbData,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-    );
-  }
-
   PopupMenuItem<String> _buildMenuItem(
     IconData icon,
     String text,
@@ -873,108 +841,56 @@ class GridviewList extends StatelessWidget {
           padding: EdgeInsets.symmetric(horizontal: 0.sp, vertical: 0.sp),
           child: Column(
             children: [
-              FutureBuilder<Widget>(
-                future: _buildThumbnail(context),
-                builder: (context, snapshot) {
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return Container(
+              Stack(
+                alignment: Alignment.center,
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.only(
+                      topLeft: Radius.circular(5.sp),
+                      topRight: Radius.circular(5.sp),
+                    ),
+                    child: VideoThumb(
+                      key: ValueKey(photo.id),
+                      asset: photo,
                       width: double.infinity,
-                      height: 100.sp,
+                      height: 140.sp,
+                    ),
+                  ),
+                  Icon(
+                    Icons.play_circle_fill,
+                    color: Colors.white.withValues(alpha: 0.8),
+                    size: 28.sp,
+                  ),
+                  // --- File size, bottom left ---
+                  Positioned(
+                    bottom: 4,
+                    left: 4,
+                    child: _FileSizeBadge(asset: photo),
+                  ),
+                  // --- Duration bottom right ---
+                  Positioned(
+                    bottom: 4,
+                    right: 4,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(5.sp),
+                        color: Colors.black.withValues(alpha: 0.6),
+                        borderRadius: BorderRadius.circular(4),
                       ),
-                      child: const Center(child: CupertinoActivityIndicator()),
-                    );
-                  }
-
-                  if (!snapshot.hasData) {
-                    return Container(
-                      width: double.infinity,
-                      height: 100.sp,
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(5.sp),
-                      ),
-                      child: Icon(
-                        Icons.broken_image,
-                        color: Colors.grey,
-                        size: 30.sp,
-                      ),
-                    );
-                  }
-
-                  return Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      ClipRRect(
-                        borderRadius: BorderRadius.only(topLeft: Radius.circular(5.sp),topRight: Radius.circular(5.sp)),
-                        child: SizedBox(
-                          width: double.infinity,
-                          height: 140.sp,
-                          child: snapshot.data!,
+                      child: Text(
+                        _formatDuration(photo.videoDuration),
+                        style: GoogleFonts.poppins(
+                          fontSize: 9.sp,
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
-                      Icon(
-                        Icons.play_circle_fill,
-                        color: Colors.white.withOpacity(0.8),
-                        size: 28.sp,
-                      ),
-                      // --- Size top right ---
-                      Positioned(
-                        bottom: 4,
-                        left: 4,
-                        child: FutureBuilder<File?>(
-                          future: photo.file,
-                          builder: (context, snapshot) {
-                            if (snapshot.hasData && snapshot.data != null) {
-                              final file = snapshot.data!;
-                              double sizeMB = file.lengthSync() / (1024 * 1024);
-                              return Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 6, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: ColorSelect.maineColor2,
-                                  borderRadius: BorderRadius.circular(4),
-                                ),
-                                child: Text(
-                                  '${sizeMB.toStringAsFixed(2)} MB',
-                                  style: TextStyle(
-                                    fontSize: 9.sp,
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              );
-                            }
-                            return const SizedBox();
-                          },
-                        ),
-                      ),
-                      // --- Duration bottom right ---
-                      Positioned(
-                        bottom: 4,
-                        right: 4,
-                        child: Container(
-                          padding: EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            _formatDuration(photo.videoDuration),
-                            style: GoogleFonts.poppins(
-                              fontSize: 9.sp,
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ],
-                  );
-                },
+                    ),
+                  ),
+                ],
               ),
               SizedBox(height: 5.sp,),
               Row(
@@ -1060,20 +976,6 @@ class GridviewList extends StatelessWidget {
     );
   }
 
-  Future<Widget> _buildThumbnail(BuildContext context) async {
-    final thumbSize = ThumbnailSize(512, 512);
-    final thumbData = await photo.thumbnailDataWithSize(thumbSize, quality: 90);
-    if (thumbData == null) {
-      return Container(color: Colors.grey.shade300);
-    }
-    return Image.memory(
-      thumbData,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-    );
-  }
-
   PopupMenuItem<String> _buildMenuItem(
       IconData icon, String text, Color color) {
     return PopupMenuItem(
@@ -1093,6 +995,90 @@ class GridviewList extends StatelessWidget {
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return "${duration.inHours > 0 ? '${twoDigits(duration.inHours)}:' : ''}$minutes:$seconds";
+  }
+}
+
+/// Shows a video's file size.
+///
+/// The old inline version created its `photo.file` future inside `build()` and
+/// then called `lengthSync()` — synchronous disk I/O on the UI thread, repeated
+/// on every rebuild of every visible tile. That is a direct contributor to the
+/// dropped-frame storms in logcat.
+class _FileSizeBadge extends StatefulWidget {
+  const _FileSizeBadge({required this.asset});
+
+  final AssetEntity asset;
+
+  /// asset id -> size in bytes (null == unavailable).
+  static final Map<String, int?> _cache = <String, int?>{};
+
+  @override
+  State<_FileSizeBadge> createState() => _FileSizeBadgeState();
+}
+
+class _FileSizeBadgeState extends State<_FileSizeBadge> {
+  int? _bytes;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(_FileSizeBadge oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.asset.id != widget.asset.id) _resolve();
+  }
+
+  Future<void> _resolve() async {
+    final id = widget.asset.id;
+
+    if (_FileSizeBadge._cache.containsKey(id)) {
+      final cached = _FileSizeBadge._cache[id];
+      if (mounted) setState(() => _bytes = cached);
+      return;
+    }
+
+    int? size;
+    try {
+      final file = await widget.asset.file;
+      // `length()` is async — unlike the old `lengthSync()`.
+      if (file != null) size = await file.length();
+    } catch (_) {
+      size = null;
+    }
+
+    _FileSizeBadge._cache[id] = size;
+    if (!mounted) return;
+    setState(() => _bytes = size);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bytes = _bytes;
+    if (bytes == null) return const SizedBox.shrink();
+
+    final mb = bytes / (1024 * 1024);
+    final label = mb >= 1024
+        ? '${(mb / 1024).toStringAsFixed(2)} GB'
+        : '${mb.toStringAsFixed(2)} MB';
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      decoration: BoxDecoration(
+        color: ColorSelect.maineColor2,
+        borderRadius: BorderRadius.circular(4),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 9.sp,
+          color: Colors.white,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
   }
 }
 

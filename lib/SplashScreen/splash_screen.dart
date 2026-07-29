@@ -1,4 +1,7 @@
+import 'dart:async';
+
 import 'package:flutter/cupertino.dart';
+import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,8 +12,9 @@ import 'package:videoplayer/Utils/string.dart';
 import '../HexColorCode/HexColor.dart';
 import '../Home/HomeBottomnavigation/home_bottomNavigation.dart';
 import '../OnboardScreen/onboarding_screen.dart';
-import '../Utils/rating_popup.dart';
+import '../VideoPLayer/4kPlayer/4k_player.dart';
 import '../ads/app_open_ad_manager.dart';
+import '../video_intent_service.dart';
 
 
 class SplashScreen extends StatefulWidget {
@@ -21,48 +25,69 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
+  // Singleton — owned and initialised by main.dart, never disposed here.
   final AppOpenAdManager _adManager = AppOpenAdManager();
 
-  bool isLoggedIn = false;
+  Timer? _startTimer;
 
   @override
   void initState() {
     super.initState();
-    _adManager.init();
 
-    Future.delayed(const Duration(seconds: 3), () {
+    _startTimer = Timer(const Duration(seconds: 3), () {
+      if (!mounted) return;
       _adManager.showAdIfAvailable(() async {
-
-        // ⭐ STEP 1: rating popup show (agar conditions match hui)
+        // Rating prompt moved to the home screen (shown there as a bottom
+        // sheet). Splash now just continues into the app.
         await Future.delayed(const Duration(milliseconds: 300));
-        if (mounted) {
-          RatingPopup.onAppOpen(context);
-        }
-
-        // ⭐ STEP 2: login check
-        await Future.delayed(const Duration(milliseconds: 300));
-        checkLoginStatus();
+        if (!mounted) return;
+        await checkLoginStatus();
       });
     });
   }
 
   @override
   void dispose() {
-    _adManager.dispose();
+    _startTimer?.cancel();
     super.dispose();
   }
 
   Future<void> checkLoginStatus() async {
+    if (!mounted) return;
+
     final prefs = await SharedPreferences.getInstance();
-    final loggedIn = prefs.getBool('isLoggedIn') ?? false;
+    // Historical key name — it actually means "onboarding already completed".
+    // Kept as-is so existing installs don't get shown onboarding again.
+    final onboardingDone = prefs.getBool('isLoggedIn') ?? false;
 
     if (!mounted) return;
 
-    Navigator.pushReplacement(
-      context,
+    final navigator = Navigator.of(context);
+
+    await navigator.pushReplacement(
       MaterialPageRoute(
-        builder: (_) =>
-        loggedIn ? const HomeBottomNavigation() : const OnboardingScreen(),
+        builder: (_) => onboardingDone
+            ? const HomeBottomNavigation()
+            : const OnboardingScreen(),
+      ),
+    );
+
+    // If the app was launched via "Open with", open the video on top of Home so
+    // pressing back returns to the app instead of an empty splash route.
+    final pending = VideoIntentService.consumePendingVideo();
+    if (pending == null) return;
+
+    debugPrint('OPEN WITH URI => $pending');
+    unawaited(
+      navigator.push(
+        MaterialPageRoute(
+          builder: (_) => FullScreenVideoPlayerFixed(
+            videos: const [],
+            initialIndex: 0,
+            // media_kit opens content:// and file:// uris directly.
+            initialUrl: pending,
+          ),
+        ),
       ),
     );
   }
@@ -135,18 +160,25 @@ class CustomUpgradeDialog extends StatelessWidget {
     required this.releaseNotes,
   }) : super(key: key);
 
-  Future<void> _launchStore() async {
-    final Uri androidUri = Uri.parse(androidAppUrl);
-    final Uri iosUri = Uri.parse(iosAppUrl);
+  /// Opens the correct store listing.
+  ///
+  /// Uses [defaultTargetPlatform] instead of `Theme.of(context).platform` so it
+  /// never depends on a context that may already be gone.
+  Future<void> _launchStore(BuildContext context) async {
+    final isIOS = defaultTargetPlatform == TargetPlatform.iOS;
+    final Uri uri = Uri.parse(isIOS ? iosAppUrl : androidAppUrl);
 
-    if (Theme.of(navigatorKey.currentContext!).platform == TargetPlatform.iOS) {
-      if (await canLaunchUrl(iosUri)) {
-        await launchUrl(iosUri, mode: LaunchMode.externalApplication);
-      }
-    } else {
-      if (await canLaunchUrl(androidUri)) {
-        await launchUrl(androidUri, mode: LaunchMode.externalApplication);
-      }
+    bool opened = false;
+    try {
+      opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
+    } catch (_) {
+      opened = false;
+    }
+
+    if (!opened && context.mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Could not open the store')),
+      );
     }
   }
 
@@ -177,7 +209,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                   gradient: RadialGradient(
                     colors: [
                       HexColor('#FFFFFF'),
-                      ColorSelect.maineColor2.withOpacity(0.9),
+                      ColorSelect.maineColor2.withValues(alpha:0.9),
                     ],
                     radius: 0.55,
                     center: Alignment.center,
@@ -207,7 +239,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                   letterSpacing: 1.2,
                   shadows: [
                     Shadow(
-                      color: Colors.black.withOpacity(0.4),
+                      color: Colors.black.withValues(alpha:0.4),
                       offset: Offset(1, 1),
                       blurRadius: 3,
                     ),
@@ -245,7 +277,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                 width: double.infinity,
                 padding: EdgeInsets.all(10.sp),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.1),
+                  color: Colors.white.withValues(alpha:0.1),
                   borderRadius: BorderRadius.circular(15.sp),
                 ),
                 child: Column(
@@ -277,7 +309,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                             child: Text(
                               entry.value,
                               style: GoogleFonts.poppins(
-                                color: Colors.white.withOpacity(0.9),
+                                color: Colors.white.withValues(alpha:0.9),
                                 fontSize: 10.sp,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -310,7 +342,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                   ),
                 ),
                 onPressed: () async {
-                  await _launchStore();
+                  await _launchStore(context);
                 },
               ),
             ],
@@ -320,5 +352,3 @@ class CustomUpgradeDialog extends StatelessWidget {
     );
   }
 }
-// You need to define a global navigator key to access context outside widgets
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();

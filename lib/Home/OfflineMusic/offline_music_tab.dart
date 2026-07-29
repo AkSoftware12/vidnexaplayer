@@ -138,7 +138,7 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       body: ScrollConfiguration(
         behavior: const ConstantScrollBehavior(),
         child: Column(
@@ -160,7 +160,7 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
 
   Widget _buildTopTabs() {
     return AppBar(
-      backgroundColor: Theme.of(context).colorScheme.background,
+      backgroundColor: Theme.of(context).colorScheme.surface,
       automaticallyImplyLeading: false,
       title: SizedBox(
         height: 40.sp,
@@ -213,19 +213,19 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
       onPageChanged: (index) => setState(() => _selectedIndex = index),
       children: [
         SongsView(
-          color: Theme.of(context).colorScheme.background,
+          color: Theme.of(context).colorScheme.surface,
           colortext: Theme.of(context).colorScheme.secondary,
         ),
         ArtistsView(
-          color: Theme.of(context).colorScheme.background,
+          color: Theme.of(context).colorScheme.surface,
           colortext: Theme.of(context).colorScheme.secondary,
         ),
         AlbumsView(
-          color: Theme.of(context).colorScheme.background,
+          color: Theme.of(context).colorScheme.surface,
           colortext: Theme.of(context).colorScheme.secondary,
         ),
         GenresView(
-          color: Theme.of(context).colorScheme.background,
+          color: Theme.of(context).colorScheme.surface,
           colortext: Theme.of(context).colorScheme.secondary,
         ),
       ],

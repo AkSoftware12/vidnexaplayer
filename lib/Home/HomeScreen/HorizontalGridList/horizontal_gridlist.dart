@@ -113,7 +113,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                   Container(
                     padding: EdgeInsets.all(6.sp),
                     decoration: BoxDecoration(
-                      color: Colors.blue.withOpacity(0.12),
+                      color: Colors.blue.withValues(alpha:0.12),
                       borderRadius: BorderRadius.circular(8.sp),
                     ),
                     child: Icon(
@@ -153,7 +153,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                 padding: EdgeInsets.all(5.sp),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  color: Colors.grey.withOpacity(0.08),
+                  color: Colors.grey.withValues(alpha:0.08),
                 ),
                 child: Icon(
                   Icons.arrow_forward_ios,
@@ -241,7 +241,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                           borderRadius: BorderRadius.circular(20.sp),
                           gradient: LinearGradient(
                             colors: [
-                              Colors.white.withOpacity(0.08),
+                              Colors.white.withValues(alpha:0.08),
                               Colors.transparent,
                             ],
                             begin: Alignment.topLeft,
@@ -260,7 +260,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                                 height: 30.sp,
                                 width: 30.sp,
                                 decoration: BoxDecoration(
-                                  color: Colors.white.withOpacity(0.15),
+                                  color: Colors.white.withValues(alpha:0.15),
                                   shape: BoxShape.circle,
                                 ),
                                 child: Padding(

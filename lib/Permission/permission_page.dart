@@ -1,8 +1,8 @@
+import 'dart:io';
+
 import 'package:animate_do/animate_do.dart';
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/widgets.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
@@ -46,44 +46,132 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
     _animationController.dispose();
     super.dispose();
   }
+  bool _requesting = false;
+
+  /// Permissions this app genuinely needs, chosen per Android version.
+  ///
+  /// Deliberately excludes `Permission.camera` (a video player has no camera
+  /// feature) and `Permission.manageExternalStorage` (All-Files Access needs a
+  /// Play Console declaration and is not required to read media).
+  Future<List<Permission>> _requiredPermissions() async {
+    if (!Platform.isAndroid) {
+      return [Permission.photos, Permission.videos, Permission.notification];
+    }
+
+    final info = await DeviceInfoPlugin().androidInfo;
+    final sdk = info.version.sdkInt;
+
+    if (sdk >= 33) {
+      // Android 13+: granular media permissions.
+      return [
+        Permission.videos,
+        Permission.audio,
+        Permission.photos,
+        Permission.notification,
+      ];
+    }
+
+    // Android 12 and below: the single legacy storage permission.
+    return [Permission.storage, Permission.notification];
+  }
+
   Future<void> requestPermissions() async {
-    Map<Permission, PermissionStatus> statuses = await [
-      Permission.camera,
-      Permission.photos,
-      Permission.videos,
-      Permission.notification,
-      Permission.storage,
-      Permission.manageExternalStorage,
-      Permission.audio,
-    ].request();
+    if (_requesting) return;
+    setState(() => _requesting = true);
 
-    if (statuses[Permission.camera]!.isGranted &&
-        statuses[Permission.photos]!.isGranted &&
-        statuses[Permission.videos]!.isGranted &&
-        statuses[Permission.notification]!.isGranted &&
-        statuses[Permission.storage]!.isGranted&&
-        statuses[Permission.audio]!.isGranted &&
-        statuses[Permission.manageExternalStorage]!.isGranted)
+    try {
+      final permissions = await _requiredPermissions();
+      final Map<Permission, PermissionStatus> statuses =
+          await permissions.request();
 
-    {
+      // `statuses[p]` can legitimately be absent on some platforms — the old
+      // code used `statuses[p]!` and crashed there.
+      final denied = permissions
+          .where((p) => !(statuses[p]?.isGranted ?? false))
+          // A missing notification permission should not block the app.
+          .where((p) => p != Permission.notification)
+          .toList();
 
+      final permanentlyDenied = denied
+          .any((p) => statuses[p]?.isPermanentlyDenied ?? false);
 
+      if (!mounted) return;
 
-      // All permissions are granted
-      print("All permissions are granted");
-    } else {
+      if (denied.isEmpty) {
+        // ✅ Everything granted — this is the success path. The old code did
+        // nothing here, so users who granted permissions were stuck on this
+        // screen forever while users who denied them got sent to the home page.
+        await _continueToApp();
+        return;
+      }
 
-      final SharedPreferences prefs = await SharedPreferences.getInstance();
-      prefs.setBool('isLoggedIn', true);
-      // One or more permissions are denied
-      openAppSettingsDialog();
+      if (permanentlyDenied) {
+        await _showOpenSettingsDialog();
+        return;
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Media access is needed to show your videos. '
+            'You can grant it later from Settings.',
+          ),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Permission request failed: $e');
+    } finally {
+      if (mounted) setState(() => _requesting = false);
     }
   }
-  void openAppSettingsDialog() {
+
+  /// Marks onboarding complete and replaces this route with the home screen.
+  Future<void> _continueToApp() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      // Historical key name; means "onboarding finished".
+      await prefs.setBool('isLoggedIn', true);
+    } catch (_) {
+      // Non-fatal — worst case onboarding shows once more.
+    }
+
+    if (!mounted) return;
     Navigator.pushReplacement(
       context,
-      MaterialPageRoute(builder: (context) => const HomeBottomNavigation(bottomIndex: 0,)),
+      MaterialPageRoute(
+        builder: (_) => const HomeBottomNavigation(bottomIndex: 0),
+      ),
     );
+  }
+
+  /// Actually opens app settings — the old `openAppSettingsDialog()` just
+  /// navigated to the home screen despite its name.
+  Future<void> _showOpenSettingsDialog() async {
+    final open = await showDialog<bool>(
+      context: context,
+      builder: (dialogContext) => AlertDialog(
+        title: const Text('Permission needed'),
+        content: const Text(
+          'Media access was permanently denied. Enable it in App settings to '
+          'see your videos.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('Not now'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('Open settings'),
+          ),
+        ],
+      ),
+    );
+
+    if (open == true) {
+      await openAppSettings();
+    }
   }
 
   @override
@@ -113,7 +201,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                             shape: BoxShape.circle,
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.black.withOpacity(0.2),
+                                color: Colors.black.withValues(alpha:0.2),
                                 blurRadius: 20.sp,
                                 offset: Offset(0, 1.sp),
                               ),
@@ -181,7 +269,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                           height: 45.sp,
 
                           child: TextButton(
-                            onPressed: requestPermissions,
+                            onPressed: _requesting ? null : requestPermissions,
                             style: TextButton.styleFrom(
                               backgroundColor: HexColor('#008000'),
                               padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
@@ -193,7 +281,17 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.center,
                               children: [
-                                Icon(Icons.security, size: 17.sp),
+                                if (_requesting)
+                                  SizedBox(
+                                    height: 17.sp,
+                                    width: 17.sp,
+                                    child: const CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  )
+                                else
+                                  Icon(Icons.security, size: 17.sp),
                                 SizedBox(width: 8.sp),
                                 Text(
                                   'Grant All Permissions',
@@ -215,13 +313,10 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
 
                     // Not Now Option
                     GestureDetector(
-                      onTap: () async {
-
-                        Navigator.pushReplacement(
-                          context,
-                          MaterialPageRoute(builder: (context) => const HomeBottomNavigation(bottomIndex: 0,)),
-                        );
-                      },
+                      // Also marks onboarding as done — the old version skipped
+                      // straight to home without setting the flag, so onboarding
+                      // reappeared on every launch.
+                      onTap: _continueToApp,
                       child: Text(
                         'Skip for now ',
                         style: GoogleFonts.openSans(
@@ -251,12 +346,12 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
     return Container(
       padding: EdgeInsets.all(8.sp),
       decoration: BoxDecoration(
-        color: HexColor('#0A1A3F').withOpacity(0.8),
+        color: HexColor('#0A1A3F').withValues(alpha:0.8),
         borderRadius: BorderRadius.circular(16.sp),
-        border: Border.all(color: Colors.white.withOpacity(0.1)),
+        border: Border.all(color: Colors.white.withValues(alpha:0.1)),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.2),
+            color: Colors.black.withValues(alpha:0.2),
             blurRadius: 10.sp,
             offset: Offset(0, 4.sp),
           ),
@@ -267,7 +362,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
           Container(
             padding: EdgeInsets.all(7.sp),
             decoration: BoxDecoration(
-              color: ColorSelect.maineColor.withOpacity(0.2),
+              color: ColorSelect.maineColor.withValues(alpha:0.2),
               borderRadius: BorderRadius.circular(12.sp),
             ),
             child: Image.asset(

@@ -1,4 +1,3 @@
-import 'dart:typed_data';
 import 'dart:ui';
 
 import 'package:flutter/material.dart';
@@ -7,6 +6,7 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 import '../../Home/HomeScreen/home2.dart'; // VideoProvider yahi se aa raha hai
+import '../../Utils/video_thumb.dart';
 
 class RecentlyPlayedSection extends StatefulWidget {
   final void Function(List<AssetEntity> videos, int index) onTap;
@@ -66,7 +66,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
       context: context,
       barrierDismissible: true,
       barrierLabel: "remove_single",
-      barrierColor: Colors.black.withOpacity(0.45),
+      barrierColor: Colors.black.withValues(alpha:0.45),
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (_, __, ___) => const SizedBox.shrink(),
       transitionBuilder: (context, anim, __, child) {
@@ -119,7 +119,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                 Container(
                   padding: EdgeInsets.all(7.sp),
                   decoration: BoxDecoration(
-                    color: Colors.blue.withOpacity(0.12),
+                    color: Colors.blue.withValues(alpha:0.12),
                     borderRadius: BorderRadius.circular(10.r),
                   ),
                   child: Icon(
@@ -178,7 +178,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                         borderRadius: BorderRadius.circular(22.r),
                         boxShadow: [
                           BoxShadow(
-                            color: Colors.blue.withOpacity(0.25),
+                            color: Colors.blue.withValues(alpha:0.25),
                             blurRadius: 6,
                             offset: const Offset(0, 3),
                           ),
@@ -229,39 +229,13 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                     child: Stack(
                       children: [
                         /// 🎬 Thumbnail
-                        SizedBox(
+                        //  Was a FutureBuilder whose future was built inside
+                        //  build(), re-decoding the frame on every rebuild.
+                        VideoThumb(
+                          key: ValueKey(entity.id),
+                          asset: entity,
                           width: 140.w,
                           height: 60.h,
-                          child: FutureBuilder<Uint8List?>(
-                            future: entity.thumbnailDataWithSize(
-                              const ThumbnailSize(320, 220),
-                              quality: 85,
-                            ),
-                            builder: (context, snap) {
-                              if (!snap.hasData) {
-                                return Container(
-                                  color: Colors.black12,
-                                  alignment: Alignment.center,
-                                  child: const CircularProgressIndicator(strokeWidth: 2),
-                                );
-                              }
-
-                              final bytes = snap.data;
-                              if (bytes == null) {
-                                return Container(
-                                  color: Colors.black12,
-                                  alignment: Alignment.center,
-                                  child: const Icon(Icons.broken_image_outlined),
-                                );
-                              }
-
-                              return Image.memory(
-                                bytes,
-                                fit: BoxFit.cover,
-                                gaplessPlayback: true,
-                              );
-                            },
-                          ),
                         ),
 
                         /// ▶ Play icon
@@ -271,7 +245,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                           child: Container(
                             padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
                             decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.55),
+                              color: Colors.black.withValues(alpha:0.55),
                               borderRadius: BorderRadius.circular(12.r),
                             ),
                             child: const Icon(Icons.play_arrow_rounded, color: Colors.white),
@@ -291,7 +265,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                             child: Container(
                               padding: EdgeInsets.all(5.sp),
                               decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
+                                color: Colors.black.withValues(alpha:0.6),
                                 shape: BoxShape.circle,
                               ),
                               child: Icon(
@@ -349,13 +323,13 @@ class _ClearSingleDialog extends StatelessWidget {
                   padding: EdgeInsets.all(16.r),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18.r),
-                    color: Colors.white.withOpacity(0.92),
-                    border: Border.all(color: Colors.white.withOpacity(0.7)),
+                    color: Colors.white.withValues(alpha:0.92),
+                    border: Border.all(color: Colors.white.withValues(alpha:0.7)),
                     boxShadow: [
                       BoxShadow(
                         blurRadius: 26,
                         spreadRadius: 2,
-                        color: Colors.black.withOpacity(0.12),
+                        color: Colors.black.withValues(alpha:0.12),
                       ),
                     ],
                   ),
@@ -367,13 +341,13 @@ class _ClearSingleDialog extends StatelessWidget {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              Colors.blue.withOpacity(0.15),
-                              Colors.blue.withOpacity(0.06),
+                              Colors.blue.withValues(alpha:0.15),
+                              Colors.blue.withValues(alpha:0.06),
                             ],
                           ),
                           borderRadius: BorderRadius.circular(14.r),
                           border: Border.all(
-                            color: Colors.blue.withOpacity(0.18),
+                            color: Colors.blue.withValues(alpha:0.18),
                           ),
                         ),
                         child: Icon(
@@ -418,9 +392,9 @@ class _ClearSingleDialog extends StatelessWidget {
                                 padding: EdgeInsets.symmetric(vertical: 12.h),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(14.r),
-                                  color: Colors.black.withOpacity(0.06),
+                                  color: Colors.black.withValues(alpha:0.06),
                                   border: Border.all(
-                                    color: Colors.black.withOpacity(0.08),
+                                    color: Colors.black.withValues(alpha:0.08),
                                   ),
                                 ),
                                 child: Center(
@@ -448,13 +422,13 @@ class _ClearSingleDialog extends StatelessWidget {
                                   gradient: LinearGradient(
                                     colors: [
                                       Colors.blue,
-                                      Colors.blueAccent.withOpacity(0.95),
+                                      Colors.blueAccent.withValues(alpha:0.95),
                                     ],
                                   ),
                                   boxShadow: [
                                     BoxShadow(
                                       blurRadius: 18,
-                                      color: Colors.blue.withOpacity(0.25),
+                                      color: Colors.blue.withValues(alpha:0.25),
                                       offset: const Offset(0, 10),
                                     ),
                                   ],
@@ -486,8 +460,8 @@ class _ClearSingleDialog extends StatelessWidget {
                           padding: EdgeInsets.symmetric(vertical: 11.h),
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(14.r),
-                            color: Colors.red.withOpacity(0.08),
-                            border: Border.all(color: Colors.red.withOpacity(0.18)),
+                            color: Colors.red.withValues(alpha:0.08),
+                            border: Border.all(color: Colors.red.withValues(alpha:0.18)),
                           ),
                           child: Center(
                             child: Text(

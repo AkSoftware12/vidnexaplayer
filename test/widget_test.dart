@@ -1,30 +1,82 @@
-// This is a basic Flutter widget test.
+// Unit tests for the pure logic that used to be the source of real bugs.
 //
-// To perform an interaction with a widget in your test, use the WidgetTester
-// utility in the flutter_test package. For example, you can send tap and scroll
-// gestures. You can also use WidgetTester to find child widgets in the widget
-// tree, read text, and verify that the values of widget properties are correct.
+// The previous contents were Flutter's untouched "Counter increments smoke
+// test" template — it looked for an `Icons.add` button this app has never had,
+// and pumped `MyApp()` without its Providers, so it could only ever fail.
 
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:videoplayer/main.dart';
+import 'package:videoplayer/DarkMode/dark_mode.dart';
+import 'package:videoplayer/NotifyListeners/LanguageProvider/language_provider.dart';
 
 void main() {
-  testWidgets('Counter increments smoke test', (WidgetTester tester) async {
-    // Build our app and trigger a frame.
-    await tester.pumpWidget( MyApp());
+  setUp(() {
+    SharedPreferences.setMockInitialValues({});
+  });
 
-    // Verify that our counter starts at 0.
-    expect(find.text('0'), findsOneWidget);
-    expect(find.text('1'), findsNothing);
+  group('ThemeProvider', () {
+    test('defaults to light', () {
+      expect(ThemeProvider().isDark, isFalse);
+    });
 
-    // Tap the '+' icon and trigger a frame.
-    await tester.tap(find.byIcon(Icons.add));
-    await tester.pump();
+    test('toggle flips and persists the choice', () async {
+      final provider = ThemeProvider();
+      await provider.toggleTheme();
 
-    // Verify that our counter has incremented.
-    expect(find.text('0'), findsNothing);
-    expect(find.text('1'), findsOneWidget);
+      expect(provider.isDark, isTrue);
+      expect(provider.themeMode, ThemeMode.dark);
+
+      // A fresh provider must read the persisted value back — the old
+      // implementation never wrote it, so dark mode reset on every launch.
+      final reloaded = ThemeProvider();
+      await reloaded.load();
+      expect(reloaded.isDark, isTrue);
+    });
+
+    test('notifies listeners on change', () async {
+      final provider = ThemeProvider();
+      var notifications = 0;
+      provider.addListener(() => notifications++);
+
+      await provider.toggleTheme();
+      expect(notifications, 1);
+
+      // Setting the same value again must not notify.
+      await provider.setDark(true);
+      expect(notifications, 1);
+    });
+  });
+
+  group('LocaleProvider', () {
+    test('defaults to English', () {
+      expect(LocaleProvider().locale.languageCode, 'en');
+    });
+
+    test('ignores unsupported locales', () async {
+      final provider = LocaleProvider();
+      await provider.setLocale(const Locale('fr'));
+      expect(provider.locale.languageCode, 'en');
+    });
+
+    test('persists the selected locale', () async {
+      final provider = LocaleProvider();
+      await provider.setLocale(const Locale('hi'));
+      expect(provider.locale.languageCode, 'hi');
+
+      final reloaded = LocaleProvider();
+      await reloaded.load();
+      expect(reloaded.locale.languageCode, 'hi');
+    });
+
+    test('toggle round-trips between en and hi', () async {
+      final provider = LocaleProvider();
+      await provider.toggleLanguage();
+      expect(provider.locale.languageCode, 'hi');
+
+      await provider.toggleLanguage();
+      expect(provider.locale.languageCode, 'en');
+    });
   });
 }

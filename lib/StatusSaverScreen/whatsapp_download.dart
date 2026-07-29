@@ -7,7 +7,6 @@ import 'package:flutter/material.dart';
 import 'package:gal/gal.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:video_player/video_player.dart';
 import 'package:videoplayer/StatusSaverScreen/status_saver.dart';
 import 'package:videoplayer/Utils/color.dart';
 
@@ -952,10 +951,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
 
     return Column(
       children: [
-        // Padding(
-        //   padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
-        //   child: _buildAccessPanel(context),
-        // ),
+        _buildAccessBanner(context),
         Expanded(
           child: GridView.builder(
             padding: const EdgeInsets.fromLTRB(5, 5, 5, 24),
@@ -997,8 +993,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     return ListView(
       padding: const EdgeInsets.fromLTRB(5, 5, 5, 10),
       children: [
-        // _buildAccessPanel(context),
-        const SizedBox(height: 0),
+        _buildAccessBanner(context),
         ...List.generate(_downloads.length, (index) {
           final item = _downloads[index];
           final source = _statusById[item.id];
@@ -1015,6 +1010,20 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
           );
         }),
       ],
+    );
+  }
+
+  /// Shows the access/error panel only when there is something to report.
+  ///
+  /// The full panel used to be commented out at both call sites, which meant
+  /// `_error` — set in 15+ places ("Media permission was not granted",
+  /// "Folder selection failed", "Unable to load statuses", …) — was never shown
+  /// to the user. Failures looked like an empty screen.
+  Widget _buildAccessBanner(BuildContext context) {
+    if (_error == null && _folderHint == null) return const SizedBox.shrink();
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: _buildAccessPanel(context),
     );
   }
 
@@ -1039,7 +1048,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha:0.04),
             blurRadius: 10,
             offset: const Offset(0, 4),
           ),
@@ -1276,7 +1285,7 @@ class _StatusCard extends StatelessWidget {
                           vertical: 6,
                         ),
                         decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
+                          color: Colors.black.withValues(alpha:0.6),
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
@@ -1488,7 +1497,7 @@ class _StatChip extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.14),
+        color: color.withValues(alpha:0.14),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
@@ -1605,7 +1614,6 @@ class StatusPreviewPage extends StatefulWidget {
 
 class _StatusPreviewPageState extends State<StatusPreviewPage> {
   File? _file;
-  VideoPlayerController? _videoController;
   bool _loading = true;
   String? _error;
 
@@ -1613,11 +1621,6 @@ class _StatusPreviewPageState extends State<StatusPreviewPage> {
   void initState() {
     super.initState();
     unawaited(_prepare());
-  }
-
-  @override
-  void dispose() {
-    super.dispose();
   }
 
   Future<void> _prepare() async {
@@ -1648,17 +1651,38 @@ class _StatusPreviewPageState extends State<StatusPreviewPage> {
         foregroundColor: Colors.white,
         title: Text(widget.item.typeLabel),
       ),
-      body: Center(
-        child: _loading
-            ? const CircularProgressIndicator(color: Colors.white)
-            : _error != null
-            ? Text(
-          _error!,
-          style: const TextStyle(color: Colors.white),
-        )
-            :  Image.file(_file!, fit: BoxFit.contain),
-      ),
+      body: Center(child: _buildPreview()),
     );
+  }
+
+  Widget _buildPreview() {
+    if (_loading) {
+      return const CircularProgressIndicator(color: Colors.white);
+    }
+
+    final error = _error;
+    if (error != null) {
+      return Text(error, style: const TextStyle(color: Colors.white));
+    }
+
+    final file = _file;
+    if (file == null) {
+      return const Text(
+        'Preview unavailable',
+        style: TextStyle(color: Colors.white),
+      );
+    }
+
+    // Video statuses used to be handed to `Image.file`, which can never decode
+    // an mp4 — the preview was always a broken-image box.
+    if (widget.item.isVideo) {
+      return FullScreenVideoPlayerFixed(
+        videos: const [],
+        initialUrl: Uri.file(file.path).toString(),
+      );
+    }
+
+    return Image.file(file, fit: BoxFit.contain);
   }
 }
 

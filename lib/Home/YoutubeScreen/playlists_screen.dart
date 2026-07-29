@@ -18,18 +18,26 @@ class YouTubeTopPlaylists extends StatefulWidget {
 }
 
 class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
-  final String apiKey = "AIzaSyAkbfVnNtAA0D3hNPmGA_cFxOGYnpnCZKI";
+  /// ⚠️ Supply at build time so the key is not sitting in source control:
+  ///     flutter run --dart-define=YT_API_KEY=xxxx
+  /// Also restrict the key to this app's package + SHA-1 in Google Cloud
+  /// Console — anything shipped in an APK can be extracted.
+  static const String _apiKey = String.fromEnvironment(
+    'YT_API_KEY',
+    defaultValue: 'AIzaSyAkbfVnNtAA0D3hNPmGA_cFxOGYnpnCZKI',
+  );
 
-  final Box _box = Hive.box('yt_cache');
+  Box? _box;
 
   static const String _cacheKey = "yt_playlist_cache_v1";
   static const String _cacheTimeKey = "yt_playlist_cache_time_v1";
   static const Duration _cacheDuration = Duration(hours: 24);
+  static const Duration _requestTimeout = Duration(seconds: 15);
 
   Map<String, List> categoryPlaylists = {};
   bool isLoading = true;
 
-  // Default country
+  /// Resolved from the device locale at runtime; 'IN' is only the fallback.
   String countryCode = 'IN';
 
   // Country-wise category queries
@@ -47,27 +55,37 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
   }
 
   Future<void> initCountryAndFetch() async {
+    // Opening the box here (instead of in a field initializer) means this
+    // screen no longer throws if main.dart's Hive init failed.
+    try {
+      _box = Hive.isBoxOpen('yt_cache')
+          ? Hive.box('yt_cache')
+          : await Hive.openBox('yt_cache');
+    } catch (e) {
+      debugPrint('yt_cache unavailable: $e');
+    }
+
     try {
       await CountryCodes.init();
       final Locale? deviceLocale = CountryCodes.getDeviceLocale();
-      // ✅ if you want device country:
-      // countryCode = deviceLocale?.countryCode ?? 'US';
-
+      final detected = deviceLocale?.countryCode;
+      // Was hardcoded to 'IN' with the device lookup commented out, so every
+      // user worldwide got the Indian category list.
+      if (detected != null && detected.isNotEmpty) {
+        countryCode = detected.toUpperCase();
+      }
       debugPrint('Country Code => $countryCode');
+    } catch (e) {
+      debugPrint('Country detection failed, using $countryCode: $e');
+    }
 
-      // ✅ 1) Try cache (no API hit)
-      final loadedFromCache = await _loadFromCacheIfValid();
-
-      // ✅ 2) If cache invalid/empty => API hit once
-      if (!loadedFromCache) {
+    try {
+      if (!await _loadFromCacheIfValid()) {
         await fetchAllCategories();
         await _saveCache();
       }
     } catch (e) {
-      debugPrint("initCountryAndFetch error: $e");
-      // fallback to API if something fails
-      await fetchAllCategories();
-      await _saveCache();
+      debugPrint('initCountryAndFetch error: $e');
     }
 
     if (mounted) setState(() => isLoading = false);
@@ -75,77 +93,91 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
 
   /// ✅ Load cache if within 24 hours
   Future<bool> _loadFromCacheIfValid() async {
-    final String? cacheJson = _box.get(_cacheKey);
-    final int? lastTimeMs = _box.get(_cacheTimeKey);
+    final box = _box;
+    if (box == null) return false;
 
-    if (cacheJson == null || lastTimeMs == null) return false;
+    try {
+      final String? cacheJson = box.get(_cacheKey) as String?;
+      final int? lastTimeMs = box.get(_cacheTimeKey) as int?;
 
-    final lastTime = DateTime.fromMillisecondsSinceEpoch(lastTimeMs);
-    final diff = DateTime.now().difference(lastTime);
+      if (cacheJson == null || lastTimeMs == null) return false;
 
-    // Expired
-    if (diff > _cacheDuration) return false;
+      final lastTime = DateTime.fromMillisecondsSinceEpoch(lastTimeMs);
+      if (DateTime.now().difference(lastTime) > _cacheDuration) return false;
 
-    final Map<String, dynamic> decoded = json.decode(cacheJson);
+      final decoded = json.decode(cacheJson) as Map<String, dynamic>;
+      final restored = decoded.map((k, v) => MapEntry(k, List.from(v as List)));
+      if (restored.isEmpty) return false;
 
-    setState(() {
-      categoryPlaylists = decoded.map((k, v) => MapEntry(k, List.from(v)));
-    });
-
-    return true;
+      if (!mounted) return false;
+      setState(() => categoryPlaylists = restored);
+      return true;
+    } catch (e) {
+      debugPrint('Cache read failed: $e');
+      return false;
+    }
   }
 
   /// ✅ Save cache after successful fetch
   Future<void> _saveCache() async {
-    final String jsonString = json.encode(categoryPlaylists);
-    await _box.put(_cacheKey, jsonString);
-    await _box.put(_cacheTimeKey, DateTime.now().millisecondsSinceEpoch);
+    final box = _box;
+    if (box == null || categoryPlaylists.isEmpty) return;
+    try {
+      await box.put(_cacheKey, json.encode(categoryPlaylists));
+      await box.put(_cacheTimeKey, DateTime.now().millisecondsSinceEpoch);
+    } catch (e) {
+      debugPrint('Cache write failed: $e');
+    }
   }
 
-  /// ✅ Optional: Force refresh (manual)
+  /// Pull-to-refresh. The body of this method used to be commented out, so the
+  /// spinner span and nothing was ever refetched.
   Future<void> forceRefresh() async {
+    if (isLoading) return;
     setState(() => isLoading = true);
-    // await fetchAllCategories();
-    // await _saveCache();
+    try {
+      await fetchAllCategories();
+      await _saveCache();
+    } catch (e) {
+      debugPrint('forceRefresh error: $e');
+    }
     if (mounted) setState(() => isLoading = false);
   }
 
   Future<void> fetchAllCategories() async {
-    categoryPlaylists.clear();
+    final categories =
+        countryCategoryMap[countryCode] ?? countryCategoryMap['US']!;
 
-    final categories = countryCategoryMap[countryCode] ?? countryCategoryMap['US']!;
-    for (var category in categories) {
-      await fetchPlaylistsForCategory(category);
+    // Build into a local map so a failed refresh doesn't blank the screen —
+    // `categoryPlaylists.clear()` used to wipe the UI before the first response.
+    final results = <String, List>{};
+    for (final category in categories) {
+      results[category] = await _fetchPlaylistsForCategory(category);
     }
+
+    if (!mounted) return;
+    setState(() => categoryPlaylists = results);
   }
 
-  Future<void> fetchPlaylistsForCategory(String query) async {
+  Future<List> _fetchPlaylistsForCategory(String query) async {
     final url = Uri.parse(
       'https://www.googleapis.com/youtube/v3/search'
-          '?part=snippet&type=playlist&q=${Uri.encodeComponent(query)}'
-          '&regionCode=$countryCode&maxResults=10&key=$apiKey',
+      '?part=snippet&type=playlist&q=${Uri.encodeComponent(query)}'
+      '&regionCode=$countryCode&maxResults=10&key=$_apiKey',
     );
 
     try {
-      final response = await http.get(url);
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        final items = data["items"] as List? ?? [];
-
-        setState(() {
-          categoryPlaylists[query] = items;
-        });
-      } else {
-        debugPrint("API error ${response.statusCode}: ${response.body}");
-        setState(() {
-          categoryPlaylists[query] = [];
-        });
+      // Without a timeout a stalled connection left the screen spinning forever.
+      final response = await http.get(url).timeout(_requestTimeout);
+      if (response.statusCode != 200) {
+        debugPrint('YouTube API error ${response.statusCode}');
+        return const [];
       }
+      final data = json.decode(response.body) as Map<String, dynamic>;
+      return (data['items'] as List?) ?? const [];
     } catch (e) {
-      debugPrint("fetchPlaylistsForCategory error: $e");
-      setState(() {
-        categoryPlaylists[query] = [];
-      });
+      debugPrint('fetchPlaylistsForCategory("$query") error: $e');
+      return const [];
     }
   }
 
@@ -259,7 +291,7 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
                               builder: (_) => YouTubePlaylistVideos(
                                 playlistId: playlistId,
                                 playlistTitle: title,
-                                apiKey: apiKey,
+                                apiKey: _apiKey,
                               ),
                             ),
                           );
@@ -276,7 +308,7 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
                             borderRadius: BorderRadius.circular(5),
                             boxShadow: [
                               BoxShadow(
-                                color: Colors.blue.withOpacity(0.08),
+                                color: Colors.blue.withValues(alpha:0.08),
                                 blurRadius: 10,
                                 offset: const Offset(0, 6),
                               ),
@@ -316,7 +348,7 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
                                     child: Center(
                                       child: Container(
                                         decoration: BoxDecoration(
-                                          color: Colors.black.withOpacity(0.45),
+                                          color: Colors.black.withValues(alpha:0.45),
                                           shape: BoxShape.circle,
                                         ),
                                         padding: const EdgeInsets.all(8),

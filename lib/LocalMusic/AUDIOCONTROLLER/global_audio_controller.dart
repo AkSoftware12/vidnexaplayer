@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'dart:io';
-import 'dart:typed_data';
 
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/foundation.dart';
@@ -16,13 +15,29 @@ class GlobalAudioController {
   GlobalAudioController._internal();
   factory GlobalAudioController() => _instance;
 
-  GlobalAudioController._internal() {
+  // Streams are bound lazily on first use. Binding them in the constructor
+  // reached for `AudioServiceInit.handler` — a `late final` — so merely
+  // touching this singleton before AudioService finished initialising threw
+  // a LateInitializationError.
+  GlobalAudioController._internal();
+
+  bool _bound = false;
+
+  void _ensureBound() {
+    if (_bound) return;
+    if (!AudioServiceInit.isReady) return;
+    _bound = true;
     _bindStreams();
   }
 
   final OnAudioQuery _audioQuery = OnAudioQuery();
 
-  BackgroundAudioHandler get handler => AudioServiceInit.handler;
+  BackgroundAudioHandler get handler {
+    final h = AudioServiceInit.handler;
+    _ensureBound();
+    return h;
+  }
+
   AudioPlayer get player => handler.player;
 
   final ValueNotifier<List<SongModel>> currentSongs =
@@ -126,48 +141,104 @@ class GlobalAudioController {
   }
 
   // ---------------- Play playlist ----------------
+  /// How many artworks around the current track are pre-cached.
+  ///
+  /// The old code did `Future.wait(songs.map(_cacheArtworkToFile))` over the
+  /// ENTIRE list — on a 2000-song library that is 2000 concurrent 800px artwork
+  /// queries plus 2000 temp files, i.e. a guaranteed ANR / OOM.
+  static const int _artworkPrefetchRadius = 3;
+
   Future<void> playSongs(List<SongModel> songs, int index) async {
     if (songs.isEmpty) return;
 
-    currentSongs.value = songs;
-    currentIndex.value = index;
-
-    // ✅ parallel artwork caching (fast)
-    final artUris = await Future.wait(
-      songs.map((s) => _cacheArtworkToFile(songId: s.id)).toList(),
-    );
-
     final mediaItems = <MediaItem>[];
     final sources = <AudioSource>[];
+    final playable = <SongModel>[];
 
-    for (int i = 0; i < songs.length; i++) {
-      final song = songs[i];
-      final artFileUri = artUris[i];
+    for (final song in songs) {
+      final raw = song.uri;
+      if (raw == null || raw.trim().isEmpty) continue;
+
+      // `Uri.parse(song.uri!)` threw on both null and malformed uris.
+      final uri = Uri.tryParse(raw);
+      if (uri == null) continue;
 
       final item = MediaItem(
         id: song.id.toString(),
         title: song.title,
         artist: song.artist ?? 'Unknown',
-        artUri: artFileUri,
+        album: song.album,
+        duration: song.duration == null
+            ? null
+            : Duration(milliseconds: song.duration!),
       );
 
+      playable.add(song);
       mediaItems.add(item);
-      sources.add(
-        AudioSource.uri(
-          Uri.parse(song.uri!),
-          tag: item,
-        ),
-      );
+      sources.add(AudioSource.uri(uri, tag: item));
     }
+
+    if (mediaItems.isEmpty) return;
+
+    // The requested song may have been filtered out; keep pointing at it.
+    final requested = index >= 0 && index < songs.length ? songs[index] : null;
+    var startIndex = requested == null
+        ? 0
+        : playable.indexWhere((s) => s.id == requested.id);
+    if (startIndex < 0) startIndex = 0;
+
+    currentSongs.value = playable;
+    currentIndex.value = startIndex;
 
     await handler.setPlaylist(
       items: mediaItems,
       sources: sources,
-      initialIndex: index,
+      initialIndex: startIndex,
       autoplay: true,
     );
 
     hasPlayedOnce.value = true;
+
+    // Fill in artwork for the current track and its neighbours only, and update
+    // the media items in place so the notification still shows cover art.
+    unawaited(_prefetchArtwork(playable, mediaItems, startIndex));
+  }
+
+  Future<void> _prefetchArtwork(
+    List<SongModel> songs,
+    List<MediaItem> items,
+    int centre,
+  ) async {
+    final from = (centre - _artworkPrefetchRadius).clamp(0, songs.length - 1);
+    final to = (centre + _artworkPrefetchRadius).clamp(0, songs.length - 1);
+
+    for (int i = from; i <= to; i++) {
+      final art = await _cacheArtworkToFile(songId: songs[i].id);
+      if (art == null) continue;
+
+      items[i] = items[i].copyWith(artUri: art);
+      try {
+        await handler.updateMediaItem(items[i]);
+      } catch (_) {
+        // Item may no longer be in the queue.
+      }
+    }
+  }
+
+  /// Deletes cached artwork thumbnails from the temp directory.
+  /// Nothing used to clean these up, so they accumulated forever.
+  Future<void> clearArtworkCache() async {
+    try {
+      final dir = await getTemporaryDirectory();
+      await for (final entity in dir.list()) {
+        final name = entity.path.split(Platform.pathSeparator).last;
+        if (entity is File && name.startsWith('art_') && name.endsWith('.jpg')) {
+          await entity.delete();
+        }
+      }
+    } catch (_) {
+      // Best-effort cleanup.
+    }
   }
 
   // ---------------- Seek helpers ----------------
@@ -185,12 +256,17 @@ class GlobalAudioController {
     await handler.seek(newPos > total ? total : newPos);
   }
 
+  /// Detaches this controller's listeners.
+  ///
+  /// Deliberately does NOT dispose the player: this is an app-wide singleton
+  /// sharing the audio handler's player, and disposing it here killed playback
+  /// for everyone.
   Future<void> dispose() async {
     await _indexSub?.cancel();
     await _pbSub?.cancel();
     await _stateSub?.cancel();
     await _queueSub?.cancel();
     await _customSub?.cancel();
-    await player.dispose();
+    _bound = false;
   }
 }

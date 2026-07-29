@@ -14,21 +14,9 @@ class NotificationScreen extends StatefulWidget {
 }
 
 class _NotificationScreenState extends State<NotificationScreen> {
+  // Singleton — initialised once in main.dart, never disposed by a screen.
   final appOpenManager = AppOpenAdManager();
 
-
-  @override
-  void initState() {
-    super.initState();
-    appOpenManager.init();
-  }
-
-
-  @override
-  void dispose() {
-    appOpenManager.dispose();
-    super.dispose();
-  }
   @override
   Widget build(BuildContext context) {
     return Scaffold(

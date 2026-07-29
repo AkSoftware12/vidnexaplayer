@@ -49,9 +49,16 @@ class SeekBarState extends State<SeekBar> {
 
   @override
   Widget build(BuildContext context) {
+    // While the duration is still unknown (streams, slow metadata) it is zero.
+    // `Slider` with min == max == 0 produces a NaN track position, so fall back
+    // to a 1 ms range and keep the handle pinned at the start.
+    final durationMs = widget.duration.inMilliseconds;
+    final maxMs = durationMs <= 0 ? 1.0 : durationMs.toDouble();
+    final enabled = durationMs > 0;
+
     final value = min(
-      _dragValue ?? widget.position.inMilliseconds.toDouble(),
-      widget.duration.inMilliseconds.toDouble(),
+      max(_dragValue ?? widget.position.inMilliseconds.toDouble(), 0.0),
+      maxMs,
     );
     if (_dragValue != null && !_dragging) {
       _dragValue = null;
@@ -67,9 +74,11 @@ class SeekBarState extends State<SeekBar> {
           child: ExcludeSemantics(
             child: Slider(
               min: 0.0,
-              max: widget.duration.inMilliseconds.toDouble(),
-              value: min(widget.bufferedPosition.inMilliseconds.toDouble(),
-                  widget.duration.inMilliseconds.toDouble()),
+              max: maxMs,
+              value: min(
+                max(widget.bufferedPosition.inMilliseconds.toDouble(), 0.0),
+                maxMs,
+              ),
               onChanged: (value) {},
             ),
           ),
@@ -80,9 +89,11 @@ class SeekBarState extends State<SeekBar> {
           ),
           child: Slider(
             min: 0.0,
-            max: widget.duration.inMilliseconds.toDouble(),
+            max: maxMs,
             value: value,
-            onChanged: (value) {
+            onChanged: !enabled
+                ? null
+                : (value) {
               if (!_dragging) {
                 _dragging = true;
               }
@@ -107,17 +118,26 @@ class SeekBarState extends State<SeekBar> {
           right: 16.0,
           bottom: 0.0,
           child: Text(
-              RegExp(r'((^0*[1-9]\d*:)?\d{2}:\d{2})\.\d+$')
-                      .firstMatch("$_remaining")
-                      ?.group(1) ??
-                  '$_remaining',
-              style: Theme.of(context).textTheme.bodySmall),
+            enabled ? _format(_remaining) : '--:--',
+            style: Theme.of(context).textTheme.bodySmall,
+          ),
         ),
       ],
     );
   }
 
-  Duration get _remaining => widget.duration - widget.position;
+  Duration get _remaining {
+    final left = widget.duration - widget.position;
+    return left.isNegative ? Duration.zero : left;
+  }
+
+  static String _format(Duration d) {
+    String two(int n) => n.toString().padLeft(2, '0');
+    final h = d.inHours;
+    final m = two(d.inMinutes.remainder(60));
+    final s = two(d.inSeconds.remainder(60));
+    return h > 0 ? '$h:$m:$s' : '$m:$s';
+  }
 }
 
 class HiddenThumbComponentShape extends SliderComponentShape {
@@ -169,9 +189,8 @@ class LoggingAudioHandler extends CompositeAudioHandler {
     });
   }
 
-  // TODO: Use logger. Use different log levels.
-  // ignore: avoid_print
-  void _log(String s) => print('----- LOG: $s');
+  // `debugPrint` is stripped in release builds; `print` was not.
+  void _log(String s) => debugPrint('----- LOG: $s');
 
   @override
   Future<void> prepare() {
@@ -461,7 +480,9 @@ void showSliderDialog({
           height: 100.0,
           child: Column(
             children: [
-              Text('${snapshot.data?.toStringAsFixed(1)}$valueSuffix',
+              // `snapshot.data?.toStringAsFixed(1)` rendered the literal text
+              // "null" until the first stream event arrived.
+              Text('${(snapshot.data ?? value).toStringAsFixed(1)}$valueSuffix',
                   style: const TextStyle(
                       fontFamily: 'Fixed',
                       fontWeight: FontWeight.bold,

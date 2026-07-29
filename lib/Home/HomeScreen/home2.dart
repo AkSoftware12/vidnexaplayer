@@ -1,6 +1,3 @@
-import 'dart:io';
-import 'package:flutter/cupertino.dart' hide AnimatedScale;
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart' hide AnimatedScale;
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -18,16 +15,15 @@ import 'BannerSlider/banner_slider.dart';
 import 'BottomsheetHomeScreen/bottomsheet_menu_button.dart';
 import 'HorizontalGridList/horizontal_gridlist.dart';
 
-import 'package:flutter/foundation.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-
 class VideoProvider with ChangeNotifier {
   static const _key = 'recently_played_videos';
   static const int _max = 20;
 
   List<String> _recentlyPlayed = [];
 
-  List<String> get recentlyPlayed => _recentlyPlayed;
+  /// Read-only view — callers used to mutate this list directly, which changed
+  /// the UI but never touched storage.
+  List<String> get recentlyPlayed => List.unmodifiable(_recentlyPlayed);
 
   Future<void> loadRecentlyPlayed() async {
     try {
@@ -57,25 +53,26 @@ class VideoProvider with ChangeNotifier {
   }
 
   Future<void> removeFromRecentlyPlayed(String assetId) async {
+    // Update in memory first so the UI reacts immediately…
+    if (!_recentlyPlayed.remove(assetId)) return;
+    notifyListeners();
+
+    // …then persist. Without this the entry came back after a restart.
     try {
       final prefs = await SharedPreferences.getInstance();
-      List<String> list = prefs.getStringList(_key) ?? [];
-      list.remove(assetId);
-
-      await prefs.setStringList(_key, list);
-      _recentlyPlayed = list;
-      notifyListeners();
-    } catch (_) {}
-  }
-  void removeRecentlyPlayed(String id) {
-    recentlyPlayed.remove(id);
-    notifyListeners();
+      await prefs.setStringList(_key, _recentlyPlayed);
+    } catch (_) {
+      // Non-fatal; the in-memory list is still correct for this session.
+    }
   }
 
-  void removeRecentAt(int index) {
-    if (index < 0 || index >= recentlyPlayed.length) return;
-    recentlyPlayed.removeAt(index);
-    notifyListeners();
+  /// Alias kept for existing call sites.
+  Future<void> removeRecentlyPlayed(String id) =>
+      removeFromRecentlyPlayed(id);
+
+  Future<void> removeRecentAt(int index) async {
+    if (index < 0 || index >= _recentlyPlayed.length) return;
+    await removeFromRecentlyPlayed(_recentlyPlayed[index]);
   }
 
   Future<void> clearRecentlyPlayed() async {
@@ -98,7 +95,6 @@ class DemoHomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<DemoHomeScreen>
     with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   List<AssetPathEntity> _albums = [];
-  final appOpenManager = AppOpenAdManager();
 
   bool _isLoading = true;
   bool _hasPermission = false;
@@ -112,44 +108,74 @@ class _HomeScreenState extends State<DemoHomeScreen>
   @override
   void initState() {
     super.initState();
-    appOpenManager.init();
 
     WidgetsBinding.instance.addObserver(this);
 
     _controller = AnimationController(
-      duration: Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
     _requestPermissionAndLoadAlbums();
   }
 
+  /// Re-checks access on resume **without** re-prompting.
+  ///
+  /// `requestPermissionExtend()` shows the system dialog; calling it on every
+  /// resume nagged the user repeatedly. `getPermissionState` only reads the
+  /// current state.
   Future<void> _checkPermissionStatus() async {
-    final ps = await PhotoManager.requestPermissionExtend();
-    if (ps.isAuth && !_hasPermission) {
-      setState(() {
-        _hasPermission = true;
-        _isLoading = true;
-      });
-      await _requestPermissionAndLoadAlbums();
+    try {
+      final ps = await PhotoManager.getPermissionState(
+        requestOption: const PermissionRequestOption(
+          androidPermission: AndroidPermission(
+            type: RequestType.video,
+            mediaLocation: false,
+          ),
+        ),
+      );
+      if (!mounted) return;
+      // `hasAccess` is true for Android 14 "Selected photos" too, where
+      // `isAuth` is false — treating that as denied left users stuck on the
+      // "Permissions Required" card forever.
+      if (ps.hasAccess && !_hasPermission) {
+        await _requestPermissionAndLoadAlbums();
+      }
+    } catch (e) {
+      debugPrint('Permission re-check failed: $e');
     }
   }
 
   Future<void> _requestPermissionAndLoadAlbums() async {
+    if (!mounted) return;
     setState(() => _isLoading = true);
-    final PermissionState ps = await PhotoManager.requestPermissionExtend();
-    if (ps.isAuth) {
-      _hasPermission = true;
+
+    try {
+      final PermissionState ps = await PhotoManager.requestPermissionExtend();
+      if (!mounted) return;
+
+      if (!ps.hasAccess) {
+        setState(() {
+          _hasPermission = false;
+          _isLoading = false;
+        });
+        return;
+      }
+
       final albums = await PhotoManager.getAssetPathList(
         type: RequestType.video,
       );
+      if (!mounted) return;
+
       setState(() {
+        _hasPermission = true;
         _albums = albums;
         _isLoading = false;
       });
       _controller.forward();
-    } else {
-      _hasPermission = false;
+    } catch (e) {
+      debugPrint('Loading albums failed: $e');
+      if (!mounted) return;
       setState(() => _isLoading = false);
     }
   }
@@ -157,7 +183,6 @@ class _HomeScreenState extends State<DemoHomeScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    appOpenManager.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -244,10 +269,13 @@ class _HomeScreenState extends State<DemoHomeScreen>
       backgroundColor: Colors.white,
       body: RefreshIndicator(
         onRefresh: () async {
-          await Provider.of<VideoProvider>(
-            context,
-            listen: false,
-          ).loadRecentlyPlayed();
+          // Pull-to-refresh now also rescans the device for new folders —
+          // previously it only re-read the recently-played list.
+          await Future.wait([
+            Provider.of<VideoProvider>(context, listen: false)
+                .loadRecentlyPlayed(),
+            _requestPermissionAndLoadAlbums(),
+          ]);
         },
         child: SingleChildScrollView(
           physics: const AlwaysScrollableScrollPhysics(),
@@ -256,17 +284,15 @@ class _HomeScreenState extends State<DemoHomeScreen>
               SizedBox(height: 10.sp),
               const BannerSlider(),
 
-
-
-
               _isLoading
-                  ? SizedBox()
+                  ? const SizedBox()
                   : !_hasPermission
                   ? _buildPermissionCard()
                   : FadeTransition(
                     opacity: _fadeAnimation,
-                    child: SingleChildScrollView(
-                      child: Column(
+                    // Removed a nested SingleChildScrollView — this Column is
+                    // already inside a scroll view.
+                    child: Column(
                         children: [
 
                           RecentlyPlayedSection(
@@ -304,7 +330,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                         Container(
                                           padding: EdgeInsets.all(6.sp),
                                           decoration: BoxDecoration(
-                                            color: Colors.blue.withOpacity(0.1),
+                                            color: Colors.blue.withValues(alpha:0.1),
                                             borderRadius: BorderRadius.circular(
                                               10.sp,
                                             ),
@@ -334,7 +360,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                         Container(
                                           height: 32.sp,
                                           decoration: BoxDecoration(
-                                            color: Colors.blue.withOpacity(0.1),
+                                            color: Colors.blue.withValues(alpha:0.1),
                                             borderRadius: BorderRadius.circular(30),
                                           ),
                                           child: Row(
@@ -411,7 +437,9 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                   : FadeTransition(
                                 opacity: _fadeAnimation,
                                 child: AnimatedSwitcher(
-                                  duration: Duration(milliseconds: 000),
+                                  // Was `milliseconds: 000` — a zero-length
+                                  // animation, i.e. no animation at all.
+                                  duration: const Duration(milliseconds: 300),
                                   switchInCurve: Curves.easeIn,
                                   switchOutCurve: Curves.easeIn,
                                   child:
@@ -419,7 +447,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                       ? InlineBannerList(
                                     key: const ValueKey('listView'),
                                     items: _albums,
-                                    adUnitId: 'ca-app-pub-6478840988045325/7764390357',
+                                    adUnitId: AdUnits.banner,
                                     itemsPerAd: 9, // ✅ 6 items ke baad ad
                                     physics: const NeverScrollableScrollPhysics(),
                                     shrinkWrap: true,
@@ -509,7 +537,6 @@ class _HomeScreenState extends State<DemoHomeScreen>
 
                         ],
                       ),
-                    ),
                   ),
             ],
           ),
@@ -779,7 +806,7 @@ class AlbumGridTile extends StatelessWidget {
                 borderRadius: BorderRadius.circular(10.sp),
                 boxShadow: [
                   BoxShadow(
-                    color: selectedColor.withOpacity(0.3),
+                    color: selectedColor.withValues(alpha:0.3),
                     blurRadius: 10,
                     spreadRadius: 2,
                     offset: Offset(2, 3),
@@ -918,8 +945,6 @@ class AlbumGridTile3 extends StatelessWidget {
       [Colors.pinkAccent, Colors.orangeAccent],
     ];
 
-    final selectedGradient = gradients[index % gradients.length];
-
     return FutureBuilder<int>(
       future: album.assetCountAsync,
       builder: (context, snapshot) {
@@ -974,7 +999,7 @@ class AlbumGridTile3 extends StatelessWidget {
               borderRadius: BorderRadius.circular(10.sp),
               boxShadow: [
                 BoxShadow(
-                  color: selectedColor.withOpacity(0.3),
+                  color: selectedColor.withValues(alpha:0.3),
                   blurRadius: 10,
                   spreadRadius: 2,
                   offset: Offset(2, 3),
@@ -1016,7 +1041,7 @@ class AlbumGridTile3 extends StatelessWidget {
                       vertical: 2.h,
                     ),
                     decoration: BoxDecoration(
-                      // color: Colors.white.withOpacity(0.25),
+                      // color: Colors.white.withValues(alpha:0.25),
                       borderRadius: BorderRadius.only(
                         bottomLeft: Radius.circular(15.r),
                         bottomRight: Radius.circular(15.r),

@@ -1,6 +1,7 @@
-// main.dart (FULL)
+// main.dart
 // ✅ Safe FCM init (no crash), ✅ background handler top-level, ✅ proper order
 
+import 'dart:async';
 import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
@@ -8,6 +9,7 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_portal/flutter_portal.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
@@ -23,13 +25,12 @@ import 'LocalMusic/AudioServiceInit/audio_service_init.dart';
 import 'NotifyListeners/AppBar/app_bar_color.dart';
 import 'NotifyListeners/LanguageProvider/language_provider.dart';
 import 'NotifyListeners/UserData/user_data.dart';
-import 'VideoPLayer/4kPlayer/4k_player.dart';
 import 'ads/app_open_ad_manager.dart';
+import 'app_globals.dart';
 
-// If you have these globals in some other file, keep using yours
-final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+/// The single app-wide ad manager. Screens use `AppOpenAdManager()` which
+/// returns this same instance; only main.dart is allowed to `init()` it.
 final AppOpenAdManager appOpenManager = AppOpenAdManager();
-
 
 // adb uninstall com.vidnexa.videoplayer
 /// ✅ MUST be top-level + entry-point for background isolate
@@ -39,72 +40,134 @@ Future<void> firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
 
   if (kDebugMode) {
-    print('🔔 Background Message: ${message.messageId}');
-    print('🔔 Title: ${message.notification?.title}');
-    print('🔔 Data: ${message.data}');
+    debugPrint('🔔 Background Message: ${message.messageId}');
+    debugPrint('🔔 Title: ${message.notification?.title}');
+    debugPrint('🔔 Data: ${message.data}');
   }
 }
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Any other init you do before Firebase is fine
-  await AudioServiceInit.init();
-  MediaKit.ensureInitialized();
-  appOpenManager.init(); // ✅ start ads manager
+  // Providers are created up-front so their persisted values can be restored
+  // before the first frame (avoids a light→dark / en→hi flash).
+  final themeProvider = ThemeProvider();
+  final localeProvider = LocaleProvider();
 
-  // ✅ Firebase init FIRST (before messaging setup)
-  if (Platform.isAndroid) {
-    await Firebase.initializeApp(
-      options: const FirebaseOptions(
-        apiKey: 'AIzaSyBXH-9NE0Q0VeQVRYkF0xMYeu12IMQ4EW0',
-        appId: '1:1054442908505:android:b664773d6e1220246a3a48',
-        messagingSenderId: '1054442908505',
-        projectId: 'vidnexa-video-player-a69f8',
-        storageBucket: "vidnexa-video-player-a69f8.firebasestorage.app",
-      ),
-    );
-  } else {
-    await Firebase.initializeApp();
-  }
-
-  // ✅ Background handler register BEFORE runApp
-  FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
-
-  // ✅ Ads init
-  await MobileAds.instance.initialize();
-  MobileAds.instance.updateRequestConfiguration(
-    RequestConfiguration(
-      testDeviceIds: const ['05B5C242534D4508DE3D9FF83044AED8'],
-    ),
-  );
-
-  // ✅ Hive init
-  await Hive.initFlutter();
-  await Hive.openBox('yt_cache');
-
-  // ✅ Lock portrait
-  await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-
-  // ✅ Init notifications (safe, won't crash)
-  await NotificationService().initNotifications();
+  await _initCritical(themeProvider, localeProvider);
 
   runApp(
     MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (context) => ThemeProvider()),
-        ChangeNotifierProvider(create: (context) => AppBarColorProvider()),
-        ChangeNotifierProvider(create: (context) => LocaleProvider()),
-        ChangeNotifierProvider(create: (context) => UserModel()),
+        ChangeNotifierProvider.value(value: themeProvider),
+        ChangeNotifierProvider(create: (_) => AppBarColorProvider()),
+        ChangeNotifierProvider.value(value: localeProvider),
+        ChangeNotifierProvider(create: (_) => UserModel()),
         ChangeNotifierProvider(create: (_) => VideoProvider()),
       ],
-      child: MyApp(),
+      child: const MyApp(),
     ),
   );
+
+  // Everything the first frame does NOT depend on runs after runApp, so the UI
+  // appears immediately instead of after the whole stack has booted.
+  unawaited(_initDeferred());
 }
 
+/// The minimum that must be ready before the first frame is painted.
+///
+/// Everything here is either needed to choose what to draw (theme/locale) or is
+/// required by any screen that could appear first. The previous version awaited
+/// Firebase, AdMob, Hive and FCM permissions here too — all sequentially — which
+/// is what produced the `Davey! duration=1893ms` first frame and the
+/// "Skipped 189 frames" burst at start-up.
+Future<void> _initCritical(
+  ThemeProvider themeProvider,
+  LocaleProvider localeProvider,
+) async {
+  // Cheap, and picking the wrong theme/locale for one frame is a visible flash.
+  await _guard('preferences', () async {
+    await themeProvider.load();
+    await localeProvider.load();
+  });
 
+  // Synchronous and required before any Player is constructed.
+  _guardSync('media_kit', MediaKit.ensureInitialized);
 
+  // These are independent of each other, so run them concurrently instead of
+  // one after another.
+  await Future.wait([
+    // Music screens call AudioServiceInit.handler, so it must be up first.
+    _guard('audio_service', AudioServiceInit.init),
+    _guard('hive', () async {
+      await Hive.initFlutter();
+      if (!Hive.isBoxOpen('yt_cache')) {
+        await Hive.openBox('yt_cache');
+      }
+    }),
+    _guard('orientation', () async {
+      await SystemChrome.setPreferredOrientations(
+        [DeviceOrientation.portraitUp],
+      );
+    }),
+  ]);
+}
+
+/// Runs after the first frame. Nothing here blocks the UI.
+Future<void> _initDeferred() async {
+  await _guard('firebase', () async {
+    // Options come from android/app/google-services.json (processed by the
+    // com.google.gms.google-services Gradle plugin) instead of being hardcoded
+    // in source.
+    await Firebase.initializeApp();
+    FirebaseMessaging.onBackgroundMessage(firebaseMessagingBackgroundHandler);
+  });
+
+  await Future.wait([
+    _guard('ads', () async {
+      await MobileAds.instance.initialize();
+
+      // Device ids that should always receive test ads.
+      //
+      // Find a device's id in logcat — the SDK prints:
+      //   I/Ads: Use RequestConfiguration.Builder().setTestDeviceIds(
+      //            Arrays.asList("XXXXXXXX")) to get test ads on this device.
+      //
+      // Debug builds don't depend on this list (they use AdUnits' test unit
+      // ids), but it still matters for release/profile testing on a handset.
+      MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(
+          testDeviceIds: const [
+            'D55A05AC5F182B8B7343029E881273E8', // Samsung SM-A505F
+            '05B5C242534D4508DE3D9FF83044AED8', // (older dev device)
+          ],
+        ),
+      );
+
+      appOpenManager.init();
+    }),
+
+    // FCM permission prompt + token fetch; nothing on screen waits for it.
+    _guard('notifications', NotificationService().initNotifications),
+  ]);
+}
+
+Future<void> _guard(String label, Future<void> Function() body) async {
+  try {
+    await body();
+  } catch (e, st) {
+    debugPrint('⚠️ init "$label" failed: $e');
+    if (kDebugMode) debugPrint('$st');
+  }
+}
+
+void _guardSync(String label, void Function() body) {
+  try {
+    body();
+  } catch (e) {
+    debugPrint('⚠️ init "$label" failed: $e');
+  }
+}
 
 class MyApp extends StatefulWidget {
   const MyApp({super.key});
@@ -114,60 +177,51 @@ class MyApp extends StatefulWidget {
 }
 
 class _MyAppState extends State<MyApp> {
-  final RouteObserver<PageRoute> _routeObserver = RouteObserver<PageRoute>();
-
   @override
   void initState() {
     super.initState();
-    _openVideoIfNeeded();
-  }
-
-  Future<void> _openVideoIfNeeded() async {
-    final path = await VideoIntentService.getVideoPath();
-    if (path == null || path.isEmpty) return;
-    if (!mounted) return;
-
-    debugPrint('OPEN WITH PATH => $path');
-
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      navigatorKey.currentState?.push(
-        MaterialPageRoute(
-          builder: (_) => FullScreenVideoPlayerFixed(
-            videos: const [],
-            initialIndex: 0,
-            initialUrl: Uri.file(path).toString(),
-          ),
-        ),
-      );
-    });
+    // Only *fetch* the launch uri here. The splash screen opens it once Home is
+    // on the stack — pushing the player straight onto the splash route meant
+    // backing out of the video left the user staring at a dead splash screen,
+    // and the splash's own pushReplacement then destroyed the player route.
+    if (Platform.isAndroid) {
+      VideoIntentService.fetchLaunchUri();
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Portal(
-      child: Provider.value(
-        value: _routeObserver,
+      child: Provider<RouteObserver<PageRoute<dynamic>>>.value(
+        value: routeObserver,
         child: ScreenUtilInit(
           designSize: const Size(360, 690),
           minTextAdapt: true,
           splitScreenMode: true,
-          builder: (_, child) {
-            return Consumer<LocaleProvider>(
-              builder: (context, localeProvider, child) {
+          builder: (_, __) {
+            return Consumer2<ThemeProvider, LocaleProvider>(
+              builder: (context, theme, localeProvider, _) {
                 return MaterialApp(
                   debugShowCheckedModeBanner: false,
                   navigatorKey: navigatorKey,
-                  navigatorObservers: [_routeObserver],
-                  title: '',
-                  theme: Provider.of<ThemeProvider>(context).themeDataStyle,
+                  navigatorObservers: [routeObserver],
+                  title: 'Vidnexa Video Player',
+
+                  theme: theme.lightTheme,
+                  darkTheme: theme.darkTheme,
+                  themeMode: theme.themeMode,
+
                   locale: localeProvider.locale,
-                  supportedLocales: const [
-                    Locale('en', ''),
-                    Locale('hi', ''),
+                  supportedLocales: LocaleProvider.supported,
+                  localizationsDelegates: const [
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
                   ],
-                  home: const Scaffold(
-                    body: SplashScreen(),
-                  ),
+
+                  // SplashScreen already builds its own Scaffold — wrapping it
+                  // in another one nested two Scaffolds.
+                  home: const SplashScreen(),
                 );
               },
             );
@@ -192,53 +246,45 @@ class NotificationService {
       );
 
       if (kDebugMode) {
-        print('✅ Permission status: ${settings.authorizationStatus}');
+        debugPrint('✅ Permission status: ${settings.authorizationStatus}');
       }
 
       // ✅ Get token safely (SERVICE_NOT_AVAILABLE won't crash)
       final token = await _retryGetToken();
       if (kDebugMode) {
-        print('✅ FCM Token: $token');
+        debugPrint('✅ FCM Token: $token');
       }
 
       // ✅ Token refresh
       _firebaseMessaging.onTokenRefresh.listen((newToken) {
-        if (kDebugMode) print("🔁 FCM Token refreshed: $newToken");
+        if (kDebugMode) debugPrint('🔁 FCM Token refreshed: $newToken');
         // TODO: send to backend or save prefs
       });
 
       // ✅ Foreground message
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         if (kDebugMode) {
-          print('📩 Foreground message: ${message.messageId}');
-          print('📩 Title: ${message.notification?.title}');
-          print('📩 Body: ${message.notification?.body}');
-          print('📩 Data: ${message.data}');
+          debugPrint('📩 Foreground message: ${message.messageId}');
+          debugPrint('📩 Title: ${message.notification?.title}');
+          debugPrint('📩 Data: ${message.data}');
         }
-        // TODO: show local notification/snackbar if you want
       });
 
       // ✅ When user taps notification & opens app
       FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
         if (kDebugMode) {
-          print('👉 Notification opened: ${message.messageId}');
-          print('👉 Title: ${message.notification?.title}');
-          print('👉 Data: ${message.data}');
+          debugPrint('👉 Notification opened: ${message.messageId}');
+          debugPrint('👉 Data: ${message.data}');
         }
-        // TODO: navigate based on message.data
       });
 
       // ✅ If app was terminated and opened by notification
       final initialMessage = await _firebaseMessaging.getInitialMessage();
       if (initialMessage != null && kDebugMode) {
-        print('🚀 Opened from terminated: ${initialMessage.messageId}');
-        print('🚀 Data: ${initialMessage.data}');
+        debugPrint('🚀 Opened from terminated: ${initialMessage.messageId}');
       }
-    } catch (e, st) {
-      if (kDebugMode) {
-        print("❌ FCM init failed: $e");
-        print(st);
-      }
+    } catch (e) {
+      debugPrint('❌ FCM init failed: $e');
       // Don't crash app
     }
   }
@@ -250,7 +296,7 @@ class NotificationService {
         final t = await _firebaseMessaging.getToken();
         if (t != null && t.isNotEmpty) return t;
       } catch (e) {
-        if (kDebugMode) print("⚠️ getToken failed, retry in ${s}s: $e");
+        if (kDebugMode) debugPrint('⚠️ getToken failed, retry in ${s}s: $e');
         await Future.delayed(Duration(seconds: s));
       }
     }

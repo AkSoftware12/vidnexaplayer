@@ -1,8 +1,7 @@
 import 'dart:io';
 import 'dart:ui';
-import 'package:advanced_in_app_review/advanced_in_app_review.dart';
-import 'package:advanced_in_app_review/in_app_review_manager.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -11,12 +10,12 @@ import 'package:new_version_plus/new_version_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:videoplayer/Photo/image_album.dart';
 import 'package:videoplayer/Utils/color.dart';
-import '../../DarkMode/dark_mode.dart';
+import 'package:videoplayer/Utils/internet_banner.dart';
+import 'package:videoplayer/Utils/rating_popup.dart';
 import '../../DeviceSpace/device_space.dart';
 import '../../LocalMusic/MiniPlayer/mini_player.dart';
 import '../../NetWork Stream/stream_video.dart';
@@ -25,11 +24,10 @@ import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
 import '../../SplashScreen/splash_screen.dart';
 import '../../StatusSaverScreen/whatsapp_download.dart';
-import '../../Utils/rating_popup.dart';
 import '../../Utils/textSize.dart';
 import '../../ads/app_open_ad_manager.dart';
 import '../../app_store/app_store.dart';
-import '../HomeScreen/home2.dart' hide navigatorKey;
+import '../HomeScreen/home2.dart';
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
 import '../YoutubeScreen/playlists_screen.dart';
@@ -45,40 +43,61 @@ class HomeBottomNavigation extends StatefulWidget {
 
 class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   final GlobalKey<CustomBottomBarState> bottomNavigationKey =
-      GlobalKey<CustomBottomBarState>();
-  final AdvancedInAppReview _review = AdvancedInAppReview();
+  GlobalKey<CustomBottomBarState>();
   final appOpenManager = AppOpenAdManager();
-
-
-
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int currentPage = 0;
   String currentVersion = '';
-  String release = "";
+
+  /// Guards against stacking exit dialogs on rapid back presses.
+  bool _exitDialogOpen = false;
+
   String? userName;
   String userImage = "";
 
-  // GlobalKey bottomNavigationKey = GlobalKey();
+  // ================= EXIT DIALOG AD =================
+  /// Banner ad shown inside the exit confirmation dialog.
+  /// Loaded up-front in [initState] so it is ready the moment the
+  /// user presses back — loading it lazily would show a blank space.
+  BannerAd? _exitBannerAd;
+  bool _isExitAdLoaded = false;
 
-  void _toggleTheme(BuildContext context) async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool isDarkMode = !(prefs.getBool('isDarkMode') ?? false);
-    prefs.setBool('isDarkMode', isDarkMode);
-    (context as Element).markNeedsBuild();
+  void _loadExitAd() {
+    _exitBannerAd = BannerAd(
+      // TODO: Google TEST ad unit ID — release se pehle apni real ID lagana!
+      adUnitId: 'ca-app-pub-3940256099942544/6300978111',
+      size: AdSize.mediumRectangle, // 300x250 — dialog ke liye best fit
+      request: const AdRequest(),
+      listener: BannerAdListener(
+        onAdLoaded: (ad) {
+          if (!mounted) return;
+          setState(() => _isExitAdLoaded = true);
+        },
+        onAdFailedToLoad: (ad, error) {
+          debugPrint('Exit banner failed: $error');
+          ad.dispose();
+          _exitBannerAd = null;
+          _isExitAdLoaded = false;
+        },
+      ),
+    )..load();
   }
+  // ==================================================
 
-
+  // NOTE: the old `_toggleTheme()` here was dead code that only wrote a
+  // SharedPreferences flag and called `markNeedsBuild()` — it never told
+  // ThemeProvider anything, so nothing on screen changed. The working toggle
+  // lives in Home/Me/me.dart and goes through ThemeProvider.toggleTheme().
 
   @override
   void initState() {
     super.initState();
-    appOpenManager.init();
 
-
-    checkForVersion(context);
+    checkForVersion();
 
     _getUsername();
+    _loadExitAd(); // 👈 exit dialog ka ad pehle se load
     currentPage = widget.bottomIndex;
 
     final newVersion = NewVersionPlus(
@@ -90,154 +109,239 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
 
     advancedStatusCheck(newVersion);
 
-    // ✅ Rating popup (auto conditions) - safest place
+    // ⭐ Rating prompt now lives HERE (on the home screen) as a bottom sheet,
+    // instead of on the splash screen. A small delay lets the home settle (and
+    // any update dialog resolve) before the sheet slides up.
     WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(milliseconds: 900));
       if (!mounted) return;
-
-      // update dialog ko chance dene ke liye
-      await Future.delayed(const Duration(seconds: 2));
-      if (!mounted) return;
-
-      _review
-          .setMinDaysBeforeRemind(15)     // remind after 15 days
-          .setMinDaysAfterInstall(2)      // install ke 2 days baad
-          .setMinLaunchTimes(5)           // 5 launches ke baad
-          .setMinSecondsBeforeShowDialog(4) // conditions met => 4 sec wait
-          .monitor();                     // ✅ auto trigger
+      await RatingPopup.onAppOpen(context);
     });
   }
 
   @override
   void dispose() {
-    appOpenManager.dispose();
+    _exitBannerAd?.dispose();
     super.dispose();
-
-  }
-
-  basicStatusCheck(NewVersionPlus newVersion) async {
-    final version = await newVersion.getVersionStatus();
-    if (version != null) {
-      release = version.releaseNotes ?? "";
-      setState(() {});
-    }
-    newVersion.showAlertIfNecessary(
-      context: context,
-      launchModeVersion: LaunchModeVersion.external,
-    );
   }
 
   Future<void> advancedStatusCheck(NewVersionPlus newVersion) async {
-    final status = await newVersion.getVersionStatus();
-    if (status != null) {
-      debugPrint(status.releaseNotes);
-      debugPrint(status.appStoreLink);
-      debugPrint(status.localVersion);
-      debugPrint(status.storeVersion);
-      debugPrint(status.canUpdate.toString());
+    try {
+      final status = await newVersion.getVersionStatus();
+      if (status == null || !status.canUpdate) return;
 
-      if (status.canUpdate) {
-        // Show the custom dialog instead of the default showUpdateDialog
-        showDialog(
-          context: navigatorKey.currentContext!,
-          barrierDismissible: false, // Matches allowDismissal: false
-          builder: (BuildContext context) {
-            return CustomUpgradeDialog(currentVersion: status.localVersion, newVersion: status.storeVersion, releaseNotes: [status.releaseNotes.toString()],);
-          },
-        );
-      }
+      // Use our own State's context — it is guaranteed to be mounted here.
+      // (The old code used a navigatorKey that was never attached to any
+      //  Navigator, so `currentContext!` threw as soon as an update existed.)
+      if (!mounted) return;
+
+      await showDialog<void>(
+        context: context,
+        barrierDismissible: false,
+        builder: (_) => CustomUpgradeDialog(
+          currentVersion: status.localVersion,
+          newVersion: status.storeVersion,
+          releaseNotes: [
+            if (status.releaseNotes != null &&
+                status.releaseNotes!.trim().isNotEmpty)
+              status.releaseNotes!.trim()
+            else
+              'Bug fixes and performance improvements.',
+          ],
+        ),
+      );
+    } catch (e) {
+      debugPrint('Update check failed: $e');
     }
   }
-  Future<void> checkForVersion(BuildContext context) async {
-    PackageInfo packageInfo = await PackageInfo.fromPlatform();
-    currentVersion = packageInfo.version;
+
+  Future<void> checkForVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => currentVersion = packageInfo.version);
+    } catch (e) {
+      debugPrint('PackageInfo failed: $e');
+    }
   }
 
-  // Handle back button press
-  Future<bool> _onWillPop() async {
-    return (await showDialog(
+  /// Shows the "exit app?" confirmation with a bounce-in animation,
+  /// blurred backdrop and a banner ad inside the dialog.
+  ///
+  /// Called from [PopScope.onPopInvokedWithResult]; `WillPopScope` is never
+  /// invoked with `android:enableOnBackInvokedCallback="true"` (Android 13+),
+  /// which is why the dialog stopped appearing.
+  Future<bool> _confirmExit() async {
+    return (await showGeneralDialog<bool>(
       context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
-        ),
-        backgroundColor: Colors.white,
-        contentPadding: EdgeInsets.zero,
-        content: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                HexColor('#3b82f6'),
-                ColorSelect.maineColor,
-              ],
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-            ),
-            borderRadius: BorderRadius.circular(20),
+      barrierDismissible: true,
+      barrierLabel: 'Exit',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 450),
+      pageBuilder: (context, anim1, anim2) => const SizedBox.shrink(),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        // Elastic bounce + fade + background blur
+        final curvedValue = Curves.easeOutBack.transform(animation.value);
+        return BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: 5 * animation.value,
+            sigmaY: 5 * animation.value,
           ),
-          padding: EdgeInsets.all(20.sp),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                'Exit App',
-                style: GoogleFonts.openSans(
-                  textStyle: TextStyle(
-                    color: Colors.white,
-                    fontSize: TextSizes.textlarge,
-                    fontWeight: FontWeight.bold,
-                  ),
+          child: Transform.scale(
+            scale: curvedValue,
+            child: Opacity(
+              opacity: animation.value.clamp(0.0, 1.0),
+              child: _buildExitDialog(context),
+            ),
+          ),
+        );
+      },
+    )) ??
+        false;
+  }
+
+  /// Clean white exit dialog — white background, black text,
+  /// subtle border, red Exit button. Sirf ye method replace karo.
+  Widget _buildExitDialog(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: EdgeInsets.symmetric(horizontal: 24.sp),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(24),
+          // Subtle grey border for clean outline
+          border: Border.all(
+            color: Colors.black.withValues(alpha: 0.12),
+            width: 1.5,
+          ),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.25),
+              blurRadius: 30,
+              offset: const Offset(0, 12),
+            ),
+          ],
+        ),
+        padding: EdgeInsets.all(18.sp),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // Icon in soft red circle
+            Container(
+              padding: EdgeInsets.all(12.sp),
+              decoration: BoxDecoration(
+                color: Colors.redAccent.withValues(alpha: 0.1),
+                shape: BoxShape.circle,
+                border: Border.all(
+                  color: Colors.redAccent.withValues(alpha: 0.35),
+                  width: 1.2,
                 ),
               ),
-              SizedBox(height: 10.sp),
-              Text(
-                'Are you sure you want to exit the app?',
-                style: GoogleFonts.openSans(
-                  textStyle: TextStyle(
-                    color: Colors.white70,
-                    fontSize: TextSizes.textmedium,
+              child: Icon(
+                Icons.power_settings_new_rounded,
+                color: Colors.redAccent,
+                size: 28.sp,
+              ),
+            ),
+            SizedBox(height: 12.sp),
+
+            Text(
+              'Exit App',
+              style: GoogleFonts.openSans(
+                textStyle: TextStyle(
+                  color: Colors.black,
+                  fontSize: TextSizes.textlarge,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 1.2,
+                ),
+              ),
+            ),
+            SizedBox(height: 6.sp),
+            Text(
+              'Are you sure you want to exit the app?',
+              style: GoogleFonts.openSans(
+                textStyle: TextStyle(
+                  color: Colors.black54,
+                  fontSize: TextSizes.textmedium,
+                ),
+              ),
+              textAlign: TextAlign.center,
+            ),
+
+            // Thin divider line for clean look
+            Padding(
+              padding: EdgeInsets.symmetric(vertical: 12.sp),
+              child: Divider(
+                color: Colors.black.withValues(alpha: 0.08),
+                thickness: 1,
+                height: 1,
+              ),
+            ),
+
+            // ============ AD SECTION ============
+            if (_isExitAdLoaded && _exitBannerAd != null) ...[
+              Container(
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: Colors.black.withValues(alpha: 0.1),
+                    width: 1,
                   ),
                 ),
-                textAlign: TextAlign.center,
+                clipBehavior: Clip.antiAlias,
+                width: _exitBannerAd!.size.width.toDouble(),
+                height: _exitBannerAd!.size.height.toDouble(),
+                child: AdWidget(ad: _exitBannerAd!),
               ),
-              SizedBox(height: 20.sp),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  ElevatedButton(
-                    style: ElevatedButton.styleFrom(
+              SizedBox(height: 16.sp),
+            ],
+            // ====================================
+
+            Row(
+              children: [
+                // Cancel — outlined, white bg, black border & text
+                Expanded(
+                  child: OutlinedButton(
+                    style: OutlinedButton.styleFrom(
                       backgroundColor: Colors.white,
-                      foregroundColor: Colors.purple,
+                      side: BorderSide(
+                        color: Colors.black.withValues(alpha: 0.3),
+                        width: 1.4,
+                      ),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 20.sp,
-                        vertical: 10.sp,
-                      ),
+                      padding: EdgeInsets.symmetric(vertical: 11.sp),
                     ),
                     onPressed: () => Navigator.of(context).pop(false),
                     child: Text(
                       'Cancel',
                       style: GoogleFonts.openSans(
                         textStyle: TextStyle(
-                          color: Colors.purple,
+                          color: Colors.black87,
                           fontSize: TextSizes.textmedium,
                           fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
                   ),
-                  ElevatedButton(
+                ),
+                SizedBox(width: 10.sp),
+                // Exit — solid RED bg, white text
+                Expanded(
+                  child: ElevatedButton(
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.redAccent,
                       foregroundColor: Colors.white,
+                      elevation: 6,
+                      shadowColor: Colors.redAccent.withValues(alpha: 0.4),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+                        borderRadius: BorderRadius.circular(14),
                       ),
-                      padding: EdgeInsets.symmetric(
-                        horizontal: 20.sp,
-                        vertical: 10.sp,
-                      ),
+                      padding: EdgeInsets.symmetric(vertical: 11.sp),
                     ),
                     onPressed: () => Navigator.of(context).pop(true),
                     child: Text(
@@ -246,30 +350,50 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                         textStyle: TextStyle(
                           color: Colors.white,
                           fontSize: TextSizes.textmedium,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w800,
+                          letterSpacing: 0.5,
                         ),
                       ),
                     ),
                   ),
-                ],
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
+          ],
         ),
       ),
-    )) ??
-        false;
+    );
   }
-
   @override
   Widget build(BuildContext context) {
-    final themeProvider = Provider.of<ThemeProvider>(context);
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       Provider.of<AppBarColorProvider>(context, listen: false).loadColor();
     });
 
-    return WillPopScope(
-      onWillPop: _onWillPop,
+    return PopScope(
+      // Block the automatic pop so we can ask first.
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        if (_exitDialogOpen) return; // ignore repeated back presses
+        _exitDialogOpen = true;
+
+        final bool shouldExit;
+        try {
+          shouldExit = await _confirmExit();
+        } finally {
+          _exitDialogOpen = false;
+        }
+
+        if (!shouldExit) return;
+
+        // This screen is the ROOT route (splash used pushReplacement), so
+        // `Navigator.pop()` has nothing to pop back to — it either no-ops or
+        // leaves a black screen. `SystemNavigator.pop()` is what actually
+        // hands control back to Android and closes the app.
+        await SystemNavigator.pop();
+      },
       child: Scaffold(
         key: _scaffoldKey,
         // Assign the key to the Scaffold
@@ -376,7 +500,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
           ),
         ),
 
-        body:Stack(
+        body: Stack(
           children: [
             Container(
               decoration: BoxDecoration(color: Colors.white),
@@ -385,8 +509,13 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
               ),
             ),
 
-
-
+            // 🌐 Internet on/off banner — floats at the top, non-blocking.
+            const Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: InternetStatusBanner(),
+            ),
           ],
         ),
 
@@ -418,7 +547,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
             width: MediaQuery.sizeOf(context).width * .7,
             // backgroundColor: ColorSelect.maineColor,
             child: SettingsScreen(
-              user: userName??'User Name',
+              user: userName ?? 'User Name',
               userImage: userImage, currentVersion: currentVersion,
             )),
       ),
@@ -429,8 +558,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     switch (page) {
       case 0:
         return DemoHomeScreen();
-      // case 1:
-      //   return Container();
+    // case 1:
+    //   return Container();
       case 1:
         return OfflineMusicTabScreen();
       case 2:
@@ -449,8 +578,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       userName = name;
     });
   }
-
-
 }
 
 class CustomBottomBar extends StatefulWidget {
@@ -508,7 +635,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
       ),
       items: [
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/home.svg',color: Colors.grey,height: 20,width: 20,),
+          icon: SvgPicture.asset('assets/home.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
           label: 'Home',
 
           activeIcon: Container(
@@ -520,7 +647,8 @@ class CustomBottomBarState extends State<CustomBottomBar> {
             ),
             child: SvgPicture.asset(
               'assets/home.svg',
-              color: Colors.white,
+              colorFilter:
+              const ColorFilter.mode(Colors.white, BlendMode.srcIn),
               height: 20,width: 20,
             ),
 
@@ -528,7 +656,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
           ),
         ),
         // BottomNavigationBarItem(
-        //   icon: SvgPicture.asset('assets/downloader.svg',color: Colors.grey,height: 20,width: 20,),
+        //   icon: SvgPicture.asset('assets/downloader.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
         //   label: 'Downloader',
         //   activeIcon: Container(
         //     padding: EdgeInsets.all(5.sp),
@@ -548,7 +676,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
         // ),
 
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/music.svg',color: Colors.grey,height: 20,width: 20,),
+          icon: SvgPicture.asset('assets/music.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
           label: 'Music',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -558,13 +686,14 @@ class CustomBottomBarState extends State<CustomBottomBar> {
             ),
             child: SvgPicture.asset(
               'assets/music.svg',
-              color: Colors.white,
+              colorFilter:
+              const ColorFilter.mode(Colors.white, BlendMode.srcIn),
               height: 20,width: 20,
             ),
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/online_video.svg',color: Colors.grey,height: 20,width: 20,),
+          icon: SvgPicture.asset('assets/online_video.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
           label: 'Online',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -575,13 +704,14 @@ class CustomBottomBarState extends State<CustomBottomBar> {
             ),
             child: SvgPicture.asset(
               'assets/online_video.svg',
-              color: Colors.white,
+              colorFilter:
+              const ColorFilter.mode(Colors.white, BlendMode.srcIn),
               height: 20,width: 20,
             ),
           ),
         ),
         BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/account.svg',color: Colors.grey,height: 20,width: 20,),
+          icon: SvgPicture.asset('assets/account.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
           label: 'Profile',
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
@@ -592,7 +722,8 @@ class CustomBottomBarState extends State<CustomBottomBar> {
             ),
             child: SvgPicture.asset(
               'assets/account.svg',
-              color: Colors.white,
+              colorFilter:
+              const ColorFilter.mode(Colors.white, BlendMode.srcIn),
               height: 20,width: 20,
             ),
 
@@ -603,11 +734,6 @@ class CustomBottomBarState extends State<CustomBottomBar> {
     );
   }
 }
-
-
-
-
-
 
 class SettingsScreen extends StatefulWidget {
   final String user;
@@ -822,7 +948,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     iconWidget: SvgPicture.asset(
                       'assets/privacy.svg',
-                      color: Colors.white,
+                      colorFilter: const ColorFilter.mode(
+                        Colors.white,
+                        BlendMode.srcIn,
+                      ),
                       width: 15.w,
                       height: 15.w,
                     ),
@@ -894,9 +1023,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: 'Share App',
                     subtitle: 'Invite your friends',
                     onTap: () {
-                      Share.share(
-                        'Check out this Vidnexa Video Player App: https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer&pcampaignid=web_share',
-                        subject: 'Download this App',
+                      SharePlus.instance.share(
+                        ShareParams(
+                          text:
+                          'Check out this Vidnexa Video Player App: https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer&pcampaignid=web_share',
+                          subject: 'Download this App',
+                        ),
                       );
                     },
                   ),
@@ -933,7 +1065,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 borderRadius: BorderRadius.circular(10.r),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.05),
+                    color: Colors.black.withValues(alpha: 0.05),
                     blurRadius: 8,
                     offset: const Offset(0, 3),
                   ),
@@ -967,7 +1099,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xff7C3AED).withOpacity(0.18),
+            color: const Color(0xff7C3AED).withValues(alpha: 0.18),
             blurRadius: 12,
             offset: const Offset(0, 6),
           ),
@@ -982,7 +1114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           )
               : CircleAvatar(
             radius: 22.r,
-            backgroundColor: Colors.white.withOpacity(0.18),
+            backgroundColor: Colors.white.withValues(alpha: 0.18),
             child: Icon(
               Icons.person,
               size: 22.sp,
@@ -995,9 +1127,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  (user.name != null && user.name!.trim().isNotEmpty)
-                      ? user.name!
-                      : 'User',
+                  // `user.name` is non-nullable, so the old null check and `!`
+                  // were dead code — only the emptiness check matters.
+                  user.name.trim().isNotEmpty ? user.name : 'User',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.radioCanada(
@@ -1059,7 +1191,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         borderRadius: BorderRadius.circular(14.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.035),
+            color: Colors.black.withValues(alpha: 0.035),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -1134,7 +1266,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         borderRadius: BorderRadius.circular(14.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.035),
+            color: Colors.black.withValues(alpha: 0.035),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -1202,7 +1334,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         borderRadius: BorderRadius.circular(14.r),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.035),
+            color: Colors.black.withValues(alpha: 0.035),
             blurRadius: 8,
             offset: const Offset(0, 3),
           ),
@@ -1272,7 +1404,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(14.r),
                     color: isSelected
-                        ? (theme["color"] as Color).withOpacity(0.12)
+                        ? (theme["color"] as Color).withValues(alpha: 0.12)
                         : Colors.transparent,
                     border: Border.all(
                       color: isSelected
@@ -1315,709 +1447,3 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 }
-
-// class SettingsScreen extends StatelessWidget {
-//   final String user;
-//   final String userImage;
-//   final String currentVersion;
-//   final TextSizes textSizes = TextSizes();
-//
-//   SettingsScreen({
-//     super.key,
-//     required this.user,
-//     required this.userImage,
-//     required this.currentVersion,
-//   });
-//
-//   @override
-//   Widget build(BuildContext context) {
-//     final user = Provider.of<UserModel>(context);
-//     final InAppReviewManager _mgr = InAppReviewManager();
-//
-//
-//     return Scaffold(
-//       body: Column(
-//         children: [
-//           SizedBox(height: 30.sp),
-//           Row(
-//             mainAxisAlignment: MainAxisAlignment.spaceBetween,
-//             children: [
-//               SizedBox(
-//                   height: 50.sp,
-//                   child: Image.asset('assets/logo_blue_text.png')),
-//               Padding(
-//                 padding: EdgeInsets.only(right: 10.sp),
-//                 child: GestureDetector(
-//                   onTap: () {
-//                     Navigator.of(context).pop();
-//                   },
-//                   child: Icon(
-//                     Icons.close,
-//
-//                     // FontAwesomeIcons.xmark,
-//                     color: Colors.black54,
-//                     size: 22.sp,
-//                   ),
-//                 ),
-//               ),
-//             ],
-//           ),
-//           SizedBox(height: 0.sp),
-//           Container(
-//             color: Colors.white,
-//             child: Padding(
-//               padding: EdgeInsets.all(10.sp),
-//               child: Container(
-//                 width: double.infinity,
-//                 decoration: BoxDecoration(
-//                   borderRadius: BorderRadius.circular(12),
-//                   gradient: LinearGradient(
-//                     colors: [
-//                       HexColor('#3b82f6'),
-//                       Colors.purple,
-//                     ],
-//                     begin: Alignment.topLeft,
-//                     end: Alignment.bottomRight,
-//                   ),
-//                 ),
-//                 padding: EdgeInsets.all(10.sp),
-//                 child: Row(
-//                   children: [
-//                     ClipOval(
-//                       child: Container(
-//                         width: 50.sp,
-//                         height: 50.sp,
-//                         decoration: BoxDecoration(
-//                           shape: BoxShape.circle,
-//                         ),
-//                         child:user.imagePath != null
-//                             ? CircleAvatar(
-//                           radius: 60,
-//                           backgroundImage: FileImage(File(user.imagePath!)),
-//                         )
-//                             : const CircleAvatar(
-//                           radius: 60,
-//                           child: Icon(Icons.person, size: 60),
-//                         )),
-//                       ),
-//
-//                     SizedBox(width: 10.sp),
-//                     Expanded(
-//                       child: Column(
-//                         mainAxisAlignment: MainAxisAlignment.start,
-//                         crossAxisAlignment: CrossAxisAlignment.start,
-//                         children: [
-//                           user.name != null
-//                               ? Text.rich(
-//                             TextSpan(
-//                               text: user.name,
-//                               style: GoogleFonts.radioCanada(
-//                                 textStyle: TextStyle(
-//                                   color:
-//                                   Colors.white,
-//                                   fontSize: 17.sp,
-//                                   // Adjust font size as needed
-//                                   fontWeight:
-//                                   FontWeight
-//                                       .bold, // Adjust font weight as needed
-//                                 ),
-//                               ),
-//                             ),
-//                             textAlign:
-//                             TextAlign
-//                                 .start, // Ensure text starts at the beginning
-//                           )
-//                               : Text.rich(
-//                             TextSpan(
-//                               text: 'User',
-//                               style: GoogleFonts.radioCanada(
-//                                 textStyle: TextStyle(
-//                                   color:
-//                                   Theme.of(
-//                                     context,
-//                                   ).colorScheme.secondary,
-//                                   fontSize: 17.sp,
-//                                   // Adjust font size as needed
-//                                   fontWeight:
-//                                   FontWeight
-//                                       .bold, // Adjust font weight as needed
-//                                 ),
-//                               ),
-//                             ),
-//                             textAlign:
-//                             TextAlign
-//                                 .start, // Ensure text starts at the beginning
-//                           ),
-//
-//                           Text(
-//                             'Premium Member',
-//                             style: GoogleFonts.radioCanada(
-//                               textStyle: TextStyle(
-//                                 color: Colors.white,
-//                                 fontSize: TextSizes.textsmall,
-//                                 fontWeight: FontWeight.bold,
-//                               ),
-//                             ),
-//                           ),
-//                         ],
-//                       ),
-//                     ),
-//                   ],
-//                 ),
-//               ),
-//             ),
-//           ),
-//           Divider(
-//             thickness: 2.sp,
-//             color: Colors.grey,
-//           ),
-//           Expanded(
-//             child: ListView(
-//               padding: EdgeInsets.zero,
-//               children: <Widget>[
-//
-//                 // Drawer List
-//                 ListTile(
-//                   leading: Container(
-//                     decoration: BoxDecoration(
-//                       borderRadius: BorderRadius.circular(12),
-//                       gradient: LinearGradient(
-//                         colors: [
-//                           HexColor('#800000'),
-//                           HexColor('#800000'),
-//                         ],
-//                         begin: Alignment.topLeft,
-//                         end: Alignment.bottomRight,
-//                       ),
-//                     ),
-//                     padding: EdgeInsets.all(10.sp),
-//                     child: Icon(
-//                       Icons.apps,
-//                       color: Colors.white,
-//                     ),
-//                   ),
-//                   title: Column(
-//                     mainAxisAlignment: MainAxisAlignment.start,
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Text(
-//                         'Dashboard',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.black,
-//                             fontSize: TextSizes.textmedium14,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       Text(
-//                         'Track Performance',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.grey,
-//                             fontSize: 9.sp,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                   onTap: () {
-//                     Navigator.of(context).pop();
-//                   },
-//                 ),
-//                 SizedBox(height: 10.sp),
-//                 // ListTile(
-//                 //   leading: Container(
-//                 //     height: 35.sp,
-//                 //     width: 35.sp,
-//                 //     decoration: BoxDecoration(
-//                 //       borderRadius: BorderRadius.circular(12),
-//                 //       gradient: LinearGradient(
-//                 //         colors: [
-//                 //           HexColor('#9A6324'),
-//                 //           HexColor('#9A6324'),
-//                 //         ],
-//                 //         begin: Alignment.topLeft,
-//                 //         end: Alignment.bottomRight,
-//                 //       ),
-//                 //     ),
-//                 //     padding: EdgeInsets.all(10.sp),
-//                 //     child: Image.asset('assets/videos_img.png'),
-//                 //   ),
-//                 //   title: Column(
-//                 //     mainAxisAlignment: MainAxisAlignment.start,
-//                 //     crossAxisAlignment: CrossAxisAlignment.start,
-//                 //     children: [
-//                 //       Text(
-//                 //         'All Videos',
-//                 //         style: GoogleFonts.openSans(
-//                 //           textStyle: TextStyle(
-//                 //             color: Colors.black,
-//                 //             fontSize: TextSizes.textmedium14,
-//                 //             fontWeight: FontWeight.bold,
-//                 //           ),
-//                 //         ),
-//                 //       ),
-//                 //       Text(
-//                 //         'View counts and analytics',
-//                 //         style: GoogleFonts.openSans(
-//                 //           textStyle: TextStyle(
-//                 //             color: Colors.grey,
-//                 //             fontSize: 9.sp,
-//                 //             fontWeight: FontWeight.bold,
-//                 //           ),
-//                 //         ),
-//                 //       ),
-//                 //     ],
-//                 //   ),
-//                 //   onTap: () async {
-//                 //     AdvancedInAppReview()
-//                 //         .setMinDaysBeforeRemind(0)
-//                 //         .setMinDaysAfterInstall(0)
-//                 //         .setMinLaunchTimes(1)
-//                 //         .setMinSecondsBeforeShowDialog(0)
-//                 //         .monitor();
-//                 //   },
-//                 // ),
-//                 // SizedBox(height: 10.sp),
-//                 ListTile(
-//                   leading: Container(
-//                     height: 35.sp,
-//                     width: 35.sp,
-//                     decoration: BoxDecoration(
-//                       borderRadius: BorderRadius.circular(12),
-//                       gradient: LinearGradient(
-//                         colors: [
-//                           HexColor('#808000'),
-//                           HexColor('#808000'),
-//                         ],
-//                         begin: Alignment.topLeft,
-//                         end: Alignment.bottomRight,
-//                       ),
-//                     ),
-//                     padding: EdgeInsets.all(10.sp),
-//                     child: Image.asset('assets/image-gallery.png'),
-//                   ),
-//                   title: Column(
-//                     mainAxisAlignment: MainAxisAlignment.start,
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Text(
-//                         'All Photos',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.black,
-//                             fontSize: TextSizes.textmedium14,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       Text(
-//                         'Captured Bliss',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.grey,
-//                             fontSize: 9.sp,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                   onTap: () {
-//                     Navigator.push(
-//                       context,
-//                       MaterialPageRoute(
-//                         builder: (context) => AlbumScreen(),
-//                       ),
-//                     );
-//                   },
-//                 ),
-//                 SizedBox(height: 10.sp),
-//                 ListTile(
-//                   leading: Container(
-//                     height: 35.sp,
-//                     width: 35.sp,
-//                     decoration: BoxDecoration(
-//                       borderRadius: BorderRadius.circular(12),
-//                       gradient: LinearGradient(
-//                         colors: [
-//                           HexColor('#911eb4'),
-//                           HexColor('#911eb4'),
-//                         ],
-//                         begin: Alignment.topLeft,
-//                         end: Alignment.bottomRight,
-//                       ),
-//                     ),
-//                     padding: EdgeInsets.all(10.sp),
-//                     child: Image.asset('assets/music_img.png'),
-//                   ),
-//                   title: Column(
-//                     mainAxisAlignment: MainAxisAlignment.start,
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Text(
-//                         'All Musics',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.black,
-//                             fontSize: TextSizes.textmedium14,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       Text(
-//                         'Melodic Echoes',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.grey,
-//                             fontSize: 9.sp,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                   onTap: () {
-//                     Navigator.push(
-//                       context,
-//                       MaterialPageRoute(
-//                         builder: (context) => const HomeBottomNavigation(
-//                           bottomIndex: 1,
-//                         ),
-//                       ),
-//                     );
-//                   },
-//                 ),
-//                 SizedBox(height: 10.sp),
-//                 ListTile(
-//                   leading: Container(
-//                     height: 35.sp,
-//                     width: 35.sp,
-//                     decoration: BoxDecoration(
-//                       borderRadius: BorderRadius.circular(12),
-//                       gradient: LinearGradient(
-//                         colors: [
-//                           HexColor('#4363d8'),
-//                           HexColor('#4363d8'),
-//                         ],
-//                         begin: Alignment.topLeft,
-//                         end: Alignment.bottomRight,
-//                       ),
-//                     ),
-//                     padding: EdgeInsets.all(10.sp),
-//                     child: Image.asset('assets/link.img.png'),
-//                   ),
-//                   title: Column(
-//                     mainAxisAlignment: MainAxisAlignment.start,
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Text(
-//                         'VidStream',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.black,
-//                             fontSize: TextSizes.textmedium14,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       Text(
-//                         'Instant Video, One Click Away',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.grey,
-//                             fontSize: 9.sp,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                   onTap: () {
-//                     Navigator.push(
-//                       context,
-//                       MaterialPageRoute(
-//                         builder: (context) => VideoPlayerStream(),
-//                       ),
-//                     );
-//                   },
-//                 ),
-//                 SizedBox(height: 10.sp),
-//                 ListTile(
-//                   leading: Container(
-//                     height: 35.sp,
-//                     width: 35.sp,
-//                     decoration: BoxDecoration(
-//                       borderRadius: BorderRadius.circular(12),
-//                       gradient: LinearGradient(
-//                         colors: [
-//                           HexColor('#469990'),
-//                           HexColor('#469990'),
-//                         ],
-//                         begin: Alignment.topLeft,
-//                         end: Alignment.bottomRight,
-//                       ),
-//                     ),
-//                     padding: EdgeInsets.all(10.sp),
-//                     child: Image.asset('assets/folder_img.png'),
-//                   ),
-//                   title: Column(
-//                     mainAxisAlignment: MainAxisAlignment.start,
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Text(
-//                         'File Manager',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.black,
-//                             fontSize: TextSizes.textmedium14,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       Text(
-//                         'All Files, Anywhere, Anytime',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.grey,
-//                             fontSize: 9.sp,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                   onTap: () {
-//                     Navigator.push(
-//                       context,
-//                       MaterialPageRoute(
-//                         builder: (context) => DeviceSpaceScreen(),
-//                       ),
-//                     );
-//                   },
-//                 ),
-//                 SizedBox(height: 10.sp),
-//                 ListTile(
-//                   leading: Container(
-//                     height: 35.sp,
-//                     width: 35.sp,
-//                     decoration: BoxDecoration(
-//                       borderRadius: BorderRadius.circular(12),
-//                       gradient: LinearGradient(
-//                         colors: [
-//                           HexColor('#dcbeff'),
-//                           HexColor('#dcbeff'),
-//                         ],
-//                         begin: Alignment.topLeft,
-//                         end: Alignment.bottomRight,
-//                       ),
-//                     ),
-//                     padding: EdgeInsets.all(0.sp),
-//                     child: Icon(Icons.notifications_none, color: Colors.white),
-//                   ),
-//                   title: Column(
-//                     mainAxisAlignment: MainAxisAlignment.start,
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Text(
-//                         'Notifications',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.black,
-//                             fontSize: TextSizes.textmedium14,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       Text(
-//                         'Stay Updated, Never Miss Out',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.grey,
-//                             fontSize: 9.sp,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                   onTap: () {
-//                     Navigator.push(
-//                       context,
-//                       MaterialPageRoute(
-//                         builder: (context) => NotificationScreen(),
-//                       ),
-//                     );
-//                   },
-//                 ),
-//
-//                 SizedBox(height: 10.sp),
-//                 ListTile(
-//                   leading: Container(
-//                     decoration: BoxDecoration(
-//                       borderRadius: BorderRadius.circular(12),
-//                       gradient: LinearGradient(
-//                         colors: [
-//                           HexColor('#334155'),
-//                           HexColor('#334155'),
-//                         ],
-//                         begin: Alignment.topLeft,
-//                         end: Alignment.bottomRight,
-//                       ),
-//                     ),
-//                     padding: EdgeInsets.all(10.sp),
-//                     child: SvgPicture.asset(
-//                       'assets/privacy.svg',
-//                       color: Colors.white,
-//                     ),
-//                   ),
-//                   title: Column(
-//                     mainAxisAlignment: MainAxisAlignment.start,
-//                     crossAxisAlignment: CrossAxisAlignment.start,
-//                     children: [
-//                       Text(
-//                         'Privacy',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.black,
-//                             fontSize: TextSizes.textmedium14,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       Text(
-//                         'Privacy & security',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.grey,
-//                             fontSize: 9.sp,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                   onTap: () async {
-//                     final Uri _url = Uri.parse('https://www.freeprivacypolicy.com/live/3a47e749-0364-44f5-8cc3-559f2cd90336');
-//                     if (!await launchUrl(_url, mode: LaunchMode.externalApplication)) {
-//                     throw 'Could not launch $_url';
-//                     }
-//                   },
-//                 ),
-//
-//                 SizedBox(height: 10.sp),
-//                 ListTile(
-//                   leading: Container(
-//                     height: 35.sp,
-//                     width: 35.sp,
-//                     decoration: BoxDecoration(
-//                       borderRadius: BorderRadius.circular(12),
-//                       color: Colors.blue.shade50,
-//                     ),
-//                     padding: EdgeInsets.all(10.sp),
-//                     child: Icon(Icons.share,
-//                         color: Colors.blue, size: 17.sp),
-//                   ),
-//                   title: Column(
-//                     mainAxisAlignment: MainAxisAlignment.start,
-//                     crossAxisAlignment:
-//                     CrossAxisAlignment.start,
-//                     children: [
-//                       Text(
-//                         'Share App',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.black,
-//                             fontSize: TextSizes.textmedium14,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                       Text(
-//                         'Invite your friends',
-//                         style: GoogleFonts.openSans(
-//                           textStyle: TextStyle(
-//                             color: Colors.grey,
-//                             fontSize: 9.sp,
-//                             fontWeight: FontWeight.bold,
-//                           ),
-//                         ),
-//                       ),
-//                     ],
-//                   ),
-//                   onTap: () {
-//                     Share.share(
-//                       'Check out this Vidnexa Video Player App: https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer&pcampaignid=web_share',
-//                       subject: 'Download this App',
-//                     );
-//                   },
-//                 ),
-//                 // Extra space at the bottom for better scrolling
-//               ],
-//             ),
-//           ),
-//
-//           Container(
-//             color: Colors.white,
-//             child: Padding(
-//               padding: EdgeInsets.all(3.sp),
-//               child: Container(
-//                 width: double.infinity,
-//                 decoration: BoxDecoration(
-//                   borderRadius: BorderRadius.circular(12),
-//                   // gradient: LinearGradient(
-//                   //   colors: [
-//                   //     // HexColor('#3b82f6'),
-//                   //     ColorSelect.maineColor,
-//                   //     ColorSelect.maineColor,
-//                   //   ],
-//                   //   begin: Alignment.topLeft,
-//                   //   end: Alignment.bottomRight,
-//                   // ),
-//                 ),
-//                 padding: EdgeInsets.all(3.sp),
-//                 child: Row(
-//                   mainAxisAlignment: MainAxisAlignment.center,
-//                   crossAxisAlignment: CrossAxisAlignment.center,
-//                   children: [
-//
-//
-//                     Expanded(
-//                       child: Column(
-//                         mainAxisAlignment: MainAxisAlignment.center,
-//                         crossAxisAlignment: CrossAxisAlignment.center,
-//                         children: [
-//                           SizedBox(
-//                               height: 25.sp,
-//                               child: Image.asset('assets/logo_blue_text.png',)),
-//
-//                           Padding(
-//                             padding:  EdgeInsets.only(left: 27.sp),
-//                             child: Text(
-//                               'Version : $currentVersion',
-//                               style: GoogleFonts.radioCanada(
-//                                 textStyle: TextStyle(
-//                                   color: Colors.grey,
-//                                   fontSize: 10.sp,
-//                                   fontWeight: FontWeight.w600,
-//                                 ),
-//                               ),
-//                             ),
-//                           ),
-//                         ],
-//                       ),
-//                     ),
-//                   ],
-//                 ),
-//               ),
-//             ),
-//           ),
-//           SizedBox(height: 20.sp),
-//         ],
-//       ),
-//     );
-//   }
-// }
-

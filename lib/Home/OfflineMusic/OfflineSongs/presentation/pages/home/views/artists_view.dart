@@ -93,7 +93,7 @@ class _ArtistsViewState extends State<ArtistsView> {
             return Center(
               child: Text(
                 "Nothing found!",
-                style: TextStyle(color: textColor.withOpacity(0.75)),
+                style: TextStyle(color: textColor.withValues(alpha:0.75)),
               ),
             );
           }
@@ -160,7 +160,7 @@ class _ArtistsViewState extends State<ArtistsView> {
                                   MaterialPageRoute(
                                     builder: (_) => ArtistPage(
                                       artist: artist,
-                                      color: Theme.of(context).colorScheme.background,
+                                      color: Theme.of(context).colorScheme.surface,
                                       colortext: Theme.of(context).colorScheme.secondary,
                                     ),
                                   ),
@@ -202,7 +202,7 @@ class _ArtistsViewState extends State<ArtistsView> {
         return Container(
           padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.92),
+            color: Colors.black.withValues(alpha:0.92),
             borderRadius: const BorderRadius.vertical(top: Radius.circular(22)),
           ),
           child: Column(
@@ -264,7 +264,7 @@ class _ArtistCard extends StatelessWidget {
     final songs = artist.numberOfTracks ?? 0;
 
     return Material(
-      color: Colors.white.withOpacity(1),
+      color: Colors.white.withValues(alpha:1),
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -272,18 +272,18 @@ class _ArtistCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withOpacity(0.06)),
+            border: Border.all(color: Colors.white.withValues(alpha:0.06)),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.white.withOpacity(1),
-                Colors.white.withOpacity(1),
+                Colors.white.withValues(alpha:1),
+                Colors.white.withValues(alpha:1),
               ],
             ),
             boxShadow: [
               BoxShadow(
-                color: Colors.black.withOpacity(0.22),
+                color: Colors.black.withValues(alpha:0.22),
                 blurRadius: 18,
                 offset: const Offset(0, 10),
               ),
@@ -300,7 +300,7 @@ class _ArtistCard extends StatelessWidget {
                   shape: BoxShape.circle,
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.25),
+                      color: Colors.black.withValues(alpha:0.25),
                       blurRadius: 16,
                       offset: const Offset(0, 10),
                     ),
@@ -315,7 +315,7 @@ class _ArtistCard extends StatelessWidget {
                         type: ArtworkType.ARTIST,
                         artworkFit: BoxFit.cover,
                         nullArtworkWidget: Container(
-                          color: Colors.white.withOpacity(0.08),
+                          color: Colors.white.withValues(alpha:0.08),
                           child: Image.asset('assets/music_folder.png', fit: BoxFit.cover),
                         ),
                       ),
@@ -327,7 +327,7 @@ class _ArtistCard extends StatelessWidget {
                             end: Alignment.bottomCenter,
                             colors: [
                               Colors.transparent,
-                              Colors.black.withOpacity(0.28),
+                              Colors.black.withValues(alpha:0.28),
                             ],
                           ),
                         ),
@@ -356,14 +356,14 @@ class _ArtistCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.10),
+                  color: Colors.white.withValues(alpha:0.10),
                   borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: Colors.white.withOpacity(0.08)),
+                  border: Border.all(color: Colors.white.withValues(alpha:0.08)),
                 ),
                 child: Text(
                   "$songs songs",
                   style: TextStyle(
-                    color: textColor.withOpacity(0.75),
+                    color: textColor.withValues(alpha:0.75),
                     fontWeight: FontWeight.w600,
                     fontSize: 12,
                   ),
@@ -398,27 +398,27 @@ class _SearchField extends StatelessWidget {
       child: Container(
         height: 35,
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.10),
+          color: Colors.white.withValues(alpha:0.10),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: Colors.white.withOpacity(0.08)),
+          border: Border.all(color: Colors.white.withValues(alpha:0.08)),
         ),
         child: TextField(
           controller: controller,
           onChanged: onChanged,
           style: TextStyle(color: textColor, fontSize: 13),
-          cursorColor: textColor.withOpacity(0.8),
+          cursorColor: textColor.withValues(alpha:0.8),
           decoration: InputDecoration(
             hintText: hint,
-            hintStyle: TextStyle(color: textColor.withOpacity(0.55)),
+            hintStyle: TextStyle(color: textColor.withValues(alpha:0.55)),
             border: InputBorder.none,
             prefixIcon: Icon(Icons.search_rounded,
-                color: textColor.withOpacity(0.75), size: 20),
+                color: textColor.withValues(alpha:0.75), size: 20),
             suffixIcon: controller.text.isEmpty
                 ? null
                 : IconButton(
               onPressed: onClear,
               icon: Icon(Icons.close_rounded,
-                  color: textColor.withOpacity(0.75), size: 18),
+                  color: textColor.withValues(alpha:0.75), size: 18),
             ),
             contentPadding: const EdgeInsets.symmetric(horizontal: 12),
           ),
@@ -442,7 +442,7 @@ class _SortButton extends StatelessWidget {
     return Card(
       color: ColorSelect.maineColor2,
       child: Material(
-        color: Colors.white.withOpacity(0.12),
+        color: Colors.white.withValues(alpha:0.12),
         borderRadius: BorderRadius.circular(14),
         child: InkWell(
           borderRadius: BorderRadius.circular(14),
@@ -492,7 +492,7 @@ class _SortTile extends StatelessWidget {
       title: Text(
         title,
         style: TextStyle(
-          color: Colors.white.withOpacity(selected ? 1 : 0.75),
+          color: Colors.white.withValues(alpha:selected ? 1 : 0.75),
           fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
         ),
       ),

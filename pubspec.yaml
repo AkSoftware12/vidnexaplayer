@@ -10,10 +10,15 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  # ✅ Required for localizationsDelegates (Material/Cupertino/Widgets in hi + en)
+  flutter_localizations:
+    sdk: flutter
 
   # ✅ Core Audio Stack
+  # NOTE: just_audio_background was removed — audio_service already provides the
+  # background/media-session layer and running both registers two competing
+  # foreground services with incompatible MediaItem types.
   just_audio: ^0.10.4
-  just_audio_background: ^0.0.1-beta.17
   audio_service: ^0.18.18
   audio_session: ^0.2.2
   on_audio_query_forked: ^2.9.1
@@ -64,14 +69,21 @@ dependencies:
   path_provider: ^2.1.5
   provider: ^6.1.5
   intl: ^0.20.2
+  # NOTE: `flutter_localization` was removed — it was never imported anywhere.
+  # Localization now goes through `flutter_localizations` (declared above).
   flutter_tts: ^4.2.3
   firebase_messaging: ^15.2.9
   device_info_plus: ^11.5.0
   android_content_provider: ^0.5.2
   share_plus: ^11.0.0
-  change_app_package_name: ^1.5.0
-  flutter_localization: ^0.3.3
   flutter_local_notifications: ^17.2.1
+  # ✅ Was imported by Home/YoutubeScreen/playlists_screen.dart but never declared
+  #    (it only resolved transitively — one upstream bump away from breaking).
+  http: ^1.2.2
+  # ✅ Salted SHA-256 hashing for the vault PIN (was stored in plaintext).
+  crypto: ^3.0.3
+  # ✅ Internet on/off detection for the connectivity banner.
+  connectivity_plus: ^6.1.0
 
   # ✅ UI Helpers
   iconsax: ^0.0.8
@@ -135,6 +147,8 @@ dev_dependencies:
     sdk: flutter
   flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.14.4
+  # ✅ Build-time tooling only — was in `dependencies`, which shipped it in the app.
+  change_app_package_name: ^1.5.0
 
 flutter_launcher_icons:
   android: "ic_launcher"
@@ -155,7 +169,8 @@ flutter_launcher_icons:
     image_path: "path/to/image.png"
 
 flutter:
-  generate: true
+  # `generate: true` was set without an l10n.yaml or any .arb files, so it had
+  # nothing to generate. Re-enable it together with a real l10n setup.
   uses-material-design: true
   assets:
     - assets/

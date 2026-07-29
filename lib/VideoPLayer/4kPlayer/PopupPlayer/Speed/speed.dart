@@ -207,19 +207,19 @@ class PlaybackSpeedDialog {
                                 borderRadius: BorderRadius.circular(12),
                                 gradient: LinearGradient(
                                   colors: [
-                                    Colors.white.withOpacity(0.15),
-                                    Colors.white.withOpacity(0.05),
+                                    Colors.white.withValues(alpha:0.15),
+                                    Colors.white.withValues(alpha:0.05),
                                   ],
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                 ),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.4),
+                                  color: Colors.white.withValues(alpha:0.4),
                                   width: 1.5,
                                 ),
                                 boxShadow: [
                                   BoxShadow(
-                                    color: Colors.black.withOpacity(0.4),
+                                    color: Colors.black.withValues(alpha:0.4),
                                     blurRadius: 8,
                                     offset: const Offset(0, 3),
                                   )
@@ -249,7 +249,7 @@ class PlaybackSpeedDialog {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: Colors.redAccent.withOpacity(0.6),
+                                  color: Colors.redAccent.withValues(alpha:0.6),
                                   width: 1.5,
                                 ),
                               ),

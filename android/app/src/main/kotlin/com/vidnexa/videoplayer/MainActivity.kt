@@ -1,19 +1,27 @@
 package com.vidnexa.videoplayer
 
 import android.content.Intent
-import android.net.Uri
 import android.os.Bundle
-import android.webkit.MimeTypeMap
-import io.flutter.embedding.android.FlutterActivity
+import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
-import java.io.File
-import java.io.FileOutputStream
 
-class MainActivity : FlutterActivity() {
+/// Extends [AudioServiceActivity] (not FlutterActivity) so that audio_service's
+/// media session keeps working while this activity is the real launcher entry
+/// point — that is what makes the "getVideoPath" MethodChannel reachable.
+class MainActivity : AudioServiceActivity() {
 
-    private val CHANNEL = "open_video_channel"
-    private var openedVideoPath: String? = null
+    private companion object {
+        const val CHANNEL = "open_video_channel"
+    }
+
+    /// Uri of the media the app was opened with, as a plain string.
+    /// We hand the raw `content://` / `file://` uri to Dart — media_kit can open
+    /// content uris directly, so there is no need to copy gigabytes into cache.
+    private var openedVideoUri: String? = null
+
+    /// Guards against replaying the same intent after a configuration change.
+    private var consumed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -22,40 +30,26 @@ class MainActivity : FlutterActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
+        setIntent(intent)
         handleIntent(intent)
     }
 
     private fun handleIntent(intent: Intent?) {
-        if (intent?.action == Intent.ACTION_VIEW) {
-            val uri = intent.data
-            openedVideoPath = uri?.let { copyUriToCache(it) }
+        if (intent?.action != Intent.ACTION_VIEW) return
+        val uri = intent.data ?: return
+
+        // Persist read access so the uri stays valid after the sending app dies.
+        try {
+            contentResolver.takePersistableUriPermission(
+                uri,
+                Intent.FLAG_GRANT_READ_URI_PERMISSION,
+            )
+        } catch (_: SecurityException) {
+            // Not a persistable grant (plain file:// or one-shot share) — fine.
         }
-    }
 
-    private fun copyUriToCache(uri: Uri): String? {
-        return try {
-            val inputStream = contentResolver.openInputStream(uri) ?: return null
-            val ext = getExtension(uri)
-            val outFile = File(cacheDir, "open_with_${System.currentTimeMillis()}.$ext")
-
-            FileOutputStream(outFile).use { output ->
-                inputStream.copyTo(output)
-            }
-
-            inputStream.close()
-            outFile.absolutePath
-        } catch (e: Exception) {
-            null
-        }
-    }
-
-    private fun getExtension(uri: Uri): String {
-        return try {
-            val mime = contentResolver.getType(uri)
-            MimeTypeMap.getSingleton().getExtensionFromMimeType(mime) ?: "mp4"
-        } catch (e: Exception) {
-            "mp4"
-        }
+        openedVideoUri = uri.toString()
+        consumed = false
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
@@ -64,7 +58,16 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .setMethodCallHandler { call, result ->
                 when (call.method) {
-                    "getVideoPath" -> result.success(openedVideoPath)
+                    "getVideoPath" -> {
+                        // Deliver once; a second call (e.g. after rotation) returns null
+                        // so the player is not pushed onto the stack twice.
+                        if (consumed) {
+                            result.success(null)
+                        } else {
+                            consumed = true
+                            result.success(openedVideoUri)
+                        }
+                    }
                     else -> result.notImplemented()
                 }
             }

@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -108,7 +107,7 @@ class FolderBottomSheet {
                 height: 4,
                 margin: EdgeInsets.only(bottom: 16.0),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withOpacity(0.2),
+                  color: Colors.blue.withValues(alpha:0.2),
                   borderRadius: BorderRadius.circular(8.0),
                 ),
               ),
@@ -203,7 +202,7 @@ class FolderBottomSheet {
       child: Container(
         padding: const EdgeInsets.all(5),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
+          color: color.withValues(alpha:0.1),
           borderRadius: BorderRadius.circular(20),
         ),
         child: Column(

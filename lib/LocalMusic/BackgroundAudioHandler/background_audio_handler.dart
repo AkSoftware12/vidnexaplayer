@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/foundation.dart';
 import 'package:just_audio/just_audio.dart';
 
 class BackgroundAudioHandler extends BaseAudioHandler
@@ -11,15 +12,41 @@ class BackgroundAudioHandler extends BaseAudioHandler
   Timer? _ticker;
   DateTime? _sleepEndAt;
 
+  // Kept so they can actually be cancelled — the old code subscribed without
+  // ever holding on to the subscriptions.
+  StreamSubscription<PlaybackEvent>? _eventSub;
+  StreamSubscription<int?>? _indexSub;
+
   BackgroundAudioHandler() {
-    _player.playbackEventStream.listen(_broadcastState);
+    _eventSub = _player.playbackEventStream.listen(
+      _broadcastState,
+      onError: (Object e, StackTrace st) {
+        // A decode error must not kill the whole media session.
+        debugPrint('Playback error: $e');
+        playbackState.add(
+          playbackState.value.copyWith(
+            processingState: AudioProcessingState.error,
+            playing: false,
+          ),
+        );
+      },
+    );
 
     // ✅ current item sync
-    _player.currentIndexStream.listen((index) {
+    _indexSub = _player.currentIndexStream.listen((index) {
       final q = queue.value;
       if (index == null || q.isEmpty || index >= q.length) return;
       mediaItem.add(q[index]);
     });
+  }
+
+  /// Releases the player and its subscriptions.
+  Future<void> shutdown() async {
+    await _eventSub?.cancel();
+    await _indexSub?.cancel();
+    _sleepTimer?.cancel();
+    _ticker?.cancel();
+    await _player.dispose();
   }
 
   // ---------------- Playlist ----------------
@@ -34,15 +61,16 @@ class BackgroundAudioHandler extends BaseAudioHandler
     // ✅ keep same length
     queue.add(List<MediaItem>.from(items));
 
-    final playlist = ConcatenatingAudioSource(children: sources);
+    final start = initialIndex.clamp(0, items.length - 1);
 
-    await _player.setAudioSource(
-      playlist,
-      initialIndex: initialIndex.clamp(0, items.length - 1),
+    // `ConcatenatingAudioSource` is deprecated in just_audio 0.10.
+    await _player.setAudioSources(
+      sources,
+      initialIndex: start,
       preload: true,
     );
 
-    mediaItem.add(items[initialIndex.clamp(0, items.length - 1)]);
+    mediaItem.add(items[start]);
 
     if (autoplay) {
       await _player.play();
@@ -166,20 +194,41 @@ class BackgroundAudioHandler extends BaseAudioHandler
   @override
   Future<void> seek(Duration position) => _player.seek(position);
 
+  /// Wraps to the first track at the end of the queue.
+  /// The old version silently did nothing on the last song, so the notification
+  /// "next" button appeared broken.
   @override
   Future<void> skipToNext() async {
+    final len = queue.value.length;
+    if (len == 0) return;
+
     if (_player.hasNext) {
       await _player.seekToNext();
-      await _player.play(); // ✅ ensure resume
+    } else {
+      await _player.seek(Duration.zero, index: 0);
     }
+    await _player.play();
   }
 
+  /// Standard media behaviour: restart the track if we're more than 3 seconds
+  /// in, otherwise go to the previous one (wrapping to the last).
   @override
   Future<void> skipToPrevious() async {
+    final len = queue.value.length;
+    if (len == 0) return;
+
+    if (_player.position > const Duration(seconds: 3)) {
+      await _player.seek(Duration.zero);
+      await _player.play();
+      return;
+    }
+
     if (_player.hasPrevious) {
       await _player.seekToPrevious();
-      await _player.play(); // ✅ ensure resume
+    } else {
+      await _player.seek(Duration.zero, index: len - 1);
     }
+    await _player.play();
   }
 
   @override

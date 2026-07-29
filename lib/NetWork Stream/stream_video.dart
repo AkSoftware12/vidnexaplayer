@@ -19,44 +19,48 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
   bool _isLoading = false;
 
   @override
-  void initState() {
-    super.initState();
-    appOpenManager.init();
-
-  }
-
-  @override
   void dispose() {
-    appOpenManager.dispose();
-
     _urlController.dispose();
     super.dispose();
   }
 
-  void _loadVideo() {
-    if (_urlController.text.isEmpty) {
-      _showSnackBar('Please enter a valid URL');
+  /// Accepts only well-formed absolute http(s)/rtsp/rtmp urls.
+  /// Previously any text at all was handed straight to the player.
+  static bool _isPlayableUrl(String raw) {
+    final uri = Uri.tryParse(raw);
+    if (uri == null || !uri.hasScheme || !uri.hasAuthority) return false;
+    const allowed = {'http', 'https', 'rtsp', 'rtmp', 'rtmps'};
+    return allowed.contains(uri.scheme.toLowerCase());
+  }
+
+  Future<void> _loadVideo() async {
+    final url = _urlController.text.trim();
+
+    if (url.isEmpty) {
+      _showSnackBar('Please enter a video URL');
+      return;
+    }
+    if (!_isPlayableUrl(url)) {
+      _showSnackBar('Enter a full URL, e.g. https://example.com/video.mp4');
       return;
     }
 
-    setState(() {
-      _isLoading = true;
-    });
+    setState(() => _isLoading = true);
 
-
-      Navigator.push(
+    await Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => FullScreenVideoPlayerFixed(
+        builder: (_) => FullScreenVideoPlayerFixed(
           videos: const [],
-          initialUrl: _urlController.text,),
+          initialUrl: url,
+        ),
       ),
-    ).then((_) {
-      setState(() {
-        _isLoading = false;
-      });
-    });
- }
+    );
+
+    // The user may have popped this screen too while the player was open.
+    if (!mounted) return;
+    setState(() => _isLoading = false);
+  }
 
   void _showSnackBar(String message) {
     ScaffoldMessenger.of(context).showSnackBar(

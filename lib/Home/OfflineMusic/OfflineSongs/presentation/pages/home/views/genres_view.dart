@@ -53,11 +53,10 @@ class _GenresViewState extends State<GenresView>
             }
 
             // 'Library' is empty.
-            if (item.data!.isEmpty)
+            if (item.data!.isEmpty) {
               return const Text("Nothing found!");
+            }
 
-            // You can use [item.data!] direct or you can create a:
-            List<GenreModel> songs = item.data!;
             return  ListView.builder(
               padding: EdgeInsets.zero,
               itemCount: item.data!.length,
@@ -76,7 +75,7 @@ class _GenresViewState extends State<GenresView>
                           MaterialPageRoute(
                             builder: (context) {
                               return GenrePage(genre: genre,
-                                color:  Theme.of(context).colorScheme.background, colortext: Theme.of(context).colorScheme.secondary,
+                                color:  Theme.of(context).colorScheme.surface, colortext: Theme.of(context).colorScheme.secondary,
                               );
                             },
                           ),
@@ -97,7 +96,7 @@ class _GenresViewState extends State<GenresView>
                           height: 48,
                           decoration: BoxDecoration(
                             borderRadius: BorderRadius.circular(10),
-                            color: Colors.grey.withOpacity(0.1),
+                            color: Colors.grey.withValues(alpha:0.1),
                           ),
                           child:  Icon(
                             Icons.music_note_outlined,color: widget.colortext,

@@ -1,10 +1,8 @@
 import 'dart:io';
 import 'package:file_manager/file_manager.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:photo_manager/photo_manager.dart';
-import '../Photo/image_album.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
 
 class DirectoryFolder extends StatelessWidget {
@@ -236,7 +234,7 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(30),
                 child: Container(
-                  color: Colors.black.withOpacity(0.55),
+                  color: Colors.black.withValues(alpha:0.55),
                   child: IconButton(
                     icon: const Icon(Icons.arrow_back, color: Colors.white),
                     onPressed: () => Navigator.pop(context),

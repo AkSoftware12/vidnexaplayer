@@ -25,7 +25,6 @@ class CustomVideoAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final media = MediaQuery.of(context);
     final barH = isLandscape ? 46.h : 45.h;
 
     return ClipRRect(
@@ -36,15 +35,15 @@ class CustomVideoAppBar extends StatelessWidget {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Colors.black.withOpacity(0.72),
-                Colors.black.withOpacity(0.28),
+                Colors.black.withValues(alpha:0.72),
+                Colors.black.withValues(alpha:0.28),
                 Colors.transparent,
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
             border: Border(
-              bottom: BorderSide(color: Colors.white.withOpacity(0.06)),
+              bottom: BorderSide(color: Colors.white.withValues(alpha:0.06)),
             ),
           ),
           child: SizedBox(
@@ -80,7 +79,7 @@ class CustomVideoAppBar extends StatelessWidget {
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.62),
+                          color: Colors.white.withValues(alpha:0.62),
                           fontSize: isLandscape ? 4.sp : 11.sp,
                           fontWeight: FontWeight.w600,
                         ),
@@ -130,11 +129,11 @@ class CustomVideoAppBar extends StatelessWidget {
               width: size,
               alignment: Alignment.center,
               decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.08),
-                border: Border.all(color: Colors.white.withOpacity(0.10)),
+                color: Colors.white.withValues(alpha:0.08),
+                border: Border.all(color: Colors.white.withValues(alpha:0.10)),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.25),
+                    color: Colors.black.withValues(alpha:0.25),
                     blurRadius: 16,
                     offset: const Offset(0, 6),
                   )
@@ -159,7 +158,7 @@ class CustomVideoAppBar extends StatelessWidget {
         context: context,
         barrierDismissible: true,
         barrierLabel: '',
-        barrierColor: Colors.black.withOpacity(0.35),
+        barrierColor: Colors.black.withValues(alpha:0.35),
         pageBuilder: (_, __, ___) {
           return Align(
             alignment: Alignment.centerRight,
@@ -265,13 +264,13 @@ class _PlaylistPanelState extends State<_PlaylistPanel> {
           decoration: BoxDecoration(
             gradient: LinearGradient(
               colors: [
-                Colors.black.withOpacity(0.74),
-                Colors.black.withOpacity(0.56),
+                Colors.black.withValues(alpha:0.74),
+                Colors.black.withValues(alpha:0.56),
               ],
               begin: Alignment.topCenter,
               end: Alignment.bottomCenter,
             ),
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
+            border: Border.all(color: Colors.white.withValues(alpha:0.08)),
           ),
           child: SafeArea(
             top: !widget.isLandscape,
@@ -307,7 +306,7 @@ class _PlaylistPanelState extends State<_PlaylistPanel> {
                           ),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.orange.withOpacity(0.22),
+                              color: Colors.orange.withValues(alpha:0.22),
                               blurRadius: 18,
                               offset: const Offset(0, 8),
                             )
@@ -334,7 +333,7 @@ class _PlaylistPanelState extends State<_PlaylistPanel> {
                             Text(
                               "${playingIndex + 1}/${widget.videos.length} playing", // ✅ updated
                               style: TextStyle(
-                                color: Colors.white.withOpacity(0.6),
+                                color: Colors.white.withValues(alpha:0.6),
                                 fontSize: 11,
                                 fontWeight: FontWeight.w600,
                                 decoration: TextDecoration.none,
@@ -350,15 +349,15 @@ class _PlaylistPanelState extends State<_PlaylistPanel> {
                           height: 38,
                           width: 38,
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.08),
+                            color: Colors.white.withValues(alpha:0.08),
                             borderRadius: BorderRadius.circular(999),
                             border: Border.all(
-                              color: Colors.white.withOpacity(0.10),
+                              color: Colors.white.withValues(alpha:0.10),
                             ),
                           ),
                           child: Icon(
                             Icons.close_rounded,
-                            color: Colors.white.withOpacity(0.9),
+                            color: Colors.white.withValues(alpha:0.9),
                             size: 20,
                           ),
                         ),
@@ -428,16 +427,16 @@ class _PlaylistTileNoThumb extends StatelessWidget {
       curve: Curves.easeOutCubic,
       margin: EdgeInsets.symmetric(vertical: 6.h),
       decoration: BoxDecoration(
-        color: isPlaying ? Colors.orange.withOpacity(0.13) : Colors.white.withOpacity(0.06),
+        color: isPlaying ? Colors.orange.withValues(alpha:0.13) : Colors.white.withValues(alpha:0.06),
         borderRadius: BorderRadius.circular(5),
         border: Border.all(
-          color: isPlaying ? Colors.orangeAccent.withOpacity(0.95) : Colors.white.withOpacity(0.06),
+          color: isPlaying ? Colors.orangeAccent.withValues(alpha:0.95) : Colors.white.withValues(alpha:0.06),
           width: 1.2,
         ),
         boxShadow: [
           if (isPlaying)
             BoxShadow(
-              color: Colors.orange.withOpacity(0.22),
+              color: Colors.orange.withValues(alpha:0.22),
               blurRadius: 18,
               offset: const Offset(0, 10),
             ),
@@ -462,15 +461,15 @@ class _PlaylistTileNoThumb extends StatelessWidget {
                     end: Alignment.bottomRight,
                   )
                       : LinearGradient(
-                    colors: [Colors.white.withOpacity(0.12), Colors.white.withOpacity(0.06)],
+                    colors: [Colors.white.withValues(alpha:0.12), Colors.white.withValues(alpha:0.06)],
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
                   ),
-                  border: Border.all(color: Colors.white.withOpacity(0.10)),
+                  border: Border.all(color: Colors.white.withValues(alpha:0.10)),
                 ),
                 child: Icon(
                   isPlaying ? Icons.play_arrow_rounded : Icons.videocam_rounded,
-                  color: isPlaying ? Colors.black : Colors.white.withOpacity(0.85),
+                  color: isPlaying ? Colors.black : Colors.white.withValues(alpha:0.85),
                   size: 26,
                 ),
               ),
@@ -484,7 +483,7 @@ class _PlaylistTileNoThumb extends StatelessWidget {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
-                        color: isPlaying ? Colors.orangeAccent : Colors.white.withOpacity(0.88),
+                        color: isPlaying ? Colors.orangeAccent : Colors.white.withValues(alpha:0.88),
                         fontWeight: isPlaying ? FontWeight.w800 : FontWeight.w700,
                         fontSize: 13.5,
                         decoration: TextDecoration.none,
@@ -494,7 +493,7 @@ class _PlaylistTileNoThumb extends StatelessWidget {
                     Text(
                       _formatDuration(entity.videoDuration),
                       style: TextStyle(
-                        color: Colors.white.withOpacity(0.55),
+                        color: Colors.white.withValues(alpha:0.55),
                         fontSize: 10.5,
                         fontWeight: FontWeight.w600,
                         decoration: TextDecoration.none,
@@ -529,7 +528,7 @@ class _PlaylistTileNoThumb extends StatelessWidget {
               else
                 Icon(
                   Icons.play_circle_outline_rounded,
-                  color: Colors.white.withOpacity(0.55),
+                  color: Colors.white.withValues(alpha:0.55),
                   size: 26,
                 ),
             ],

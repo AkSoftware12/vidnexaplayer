@@ -111,14 +111,14 @@ class _AlbumsViewState extends State<AlbumsView> {
                         height: 30.h,
                         padding: EdgeInsets.symmetric(horizontal: 12.w),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.08),
+                          color: Colors.white.withValues(alpha:0.08),
                           borderRadius: BorderRadius.circular(14.r),
-                          border: Border.all(color: Colors.white.withOpacity(0.12)),
+                          border: Border.all(color: Colors.white.withValues(alpha:0.12)),
                         ),
                         child: Row(
                           children: [
                             Icon(Icons.search_rounded,
-                                color: widget.colortext.withOpacity(0.75), size: 20.sp),
+                                color: widget.colortext.withValues(alpha:0.75), size: 20.sp),
                             SizedBox(width: 8.w),
                             Expanded(
                               child: TextField(
@@ -131,7 +131,7 @@ class _AlbumsViewState extends State<AlbumsView> {
                                 decoration: InputDecoration(
                                   hintText: "Search albums / artist...",
                                   hintStyle: TextStyle(
-                                    color: widget.colortext.withOpacity(0.55),
+                                    color: widget.colortext.withValues(alpha:0.55),
                                     fontSize: 13.sp,
                                   ),
                                   border: InputBorder.none,
@@ -150,7 +150,7 @@ class _AlbumsViewState extends State<AlbumsView> {
                                 child: Padding(
                                   padding: EdgeInsets.all(6.w),
                                   child: Icon(Icons.close_rounded,
-                                      color: widget.colortext.withOpacity(0.75), size: 18.sp),
+                                      color: widget.colortext.withValues(alpha:0.75), size: 18.sp),
                                 ),
                               ),
                           ],
@@ -221,7 +221,7 @@ class _AlbumsViewState extends State<AlbumsView> {
                                     MaterialPageRoute(
                                       builder: (_) => AlbumPage(
                                         album: album,
-                                        color: Theme.of(context).colorScheme.background,
+                                        color: Theme.of(context).colorScheme.surface,
                                         colortext: Theme.of(context).colorScheme.secondary,
                                       ),
                                     ),
@@ -251,19 +251,19 @@ class _AlbumsViewState extends State<AlbumsView> {
         height: 30.h,
         padding: EdgeInsets.symmetric(horizontal: 12.w),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.08),
+          color: Colors.white.withValues(alpha:0.08),
           borderRadius: BorderRadius.circular(14.r),
-          border: Border.all(color: Colors.white.withOpacity(0.12)),
+          border: Border.all(color: Colors.white.withValues(alpha:0.12)),
         ),
         child: Row(
           children: [
             Icon(Icons.sort_rounded,
-                color: widget.colortext.withOpacity(0.8), size: 20.sp),
+                color: widget.colortext.withValues(alpha:0.8), size: 20.sp),
             SizedBox(width: 6.w),
             Text(
               "Sort",
               style: TextStyle(
-                color: widget.colortext.withOpacity(0.9),
+                color: widget.colortext.withValues(alpha:0.9),
                 fontSize: 12.5.sp,
                 fontWeight: FontWeight.w600,
               ),
@@ -284,7 +284,7 @@ class _AlbumsViewState extends State<AlbumsView> {
           decoration: BoxDecoration(
             color: const Color(0xFF121212),
             borderRadius: BorderRadius.vertical(top: Radius.circular(22.r)),
-            border: Border.all(color: Colors.white.withOpacity(0.08)),
+            border: Border.all(color: Colors.white.withValues(alpha:0.08)),
           ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -400,7 +400,7 @@ class _AlbumCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
-                  color: textColor.withOpacity(0.75),
+                  color: textColor.withValues(alpha:0.75),
                   fontSize: 10.5.sp,
                   fontWeight: FontWeight.w500,
                 ),
@@ -415,13 +415,13 @@ class _AlbumCard extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 6.h),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(999),
-                  color: Colors.white.withOpacity(0.10),
-                  border: Border.all(color: Colors.white.withOpacity(0.12)),
+                  color: Colors.white.withValues(alpha:0.10),
+                  border: Border.all(color: Colors.white.withValues(alpha:0.12)),
                 ),
                 child: Text(
                   "Album",
                   style: TextStyle(
-                    color: textColor.withOpacity(0.85),
+                    color: textColor.withValues(alpha:0.85),
                     fontSize: 10.sp,
                     fontWeight: FontWeight.bold,
                   ),
@@ -441,8 +441,8 @@ class _AlbumCard extends StatelessWidget {
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [
-            Colors.white.withOpacity(0.10),
-            Colors.white.withOpacity(0.03),
+            Colors.white.withValues(alpha:0.10),
+            Colors.white.withValues(alpha:0.03),
           ],
         ),
       ),
@@ -450,7 +450,7 @@ class _AlbumCard extends StatelessWidget {
         child: Icon(
           Icons.album_rounded,
           size: 38.sp,
-          color: textColor.withOpacity(0.65),
+          color: textColor.withValues(alpha:0.65),
         ),
       ),
     );

@@ -79,7 +79,6 @@ class _FullScreenVideoPlayerSystemVolumeState
   Timer? _hideTimer;
 
   bool _isLoading = true;
-  bool _showLogo = false;
   String _selectedFilter = 'normal';
   Timer? _systemUiTimer;
   bool _isSeeking = false;
@@ -90,33 +89,20 @@ class _FullScreenVideoPlayerSystemVolumeState
   double trebleGain = 0.0;
 
   bool _isLocked = false;
-  bool _equalizerVisible = false;
-  bool _filtersVisible = false;
+  final bool _equalizerVisible = false;
   bool _audioOnly = false;
-  bool _hdrOnly = false;
   double _playbackRate = 1.0;
-  final List<double> _rateOptions = [0.5, 1.0, 1.5, 2.0];
 
   bool _isLandscapeMode = false;
 
   // seek state
-  bool _isDragging = false;
-  double _dragStartX = 0.0;
-  Duration _dragStartPosition = Duration.zero;
-
-  bool _showSkipOverlay = false;
-  int _skipDirection = 0;
-  Timer? _skipOverlayTimer;
+  final bool _isDragging = false;
 
   double _brightness = 0.5;
   bool _showBrightnessOverlay = false;
   bool _showVolumeOverlay = false;
   Timer? _brightnessTimer;
   Timer? _volumeTimer;
-
-  Duration _position = Duration.zero;
-  Duration _duration = Duration.zero;
-  bool _isPlaying = false;
 
   bool _hdrOn = false;
   bool _showHdrOverlay = false;
@@ -143,7 +129,17 @@ class _FullScreenVideoPlayerSystemVolumeState
   Duration _panStartPos = Duration.zero;
 
   static const double _axisLockThreshold = 10; // px
-  static const double _seekSpeed = 1.2; // tune 0.8..1.8
+
+  /// How much video time a full-screen-width horizontal swipe covers.
+  ///
+  /// This is a FIXED rate, deliberately independent of the clip's length. The
+  /// old code scaled the jump by total duration
+  /// (`duration * relative * 1.2`), so on a 3-hour film a mere 10% swipe moved
+  /// ~22 minutes and the gesture became unusable for anything but the roughest
+  /// scrubbing. With a fixed rate the feel is identical on a 2-minute clip and
+  /// a 3-hour one; the progress bar remains the tool for long jumps.
+  static const double _seekSecondsPerScreenWidth = 90; // tune 60..150
+
   static const double _volSpeed = 120; // tune 80..160
   static const double _briSpeed = 1.2; // tune 0.8..1.6
 
@@ -156,9 +152,6 @@ class _FullScreenVideoPlayerSystemVolumeState
   // ✅ throttle seek during horizontal pan (avoid stutter)
   Timer? _seekThrottle;
   Duration? _pendingSeekPos;
-
-  // ✅ remember offset at pan start (for zoomed reposition)
-  Offset _panStartOffset = Offset.zero;
 
   // seek overlay + bubble
   bool _showSeekOverlay = false;
@@ -186,10 +179,78 @@ class _FullScreenVideoPlayerSystemVolumeState
   bool _showZoomBadge = false;
   Timer? _zoomBadgeTimer;
 
+  /// Size the video actually occupies on screen at scale 1.0.
+  ///
+  /// This is NOT the screen size: with `BoxFit.contain` a 16:9 clip on a tall
+  /// phone is letterboxed into a band with black above and below.
+  Size _baseVideoSize(Size screen) {
+    // Prefer the controller's reported rect; fall back to the player state.
+    double? vw;
+    double? vh;
+
+    final rect = _controller.rect.value;
+    if (rect != null && rect.width > 0 && rect.height > 0) {
+      vw = rect.width;
+      vh = rect.height;
+    } else {
+      final w = _player.state.width;
+      final h = _player.state.height;
+      if (w != null && h != null && w > 0 && h > 0) {
+        vw = w.toDouble();
+        vh = h.toDouble();
+      }
+    }
+
+    // Dimensions not known yet (first frame still decoding). Returning `screen`
+    // here would resurrect the original bug — it makes the clamp think the
+    // frame is full-height and hands back a huge pan range. Report zero
+    // instead: panning is simply disabled until the real size arrives, which
+    // is a far better failure mode than letting the picture slide into the
+    // black bars.
+    if (vw == null || vh == null) return Size.zero;
+
+    final videoAr = vw / vh;
+    final screenAr = screen.width / screen.height;
+
+    switch (_resizeMode) {
+      case VideoResizeMode.stretch: // BoxFit.fill — distorted to exactly fill
+        return screen;
+
+      case VideoResizeMode.fill: // BoxFit.cover — fills, crops overflow
+        return videoAr > screenAr
+            ? Size(screen.height * videoAr, screen.height)
+            : Size(screen.width, screen.width / videoAr);
+
+      case VideoResizeMode.zoom: // BoxFit.fitWidth
+        return Size(screen.width, screen.width / videoAr);
+
+      case VideoResizeMode.fit: // BoxFit.contain — letterboxed
+        return videoAr > screenAr
+            ? Size(screen.width, screen.width / videoAr)
+            : Size(screen.height * videoAr, screen.height);
+    }
+  }
+
+  /// Keeps the zoomed frame from being dragged off screen.
+  ///
+  /// The old version measured against `MediaQuery.size`, i.e. the SCREEN, so on
+  /// a 1080x2340 phone a letterboxed 16:9 clip (really 1080x607) was allowed
+  /// ~1170px of vertical travel at 2x — far more than exists. That is why the
+  /// video slid up/down leaving big black areas. Now the limit comes from the
+  /// video's own rendered box: if the scaled frame is smaller than the screen
+  /// on an axis, that axis is pinned to 0 and simply cannot be panned.
   void _clampOffset() {
-    final size = MediaQuery.of(context).size;
-    final maxX = (size.width * (_videoScale - 1)) / 2;
-    final maxY = (size.height * (_videoScale - 1)) / 2;
+    if (!mounted) return;
+
+    final screen = MediaQuery.sizeOf(context);
+    final base = _baseVideoSize(screen);
+
+    final scaledW = base.width * _videoScale;
+    final scaledH = base.height * _videoScale;
+
+    final maxX = ((scaledW - screen.width) / 2).clamp(0.0, double.infinity);
+    final maxY = ((scaledH - screen.height) / 2).clamp(0.0, double.infinity);
+
     _videoOffset = Offset(
       _videoOffset.dx.clamp(-maxX, maxX),
       _videoOffset.dy.clamp(-maxY, maxY),
@@ -205,11 +266,14 @@ class _FullScreenVideoPlayerSystemVolumeState
         ? widget.initialIndex.clamp(0, widget.videos.length - 1)
         : 0;
 
-    // ✅ Reuse external player/controller if coming from floating
+    // ✅ Reuse external player/controller if coming from floating.
+    //    FloatingVideoManager.detach() transfers ownership to us, so we ARE
+    //    responsible for disposing it (the old `_ownsPlayer = false` here meant
+    //    nobody ever did, leaking a native player per PiP round-trip).
     if (widget.externalPlayer != null && widget.externalController != null) {
       _player = widget.externalPlayer!;
       _controller = widget.externalController!;
-      _ownsPlayer = false; // ✅ someone else owns it -> never dispose here
+      _ownsPlayer = true;
       _isLoading = false;
 
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -242,8 +306,15 @@ class _FullScreenVideoPlayerSystemVolumeState
     // Set player's internal volume to 100% so system volume controls the loudness.
     _player.setVolume(100);
 
-    // Initialise brightness
-    ScreenBrightness().current.then((value) => _brightness = value);
+    // Initialise brightness.
+    // screen_brightness 2.1 deprecated `current` / `setScreenBrightness` /
+    // `resetScreenBrightness` in favour of the `application*` variants, which
+    // scope the change to this app instead of the whole device.
+    ScreenBrightness().application.then((value) {
+      if (mounted) _brightness = value;
+    }).catchError((Object _) {
+      // Brightness unavailable (emulator / restricted OEM) — keep the default.
+    });
 
     // Hide native OS volume UI
     VolumeController.instance.showSystemUI = false;
@@ -265,9 +336,15 @@ class _FullScreenVideoPlayerSystemVolumeState
       });
     }, fetchInitialVolume: false);
 
-    // ✅ Listen to position changes
+    // ✅ Listen to position changes.
+    //    Rebuilding the whole (very large) player tree on every position tick
+    //    caused constant jank. The UI only ever renders whole seconds, so skip
+    //    the rebuild unless the displayed second actually changed — while the
+    //    user is scrubbing, the drag handler owns `_currentPosition`.
     _positionSub = _player.stream.position.listen((position) {
       if (!mounted) return;
+      if (_isDragging || _panIsHorizontal) return;
+      if (position.inSeconds == _currentPosition.inSeconds) return;
       setState(() {
         _currentPosition = position;
       });
@@ -303,10 +380,12 @@ class _FullScreenVideoPlayerSystemVolumeState
       }
 
       if (_currentIndex == widget.videos.length - 1) {
-        setState(() => _showLogo = true);
+        // End of the playlist — just stop. (The old code toggled a `_showLogo`
+        // flag that nothing ever rendered, then waited 5 s and set it again.)
         await _player.pause();
-        await Future.delayed(const Duration(seconds: 5));
-        if (mounted) setState(() => _showLogo = true);
+        if (mounted) {
+          setState(() => _controlsVisible = true);
+        }
       } else {
         await _playNext();
       }
@@ -328,7 +407,6 @@ class _FullScreenVideoPlayerSystemVolumeState
     // Playing state sync (global play/pause)
     _playingSub = _player.stream.playing.listen((playing) {
       if (!mounted) return;
-      setState(() => _isPlaying = playing);
       globalPlayPause.update(playing);
     });
   }
@@ -337,7 +415,6 @@ class _FullScreenVideoPlayerSystemVolumeState
     try {
       setState(() {
         _isLoading = true;
-        _showLogo = false;
         _videoScale = 1.0; // ✅ reset zoom
         _videoOffset = Offset.zero;
       });
@@ -401,7 +478,6 @@ class _FullScreenVideoPlayerSystemVolumeState
 
     setState(() {
       _isLoading = true;
-      _showLogo = false;
       _videoScale = 1.0; // ✅ reset zoom
       _videoOffset = Offset.zero;
     });
@@ -472,12 +548,28 @@ class _FullScreenVideoPlayerSystemVolumeState
       } else {
         _resizeMode = VideoResizeMode.fit;
       }
+
+      // The rendered video box changes with the fit mode, so an offset that
+      // was valid before can now push the picture off screen.
+      _clampOffset();
     });
 
     showCenterToast(context, _resizeMode.name.toUpperCase());
   }
 
+  /// The toast currently on screen, so it can be removed exactly once.
+  OverlayEntry? _activeToast;
+  Timer? _toastTimer;
+
   void showCenterToast(BuildContext context, String message) {
+    final overlay = Overlay.maybeOf(context);
+    if (overlay == null) return;
+
+    // Never stack toasts — remove the previous one first.
+    _toastTimer?.cancel();
+    _activeToast?.remove();
+    _activeToast = null;
+
     final OverlayEntry entry = OverlayEntry(
       builder:
           (context) => Center(
@@ -492,11 +584,11 @@ class _FullScreenVideoPlayerSystemVolumeState
                 horizontal: 20,
               ),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.85),
+                color: Colors.black.withValues(alpha:0.85),
                 borderRadius: BorderRadius.circular(14),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withOpacity(0.3),
+                    color: Colors.black.withValues(alpha:0.3),
                     blurRadius: 10,
                   ),
                 ],
@@ -515,10 +607,16 @@ class _FullScreenVideoPlayerSystemVolumeState
       ),
     );
 
-    Overlay.of(context).insert(entry);
-    Future.delayed(
-      const Duration(milliseconds: 900),
-    ).then((_) => entry.remove());
+    overlay.insert(entry);
+    _activeToast = entry;
+
+    // The old code called `entry.remove()` from an unguarded Future.delayed —
+    // if the screen closed within 900 ms that threw on an already-removed entry.
+    _toastTimer = Timer(const Duration(milliseconds: 900), () {
+      if (!identical(_activeToast, entry)) return;
+      entry.remove();
+      _activeToast = null;
+    });
   }
 
   List<double> _getColorMatrix(String filter, {double hdrIntensity = 0.65}) {
@@ -833,26 +931,21 @@ class _FullScreenVideoPlayerSystemVolumeState
 
   Future<void> toggleHdr() async {
     if (_hdrChanging) return;
-
     _hdrChanging = true;
 
-    setState(() {
-      _showHdrOverlay = true;
-    });
-
-    await Future.delayed(const Duration(seconds: 3));
-
-    if (!mounted) {
-      _hdrChanging = false; // ✅ don't leave it stuck
-      return;
-    }
-
+    // Apply immediately — the old code waited 3 seconds *before* flipping the
+    // filter, which made the button feel broken. The badge still shows briefly.
     setState(() {
       _hdrOn = !_hdrOn;
       _selectedFilter = _hdrOn ? 'hdr' : '';
-      _showHdrOverlay = false;
+      _showHdrOverlay = true;
     });
 
+    await Future.delayed(const Duration(milliseconds: 900));
+
+    if (mounted) {
+      setState(() => _showHdrOverlay = false);
+    }
     _hdrChanging = false;
   }
 
@@ -932,17 +1025,35 @@ class _FullScreenVideoPlayerSystemVolumeState
   // =========================================================
   // ✅ SCALE ENGINE: 1 finger = MX pan, 2 finger = ZOOM
   // =========================================================
+  /// Abandons any in-flight single-finger pan.
+  ///
+  /// Needed when a pinch interrupts a drag: the old code only flipped the
+  /// `_panIs*` flags, leaving `_pendingSeekPos` and `_seekThrottle` armed. Since
+  /// `_onScaleEnd` early-returns while zooming, `_panEndLogic()` never ran, so
+  /// that stale position was applied on the NEXT drag — the video jumped back
+  /// to wherever the interrupted seek had been.
+  void _abortPan() {
+    _panActive = false;
+    _panIsHorizontal = false;
+    _panIsVertical = false;
+    _verticalDragLeft = false;
+    _verticalDragRight = false;
+
+    _seekThrottle?.cancel();
+    _seekThrottle = null;
+    _pendingSeekPos = null;
+
+    _hideSeekOverlay(immediate: true);
+    _hideSeekBubble(immediate: true);
+  }
+
   void _onScaleStart(ScaleStartDetails details) {
     if (_isLocked) return;
 
     if (details.pointerCount >= 2) {
       _isZooming = true;
       _baseScaleOnGesture = _videoScale;
-      _panActive = false;
-      _panIsHorizontal = false;
-      _panIsVertical = false;
-      _hideSeekOverlay(immediate: true);
-      _hideSeekBubble(immediate: true);
+      _abortPan();
       return;
     }
 
@@ -956,13 +1067,10 @@ class _FullScreenVideoPlayerSystemVolumeState
     // ---------- 2 FINGER ZOOM ----------
     if (details.pointerCount >= 2) {
       if (!_isZooming) {
+        // A second finger landed mid-drag — drop the pan cleanly.
         _isZooming = true;
         _baseScaleOnGesture = _videoScale;
-        _panActive = false;
-        _panIsHorizontal = false;
-        _panIsVertical = false;
-        _hideSeekOverlay(immediate: true);
-        _hideSeekBubble(immediate: true);
+        _abortPan();
       }
 
       final newScale =
@@ -970,12 +1078,24 @@ class _FullScreenVideoPlayerSystemVolumeState
 
       setState(() {
         _videoScale = newScale;
-        if (_videoScale > 1.0) {
-          _videoOffset += details.focalPointDelta; // zoom me drag-reposition
-          _clampOffset();
-        } else {
+
+        // ⚠️ Do NOT apply `details.focalPointDelta` here.
+        //
+        // During a pinch, focalPointDelta is the drift of the midpoint between
+        // the two fingers. Real fingers never pinch symmetrically, so that
+        // midpoint wanders every frame — feeding it into `_videoOffset` made
+        // the video slide up/down while the user was only trying to zoom.
+        //
+        // Repositioning belongs to the single-finger drag (_panUpdateLogic),
+        // which only runs once we're already zoomed in.
+        if (_videoScale <= 1.0) {
           _videoOffset = Offset.zero;
+        } else {
+          // Zooming back out shrinks the allowed offset range, so re-clamp to
+          // keep the frame from staying stuck off-centre.
+          _clampOffset();
         }
+
         _showZoomBadge = true;
       });
 
@@ -994,6 +1114,8 @@ class _FullScreenVideoPlayerSystemVolumeState
   void _onScaleEnd(ScaleEndDetails details) {
     if (_isZooming) {
       _isZooming = false;
+      // Nothing to commit: _abortPan() already cleared the pan state when the
+      // pinch began, so no stale seek can leak into the next gesture.
       return;
     }
     _panEndLogic();
@@ -1008,12 +1130,11 @@ class _FullScreenVideoPlayerSystemVolumeState
     _panStart = localPosition;
     _panStartPos = _player.state.position;
     _panStartVolume = _systemVolume;
-    _panStartOffset = _videoOffset;
 
     // ✅ immediate default so first swipe has no jitter
     _panStartBrightness = _brightness;
     try {
-      _panStartBrightness = await ScreenBrightness().current;
+      _panStartBrightness = await ScreenBrightness().application;
     } catch (_) {}
 
     _hideSeekOverlay(immediate: true);
@@ -1023,14 +1144,11 @@ class _FullScreenVideoPlayerSystemVolumeState
   Future<void> _panUpdateLogic(Offset localPosition, Offset delta) async {
     if (!_panActive || _isLocked) return;
 
-    // ✅ Zoomed in -> single finger drags/repositions the video
-    if (_videoScale > 1.0) {
-      setState(() {
-        _videoOffset += delta;
-        _clampOffset();
-      });
-      return;
-    }
+    // ✅ Zoomed video stays LOCKED in place — a single finger must never
+    //    scroll/reposition the zoomed picture. The zoom stays centered and the
+    //    single-finger drag falls through to the normal seek / brightness /
+    //    volume gestures instead. (Repositioning is intentionally disabled per
+    //    request: after pinch-zoom, one finger should not slide the frame.)
 
     _onUserInteractionFromBottom(localPosition, delta, context);
 
@@ -1062,9 +1180,11 @@ class _FullScreenVideoPlayerSystemVolumeState
       final duration = _player.state.duration;
       if (duration.inMilliseconds <= 0) return;
 
+      // Fixed rate: swiping the full screen width == _seekSecondsPerScreenWidth
+      // of video, no matter how long the clip is.
       final relative = dxTotal / size.width;
       final offsetMs =
-      (duration.inMilliseconds * relative * _seekSpeed).toInt();
+          (relative * _seekSecondsPerScreenWidth * 1000).toInt();
 
       int newMs = _panStartPos.inMilliseconds + offsetMs;
       newMs = newMs.clamp(0, duration.inMilliseconds);
@@ -1094,7 +1214,7 @@ class _FullScreenVideoPlayerSystemVolumeState
         _brightness = b;
 
         try {
-          await ScreenBrightness().setScreenBrightness(b);
+          await ScreenBrightness().setApplicationScreenBrightness(b);
         } catch (_) {}
 
         setState(() => _showBrightnessOverlay = true);
@@ -1220,69 +1340,70 @@ class _FullScreenVideoPlayerSystemVolumeState
     }
   }
 
-  // Double tap (your existing)
+  /// Double tap left/right to skip 10 s.
+  ///
+  /// The `_skipDirection` / `_showSkipOverlay` flags that used to be set here
+  /// were never rendered — `_showSeekOverlayText` is what actually draws the
+  /// ±10 s badge — so they have been dropped.
   void _onDoubleTapDown(TapDownDetails details) {
     if (_isLocked) return;
+
     final width = MediaQuery.of(context).size.width;
-    final dx = details.localPosition.dx;
     final position = _player.state.position;
     final duration = _player.state.duration;
     if (duration.inMilliseconds <= 0) return;
 
-    if (dx < width / 2) {
-      final newPositionMs = (position.inMilliseconds - 10000).clamp(
-        0,
-        duration.inMilliseconds,
-      );
-      final newPos = Duration(milliseconds: newPositionMs);
-      _player.seek(newPos);
-      setState(() {
-        _skipDirection = -1;
-        _showSkipOverlay = true;
-        _currentPosition = newPos;
-        _bubblePos = newPos;
-      });
-      _showSeekOverlayText("-00:10");
-      _showSeekBubbleNow();
-    } else {
-      final newPositionMs = (position.inMilliseconds + 10000).clamp(
-        0,
-        duration.inMilliseconds,
-      );
-      final newPos = Duration(milliseconds: newPositionMs);
-      _player.seek(newPos);
-      setState(() {
-        _skipDirection = 1;
-        _showSkipOverlay = true;
-        _currentPosition = newPos;
-        _bubblePos = newPos;
-      });
-      _showSeekOverlayText("+00:10");
-      _showSeekBubbleNow();
-    }
+    final rewinding = details.localPosition.dx < width / 2;
+    final deltaMs = rewinding ? -10000 : 10000;
 
-    _skipOverlayTimer?.cancel();
-    _skipOverlayTimer = Timer(const Duration(milliseconds: 600), () {
-      if (mounted) setState(() => _showSkipOverlay = false);
+    final newPos = Duration(
+      milliseconds:
+          (position.inMilliseconds + deltaMs).clamp(0, duration.inMilliseconds),
+    );
+
+    _player.seek(newPos);
+    setState(() {
+      _currentPosition = newPos;
+      _bubblePos = newPos;
     });
+
+    _showSeekOverlayText(rewinding ? "-00:10" : "+00:10");
+    _showSeekBubbleNow();
   }
 
   // =========================================================
 
+  /// Hands the live player over to the floating (PiP) window.
+  ///
+  /// Ownership moves with the player: after this we must NOT dispose it, and
+  /// the floating window becomes responsible for it.
+  void _moveToFloating() {
+    if (!_hasLocalList) return;
+    if (FloatingVideoManager.isActive) return;
+
+    _ownsPlayer = false; // floating owns it now
+    FloatingVideoManager.show(
+      context,
+      _player,
+      _controller,
+      widget.videos,
+      _currentIndex,
+    );
+  }
+
   @override
   void dispose() {
-    // ✅ Dispose ONLY if we created the player AND floating isn't using it.
-    // (External/reused players are owned by someone else.)
-    if (_ownsPlayer && !FloatingVideoManager.isActive) {
-      _player.dispose();
-    }
-
+    // ⚠️ Order matters: cancel every subscription/timer BEFORE tearing the
+    // player down. The old code disposed the player first, so in-flight
+    // position/duration events still called setState() on a dead State.
     _positionSub?.cancel();
     _durationSub?.cancel();
     _completedSub?.cancel();
+    _playingSub?.cancel();
+    _volumeSubscription?.cancel();
+
     _hideTimer?.cancel();
     _systemUiTimer?.cancel();
-    _skipOverlayTimer?.cancel();
     _brightnessTimer?.cancel();
     _volumeTimer?.cancel();
     _volThrottle?.cancel();
@@ -1290,15 +1411,25 @@ class _FullScreenVideoPlayerSystemVolumeState
     _seekOverlayTimer?.cancel();
     _seekBubbleTimer?.cancel();
     _zoomBadgeTimer?.cancel();
-    _playingSub?.cancel();
 
-    // ✅ #5: cancelling our own subscription is enough to detach OUR listener.
-    // Avoid the global removeListener() which can wipe listeners app-wide.
-    _volumeSubscription?.cancel();
+    // Remove any center-toast overlay still scheduled for removal.
+    _toastTimer?.cancel();
+    _activeToast?.remove();
+    _activeToast = null;
 
-    // ✅ #4: always restore the system brightness when leaving the player,
-    // otherwise the screen can stay stuck at the brightness we set.
-    ScreenBrightness().resetScreenBrightness();
+    // Dispose only what we still own. `_ownsPlayer` is set to false the moment
+    // the player is handed to the floating window.
+    if (_ownsPlayer) {
+      try {
+        _player.dispose();
+      } catch (_) {
+        // Already disposed by whoever else held it.
+      }
+    }
+
+    // Always restore the system brightness, otherwise the screen stays stuck
+    // at whatever the swipe gesture set.
+    ScreenBrightness().resetApplicationScreenBrightness().catchError((Object _) {});
 
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
 
@@ -1308,11 +1439,16 @@ class _FullScreenVideoPlayerSystemVolumeState
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
+
+    // Fires on MediaQuery changes too (e.g. rotation), where the rendered
+    // video box changes and a previously valid offset may now be out of range.
+    _clampOffset();
+
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!_isLocked) {
-        setState(() => _controlsVisible = true);
-        _startHideTimer();
-      }
+      if (!mounted) return; // guard: this fires after dispose otherwise
+      if (_isLocked) return;
+      setState(() => _controlsVisible = true);
+      _startHideTimer();
     });
   }
 
@@ -1342,7 +1478,7 @@ class _FullScreenVideoPlayerSystemVolumeState
       context: context,
       barrierLabel: "Controls",
       barrierDismissible: true,
-      barrierColor: Colors.black.withOpacity(0.55),
+      barrierColor: Colors.black.withValues(alpha:0.55),
       transitionDuration: const Duration(milliseconds: 220),
       pageBuilder: (_, __, ___) {
         return SafeArea(
@@ -1355,12 +1491,12 @@ class _FullScreenVideoPlayerSystemVolumeState
                 height: double.infinity,
                 margin: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.92),
+                  color: Colors.black.withValues(alpha:0.92),
                   borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.white.withOpacity(0.10)),
+                  border: Border.all(color: Colors.white.withValues(alpha:0.10)),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.7),
+                      color: Colors.black.withValues(alpha:0.7),
                       blurRadius: 30,
                     ),
                   ],
@@ -1393,7 +1529,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                       ),
                     ),
 
-                    Divider(color: Colors.white.withOpacity(0.12), height: 1),
+                    Divider(color: Colors.white.withValues(alpha:0.12), height: 1),
 
                     // ✅ Scroll Body
                     Expanded(
@@ -1478,19 +1614,13 @@ class _FullScreenVideoPlayerSystemVolumeState
                                     ? null
                                     : () {
                                   Navigator.pop(context); // close sheet only
-                                  FloatingVideoManager.show(
-                                    context,
-                                    _player,
-                                    _controller,
-                                    widget.videos,
-                                    _currentIndex,
-                                  );
+                                  _moveToFloating();
                                 },
                               ),
                             ]),
 
                             const SizedBox(height: 14),
-                            Divider(color: Colors.white.withOpacity(0.12)),
+                            Divider(color: Colors.white.withValues(alpha:0.12)),
                             const SizedBox(height: 12),
 
                             _sheetTitle("Playback"),
@@ -1611,12 +1741,12 @@ class _FullScreenVideoPlayerSystemVolumeState
             margin: const EdgeInsets.all(0),
             constraints: BoxConstraints(maxHeight: maxH), // ✅ fixed height
             decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.92),
+              color: Colors.black.withValues(alpha:0.92),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: Colors.white.withOpacity(0.10)),
+              border: Border.all(color: Colors.white.withValues(alpha:0.10)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.6),
+                  color: Colors.black.withValues(alpha:0.6),
                   blurRadius: 30,
                 ),
               ],
@@ -1658,7 +1788,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                   ),
                 ),
 
-                Divider(color: Colors.white.withOpacity(0.12), height: 1),
+                Divider(color: Colors.white.withValues(alpha:0.12), height: 1),
 
                 // ✅ scrollable body
                 Expanded(
@@ -1743,19 +1873,13 @@ class _FullScreenVideoPlayerSystemVolumeState
                                 ? null
                                 : () {
                               Navigator.pop(context); // close sheet only
-                              FloatingVideoManager.show(
-                                context,
-                                _player,
-                                _controller,
-                                widget.videos,
-                                _currentIndex,
-                              );
+                              _moveToFloating();
                             },
                           ),
                         ]),
 
                         const SizedBox(height: 14),
-                        Divider(color: Colors.white.withOpacity(0.12)),
+                        Divider(color: Colors.white.withValues(alpha:0.12)),
                         const SizedBox(height: 12),
 
                         _sheetTitle("Playback"),
@@ -1890,13 +2014,13 @@ class _FullScreenVideoPlayerSystemVolumeState
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
         decoration: BoxDecoration(
           color: active
-              ? Colors.white.withOpacity(0.18)
-              : Colors.white.withOpacity(0.08),
+              ? Colors.white.withValues(alpha:0.18)
+              : Colors.white.withValues(alpha:0.08),
           borderRadius: BorderRadius.circular(16),
           border: Border.all(
             color: active
-                ? Colors.white.withOpacity(0.22)
-                : Colors.white.withOpacity(0.10),
+                ? Colors.white.withValues(alpha:0.22)
+                : Colors.white.withValues(alpha:0.10),
           ),
         ),
         child: Column(
@@ -1945,10 +2069,10 @@ class _FullScreenVideoPlayerSystemVolumeState
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
         decoration: BoxDecoration(
           color: active
-              ? Colors.white.withOpacity(0.18)
-              : Colors.white.withOpacity(0.10),
+              ? Colors.white.withValues(alpha:0.18)
+              : Colors.white.withValues(alpha:0.10),
           borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: Colors.white.withOpacity(0.12)),
+          border: Border.all(color: Colors.white.withValues(alpha:0.12)),
         ),
         child: Row(
           mainAxisSize: MainAxisSize.min,
@@ -1977,6 +2101,158 @@ class _FullScreenVideoPlayerSystemVolumeState
     );
   }
 
+
+  // =========================================================
+  // ✅ HUD OVERLAYS — one unified, production-grade glass style
+  //    used by every transient gesture badge (zoom %, seek delta,
+  //    time preview) and the brightness / volume meters. Keeping the
+  //    look in these two helpers means every overlay stays consistent.
+  // =========================================================
+
+  /// Soft "pop-in" wrapper so a badge scales + fades up when it appears.
+  Widget _hudPopIn({required Widget child}) {
+    return TweenAnimationBuilder<double>(
+      tween: Tween(begin: 0.82, end: 1),
+      duration: const Duration(milliseconds: 180),
+      curve: Curves.easeOutBack,
+      builder: (_, v, c) => Opacity(
+        opacity: v.clamp(0.0, 1.0),
+        child: Transform.scale(scale: v, child: c),
+      ),
+      child: child,
+    );
+  }
+
+  /// Frosted-glass pill: icon + text. Used for zoom %, seek ±, time preview.
+  Widget _hudPill({
+    required IconData icon,
+    required String text,
+    Color? accent,
+    double fontSize = 14,
+  }) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+          decoration: BoxDecoration(
+            color: Colors.black.withValues(alpha: 0.42),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.16)),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.35),
+                blurRadius: 18,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, color: accent ?? Colors.white, size: fontSize + 5),
+              const SizedBox(width: 8),
+              Text(
+                text,
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: fontSize,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Vertical brightness / volume meter — a matched pair so left (brightness)
+  /// and right (volume) read as the same control.
+  Widget _hudMeter({
+    required IconData icon,
+    required double fraction, // 0..1
+    required int value,
+  }) {
+    const double trackH = 150;
+    const double trackW = 8;
+    final accent = ColorSelect.maineColor;
+    final f = fraction.clamp(0.0, 1.0);
+
+    return _hudPopIn(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(24),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 14, sigmaY: 14),
+          child: Container(
+            width: 60,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            decoration: BoxDecoration(
+              color: Colors.black.withValues(alpha: 0.40),
+              borderRadius: BorderRadius.circular(24),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.40),
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
+                ),
+              ],
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '$value',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Container(
+                  width: trackW,
+                  height: trackH,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(trackW),
+                  ),
+                  child: Align(
+                    alignment: Alignment.bottomCenter,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 120),
+                      curve: Curves.easeOutCubic,
+                      width: trackW,
+                      height: trackH * f,
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.bottomCenter,
+                          end: Alignment.topCenter,
+                          colors: [accent, const Color(0xFF9D6BFF)],
+                        ),
+                        borderRadius: BorderRadius.circular(trackW),
+                        boxShadow: [
+                          BoxShadow(
+                            color: accent.withValues(alpha: 0.6),
+                            blurRadius: 10,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Icon(icon, color: Colors.white, size: 22),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   // =================== BUILD (UI SAME) =====================
   @override
@@ -2023,19 +2299,16 @@ class _FullScreenVideoPlayerSystemVolumeState
       ),
     );
 
-    return WillPopScope(
-      onWillPop: () async {
-        // ✅ only show floating when we have local list (safe)
-        if (_hasLocalList) {
-          FloatingVideoManager.show(
-            context,
-            _player,
-            _controller,
-            widget.videos,
-            _currentIndex,
-          );
-        }
-        return true;
+    // `WillPopScope` is never invoked once the manifest sets
+    // android:enableOnBackInvokedCallback="true" (Android 13+ predictive back),
+    // so the PiP hand-off silently stopped working. `PopScope` is the API that
+    // works with the new back dispatcher.
+    return PopScope(
+      canPop: true,
+      onPopInvokedWithResult: (didPop, _) {
+        if (!didPop) return;
+        // Only hand over to PiP for local playlists; URL streams have no queue.
+        // if (_hasLocalList) _moveToFloating();
       },
       child: GestureDetector(
         behavior: HitTestBehavior.translucent,
@@ -2084,30 +2357,14 @@ class _FullScreenVideoPlayerSystemVolumeState
                 Positioned.fill(
                   child: IgnorePointer(
                     child: Center(
-                      child: AnimatedScale(
-                        duration: const Duration(milliseconds: 120),
-                        scale: _showSeekOverlay ? 1 : 0.95,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 18,
-                            vertical: 12,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.70),
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(
-                              color: Colors.white.withOpacity(0.10),
-                            ),
-                          ),
-                          child: Text(
-                            _seekOverlayText,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 20,
-                              fontWeight: FontWeight.w800,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
+                      child: _hudPopIn(
+                        child: _hudPill(
+                          icon: _seekOverlayText.startsWith('-')
+                              ? Icons.fast_rewind_rounded
+                              : Icons.fast_forward_rounded,
+                          text: _seekOverlayText,
+                          accent: ColorSelect.maineColor,
+                          fontSize: 20,
                         ),
                       ),
                     ),
@@ -2122,199 +2379,67 @@ class _FullScreenVideoPlayerSystemVolumeState
                   right: 0,
                   child: IgnorePointer(
                     child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.72),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.10),
-                          ),
-                        ),
-                        child: Text(
-                          "${(_videoScale * 100).round()}%",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w800,
-                          ),
+                      child: _hudPopIn(
+                        child: _hudPill(
+                          icon: Icons.zoom_in_rounded,
+                          text: "${(_videoScale * 100).round()}%",
+                          accent: ColorSelect.maineColor,
                         ),
                       ),
                     ),
                   ),
                 ),
 
-              // ✅ Seek bubble (time preview)
+              // ✅ Seek bubble (time preview) — sits just below the top badges
               if (_showSeekBubble)
                 Positioned(
-                  top: 70,
+                  top: 120,
                   left: 0,
                   right: 0,
                   child: IgnorePointer(
                     child: Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.72),
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: Colors.white.withOpacity(0.10),
-                          ),
-                        ),
-                        child: Text(
-                          "${_formatDuration(_bubblePos)} / ${_formatDuration(_totalDuration)}",
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 13,
-                            fontWeight: FontWeight.w700,
-                          ),
+                      child: _hudPopIn(
+                        child: _hudPill(
+                          icon: Icons.schedule_rounded,
+                          text:
+                              "${_formatDuration(_bubblePos)}  /  ${_formatDuration(_totalDuration)}",
+                          fontSize: 13,
                         ),
                       ),
                     ),
                   ),
                 ),
 
-              // brightness overlay (same)
+              // brightness overlay
               if (_showBrightnessOverlay)
-                Builder(
-                  builder: (context) {
-                    final screenHeight =
-                        MediaQuery.of(context).size.height;
-                    final barHeight = screenHeight * 0.3;
-                    final brightnessValue = (_brightness * 100).round();
-                    return Positioned(
-                      left: 20,
-                      top: screenHeight / 2 - barHeight / 2,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Container(
-                            width: 20,
-                            height: barHeight,
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: Container(
-                                width: double.infinity,
-                                height: barHeight * _brightness,
-                                decoration: BoxDecoration(
-                                  color: ColorSelect.maineColor2,
-                                  borderRadius:
-                                  const BorderRadius.vertical(
-                                    top: Radius.circular(20),
-                                    bottom: Radius.circular(20),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.brightness_6,
-                                color: Colors.white,
-                                size: 32,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                brightnessValue.toString(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                Align(
+                  alignment: const Alignment(-0.85, 0),
+                  child: IgnorePointer(
+                    child: _hudMeter(
+                      icon: _brightness > 0.5
+                          ? Icons.brightness_high_rounded
+                          : Icons.brightness_low_rounded,
+                      fraction: _brightness,
+                      value: (_brightness * 100).round(),
+                    ),
+                  ),
                 ),
 
               // volume overlay
               if (_showVolumeOverlay)
-                Builder(
-                  builder: (context) {
-                    final screenHeight =
-                        MediaQuery.of(context).size.height;
-                    final barHeight = screenHeight * 0.3;
-                    final volValue = _systemVolume.round();
-                    final frac = (_systemVolume / 100).clamp(0.0, 1.0);
-
-                    return Positioned(
-                      right: 20,
-                      top: screenHeight / 2 - barHeight / 2,
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          Row(
-                            children: [
-                              Icon(
-                                volValue == 0
-                                    ? Icons.volume_off
-                                    : Icons.volume_up,
-                                color: Colors.white,
-                                size: 32,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                volValue.toString(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 28,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 10),
-                          Container(
-                            width: 22,
-                            height: barHeight,
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: Align(
-                              alignment: Alignment.bottomCenter,
-                              child: AnimatedContainer(
-                                duration: const Duration(
-                                  milliseconds: 120,
-                                ),
-                                curve: Curves.easeOutCubic,
-                                width: 22,
-                                height: barHeight * frac,
-                                decoration: const BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.bottomCenter,
-                                    end: Alignment.topCenter,
-                                    colors: [
-                                      Colors.greenAccent,
-                                      Colors.green,
-                                    ],
-                                  ),
-                                  borderRadius: BorderRadius.vertical(
-                                    bottom: Radius.circular(14),
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
+                Align(
+                  alignment: const Alignment(0.85, 0),
+                  child: IgnorePointer(
+                    child: _hudMeter(
+                      icon: _systemVolume <= 0
+                          ? Icons.volume_off_rounded
+                          : _systemVolume < 50
+                          ? Icons.volume_down_rounded
+                          : Icons.volume_up_rounded,
+                      fraction: _systemVolume / 100,
+                      value: _systemVolume.round(),
+                    ),
+                  ),
                 ),
 
               // ✅ HDR overlay (same - premium)
@@ -2326,7 +2451,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
                       child: Container(
-                        color: Colors.black.withOpacity(0.45),
+                        color: Colors.black.withValues(alpha:0.45),
                         alignment: Alignment.center,
                         child: TweenAnimationBuilder<double>(
                           tween: Tween(begin: 0.85, end: 1),
@@ -2362,13 +2487,13 @@ class _FullScreenVideoPlayerSystemVolumeState
                               ),
                               boxShadow: [
                                 BoxShadow(
-                                  color: Colors.black.withOpacity(0.65),
+                                  color: Colors.black.withValues(alpha:0.65),
                                   blurRadius: 35,
                                   spreadRadius: 4,
                                 ),
                               ],
                               border: Border.all(
-                                color: Colors.white.withOpacity(0.12),
+                                color: Colors.white.withValues(alpha:0.12),
                               ),
                             ),
                             child: Column(
@@ -2389,12 +2514,8 @@ class _FullScreenVideoPlayerSystemVolumeState
                                       shape: BoxShape.circle,
                                       gradient: RadialGradient(
                                         colors: [
-                                          Colors.white.withOpacity(
-                                            0.35,
-                                          ),
-                                          Colors.white.withOpacity(
-                                            0.05,
-                                          ),
+                                          Colors.white.withValues(alpha: 0.35),
+                                          Colors.white.withValues(alpha: 0.05),
                                         ],
                                       ),
                                     ),
@@ -2483,7 +2604,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                     width: 200,
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
+                      color: Colors.black.withValues(alpha:0.5),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: Column(
@@ -2515,7 +2636,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Container(
-                      color: Colors.black.withOpacity(0.4),
+                      color: Colors.black.withValues(alpha:0.4),
                       child: Padding(
                         padding: EdgeInsets.only(
                           top: isLandscape ? 0.sp : 40.sp,
@@ -2540,7 +2661,8 @@ class _FullScreenVideoPlayerSystemVolumeState
                               );
                             } else {
                               ScreenBrightness()
-                                  .resetScreenBrightness();
+                                  .resetApplicationScreenBrightness()
+                                  .catchError((Object _) {});
                               Navigator.pop(context);
                             }
                           },
@@ -2562,19 +2684,15 @@ class _FullScreenVideoPlayerSystemVolumeState
                           },
                           isLandscape: isLandscape,
                           videos: widget.videos,
-                          onBackPressedMore: () {
-                            print('click more');
-                            openControlsSheetSmart();
-
-
-                          },
+                          onBackPressedMore: openControlsSheetSmart,
                         )
                             : Container(
                           child: _StreamTopBar(
                             title: appBarTitle,
                             onBack: () {
                               ScreenBrightness()
-                                  .resetScreenBrightness();
+                                  .resetApplicationScreenBrightness()
+                                  .catchError((Object _) {});
                               Navigator.pop(context);
                             },
                           ),
@@ -2661,13 +2779,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                     onPressed:
                                     _hasLocalList
                                         ? () {
-                                      FloatingVideoManager.show(
-                                        context,
-                                        _player,
-                                        _controller,
-                                        widget.videos,
-                                        _currentIndex,
-                                      );
+                                      _moveToFloating();
                                       Navigator.pop(context);
                                     }
                                         : null, // ✅ disable for URL mode
@@ -2815,10 +2927,21 @@ class _FullScreenVideoPlayerSystemVolumeState
   }
 
   // helpers
+  /// `MM:SS`, or `H:MM:SS` once the clip runs past an hour.
+  ///
+  /// The old version only emitted `MM:SS` using `inMinutes.remainder(60)`, so
+  /// hours were silently dropped: a 1:20:15 film displayed as "20:15" and a
+  /// 2:00:00 one as "00:00".
   String _formatDuration(Duration d) {
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
+    final negative = d.isNegative;
+    final abs = negative ? -d : d;
+
+    final hours = abs.inHours;
+    final minutes = abs.inMinutes.remainder(60).toString().padLeft(2, '0');
+    final seconds = abs.inSeconds.remainder(60).toString().padLeft(2, '0');
+
+    final text = hours > 0 ? '$hours:$minutes:$seconds' : '$minutes:$seconds';
+    return negative ? '-$text' : text;
   }
 
   Future<void> _togglePlayPause() async {

@@ -155,7 +155,7 @@ class VolumeDialog {
                               decoration: BoxDecoration(
                                 borderRadius: BorderRadius.circular(12),
                                 border: Border.all(
-                                  color: Colors.white.withOpacity(0.5),
+                                  color: Colors.white.withValues(alpha:0.5),
                                   width: 1.2,
                                 ),
                               ),

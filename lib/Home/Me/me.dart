@@ -7,7 +7,6 @@ import 'package:icons_plus/icons_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:videoplayer/Photo/image_album.dart';
-import 'package:videoplayer/Utils/color.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
@@ -16,16 +15,13 @@ import 'dart:io';
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/styles/theme_data_style.dart';
 import '../../DeviceSpace/device_space.dart';
-import '../../HexColorCode/HexColor.dart';
 import '../../LockScreen/LockScreen/lock_screen.dart';
 import '../../NetWork Stream/stream_video.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/AppBar/colorList.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
-import '../../StatusSaverScreen/status_saver.dart';
 import '../../StatusSaverScreen/whatsapp_download.dart';
-import '../../app_store/app_store.dart';
 import '../HomeBottomnavigation/home_bottomNavigation.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -33,7 +29,6 @@ import '../HomeBottomnavigation/home_bottomNavigation.dart';
 // ─────────────────────────────────────────────────────────────────────────────
 class _T {
   // backgrounds
-  static const Color bg       = Color(0xFFF5F6FA);
   static const Color white    = Color(0xFFFFFFFF);
   static const Color surface  = Color(0xFFF0F1F6);
 
@@ -41,7 +36,6 @@ class _T {
   static const Color accent    = Color(0xFFE8382C);
   static const Color accentSoft= Color(0x18E8382C);
   static const Color gold      = Color(0xFFFFB800);
-  static const Color goldSoft  = Color(0x22FFB800);
 
   // text
   static const Color textH = Color(0xFF111827);
@@ -53,12 +47,8 @@ class _T {
   static const Color borderM = Color(0xFFD1D5DB);
 
   // shadows
-  static List<BoxShadow> get cardShadow => [
-    BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 16, offset: const Offset(0, 4)),
-    BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 4,  offset: const Offset(0, 1)),
-  ];
   static List<BoxShadow> get accentShadow => [
-    BoxShadow(color: accent.withOpacity(0.25), blurRadius: 14, offset: const Offset(0, 4)),
+    BoxShadow(color: accent.withValues(alpha:0.25), blurRadius: 14, offset: const Offset(0, 4)),
   ];
 
   // gradients
@@ -68,10 +58,6 @@ class _T {
   );
   static LinearGradient get goldGrad => const LinearGradient(
     colors: [Color(0xFFFFB800), Color(0xFFFF8C00)],
-    begin: Alignment.topLeft, end: Alignment.bottomRight,
-  );
-  static LinearGradient get heroBg => const LinearGradient(
-    colors: [Color(0xFFFF4444), Color(0xFFE8382C), Color(0xFFB91C1C)],
     begin: Alignment.topLeft, end: Alignment.bottomRight,
   );
 
@@ -167,12 +153,6 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
     setState(() => _isLoading = false);
   }
 
-  void _done() {
-    if (!mounted) return;
-    // ✅ FIX 7: _done() only updates state now
-    setState(() => _isLoading = false);
-  }
-
   Future<void> _pickImage(StateSetter local, {ImageSource src = ImageSource.gallery}) async {
     final f = await ImagePicker().pickImage(source: src);
     if (f == null) return;
@@ -185,7 +165,8 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
 
   // ── EDIT PROFILE SHEET ────────────────────────────────────────────────────
   void _openEditSheet(BuildContext ctx, UserModel user) {
-    _nameController.text = user.name ?? '';
+    // `user.name` is non-nullable, so `?? ''` was dead.
+    _nameController.text = user.name;
     showModalBottomSheet(
       context: ctx,
       isScrollControlled: true,
@@ -488,7 +469,10 @@ class _HeroBanner extends StatelessWidget {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          user.name ?? 'Guest User',
+                          // `user.name` is non-nullable, so `?? 'Guest User'`
+                          // never fired — a user who had not set a name saw a
+                          // blank line instead of the placeholder.
+                          user.name.trim().isEmpty ? 'Guest User' : user.name,
                           style: GoogleFonts.outfit(
                             fontSize: 17.sp, fontWeight: FontWeight.w700,
                             color: _T.textH, letterSpacing: 0.5,
@@ -502,7 +486,7 @@ class _HeroBanner extends StatelessWidget {
                           decoration: BoxDecoration(
                             color: _T.accentSoft,
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: _T.accent.withOpacity(0.3), width: 1),
+                            border: Border.all(color: _T.accent.withValues(alpha:0.3), width: 1),
                           ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
@@ -620,7 +604,7 @@ class _StorageCard extends StatelessWidget {
           Container(
             width: 34.sp, height: 34.sp,
             decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.2),
+              color: Colors.white.withValues(alpha:0.2),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Icon(c.icon, color: Colors.white, size: 18.sp),
@@ -806,9 +790,12 @@ class _SettingsCard extends StatelessWidget {
               iColor: const Color(0xFF2563EB), iBg: const Color(0xFFDBEAFE),
               title: 'Share App', sub: 'Invite your friends',
               isLast: true,
-              onTap: () => Share.share(
-                'Check out Vidnexa Video Player: https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer',
-                subject: 'Download Vidnexa',
+              onTap: () => SharePlus.instance.share(
+                ShareParams(
+                  text:
+                      'Check out Vidnexa Video Player: https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer',
+                  subject: 'Download Vidnexa',
+                ),
               )),
         ],
       ),
@@ -857,7 +844,7 @@ class _Tile extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        splashColor: _T.accent.withOpacity(0.04),
+        splashColor: _T.accent.withValues(alpha:0.04),
         highlightColor: _T.accentSoft,
         borderRadius: isLast
             ? const BorderRadius.vertical(bottom: Radius.circular(20))
@@ -873,7 +860,10 @@ class _Tile extends StatelessWidget {
                 child: svgAsset != null
                     ? Padding(
                     padding: const EdgeInsets.all(10),
-                    child: SvgPicture.asset(svgAsset!, color: iColor))
+                    child: SvgPicture.asset(
+                      svgAsset!,
+                      colorFilter: ColorFilter.mode(iColor, BlendMode.srcIn),
+                    ))
                     : Icon(icon, color: iColor, size: 20.sp),
               ),
               SizedBox(width: 13.sp),
@@ -912,9 +902,9 @@ class _Badge extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
     decoration: BoxDecoration(
-      color: color.withOpacity(0.12),
+      color: color.withValues(alpha:0.12),
       borderRadius: BorderRadius.circular(6),
-      border: Border.all(color: color.withOpacity(0.3)),
+      border: Border.all(color: color.withValues(alpha:0.3)),
     ),
     child: Text(text,
         style: GoogleFonts.outfit(
@@ -959,7 +949,7 @@ class _NightTile extends StatelessWidget {
             child: Switch(
               value: isDark,
               activeColor: _T.accent,
-              activeTrackColor: _T.accent.withOpacity(0.35),
+              activeTrackColor: _T.accent.withValues(alpha:0.35),
               inactiveThumbColor: _T.textS,
               inactiveTrackColor: _T.border,
               onChanged: (_) => themeProvider.changeTheme(),
@@ -984,10 +974,10 @@ class _RemoveAdsTile extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
-              colors: [_T.gold.withOpacity(0.08), _T.accent.withOpacity(0.05)],
+              colors: [_T.gold.withValues(alpha:0.08), _T.accent.withValues(alpha:0.05)],
             ),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: _T.gold.withOpacity(0.3)),
+            border: Border.all(color: _T.gold.withValues(alpha:0.3)),
           ),
           padding: EdgeInsets.symmetric(horizontal: 12.sp, vertical: 13.sp),
           child: Row(
@@ -1034,7 +1024,7 @@ class _RemoveAdsTile extends StatelessWidget {
                 decoration: BoxDecoration(
                   gradient: _T.goldGrad,
                   borderRadius: BorderRadius.circular(10),
-                  boxShadow: [BoxShadow(color: _T.gold.withOpacity(0.3), blurRadius: 10)],
+                  boxShadow: [BoxShadow(color: _T.gold.withValues(alpha:0.3), blurRadius: 10)],
                 ),
                 child: Text('Upgrade',
                     style: GoogleFonts.outfit(
@@ -1074,7 +1064,7 @@ class _RateUsTileState extends State<_RateUsTile> {
       color: Colors.transparent,
       child: InkWell(
         onTap: _openPlayStore,
-        splashColor: _T.accent.withOpacity(0.04),
+        splashColor: _T.accent.withValues(alpha:0.04),
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 14.sp, vertical: 12.sp),
           child: Row(

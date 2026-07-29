@@ -1,10 +1,13 @@
-import 'package:flutter/cupertino.dart';
+import 'dart:io';
+
+import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:videoplayer/Utils/color.dart';
 
+import '../Utils/video_thumb.dart';
 import '../ads/app_open_ad_manager.dart';
 
 class AlbumScreen extends StatefulWidget {
@@ -24,7 +27,6 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    appOpenManager.init();
 
     _controller = AnimationController(
       duration: Duration(milliseconds: 800),
@@ -36,7 +38,6 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
 
   @override
   void dispose() {
-    appOpenManager.dispose();
     _controller.dispose();
     super.dispose();
   }
@@ -190,16 +191,11 @@ class AlbumTile extends StatelessWidget {
                           if (!snapshot.hasData || snapshot.data!.isEmpty) {
                             return Center(child: Icon(Icons.image_not_supported, size: 30.sp, color: Colors.grey[600]));
                           }
-                          return FutureBuilder<Widget>(
-                            future: _buildThumbnail(snapshot.data![0], context),
-                            builder: (context, thumbSnapshot) {
-                              return thumbSnapshot.hasData
-                                  ? thumbSnapshot.data!
-                                  : Container(
-                                color: Colors.grey[300],
-                                child: Center(child: AnimatedProgressIndicator()),
-                              );
-                            },
+                          final cover = snapshot.data![0];
+                          return VideoThumb(
+                            key: ValueKey(cover.id),
+                            asset: cover,
+                            placeholderIcon: Icons.image_outlined,
                           );
                         },
                       ),
@@ -242,29 +238,6 @@ class AlbumTile extends StatelessWidget {
     );
   }
 
-  Future<Widget> _buildThumbnail(AssetEntity asset, BuildContext context) async {
-    // Use higher resolution for thumbnails (adjust based on device density)
-    final thumbSize = ThumbnailSize(512, 512); // Increased from 200x200
-    final thumbData = await asset.thumbnailDataWithSize(thumbSize, quality: 90); // Higher quality
-    if (thumbData == null) {
-      return Container(
-        color: Colors.grey[300],
-        child: Icon(Icons.error, size: 50.sp, color: Colors.red),
-      );
-    }
-    return Image.memory(
-      thumbData,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      cacheWidth: (512 * MediaQuery.of(context).devicePixelRatio).toInt(), // Optimize for device density
-      cacheHeight: (512 * MediaQuery.of(context).devicePixelRatio).toInt(),
-      errorBuilder: (context, error, stackTrace) => Container(
-        color: Colors.grey[300],
-        child: Icon(Icons.error, size: 50.sp, color: Colors.red),
-      ),
-    );
-  }
 }
 
 class PhotosScreen extends StatefulWidget {
@@ -398,42 +371,12 @@ class PhotoTile extends StatelessWidget {
         scale: 1.0,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(5),
-          child: FutureBuilder<Widget>(
-            future: _buildThumbnail(context),
-            builder: (context, snapshot) {
-              return snapshot.hasData
-                  ? snapshot.data!
-                  : Container(
-                color: Colors.grey[300],
-                child: Center(child: AnimatedProgressIndicator()),
-              );
-            },
+          child: VideoThumb(
+            key: ValueKey(photo.id),
+            asset: photo,
+            placeholderIcon: Icons.image_outlined,
           ),
         ),
-      ),
-    );
-  }
-
-  Future<Widget> _buildThumbnail(BuildContext context) async {
-    // Use higher resolution for thumbnails
-    final thumbSize = ThumbnailSize(512, 512); // Increased from 200x200
-    final thumbData = await photo.thumbnailDataWithSize(thumbSize, quality: 90); // Higher quality
-    if (thumbData == null) {
-      return Container(
-        color: Colors.grey[300],
-        child: Icon(Icons.error, size: 50.sp, color: Colors.red),
-      );
-    }
-    return Image.memory(
-      thumbData,
-      fit: BoxFit.cover,
-      width: double.infinity,
-      height: double.infinity,
-      cacheWidth: (512 * MediaQuery.of(context).devicePixelRatio).toInt(), // Optimize for device density
-      cacheHeight: (512 * MediaQuery.of(context).devicePixelRatio).toInt(),
-      errorBuilder: (context, error, stackTrace) => Container(
-        color: Colors.grey[300],
-        child: Icon(Icons.error, size: 50.sp, color: Colors.red),
       ),
     );
   }
@@ -570,33 +513,85 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
             });
           },
           itemBuilder: (context, index) {
+            final photo = _photos[index];
             return Center(
-              child: FutureBuilder<Widget>(
-                future: _buildFullImage(_photos[index]),
-                builder: (context, snapshot) {
-                  return snapshot.hasData
-                      ? snapshot.data!
-                      : AnimatedProgressIndicator();
-                },
-              ),
+              child: _FullPhoto(key: ValueKey(photo.id), asset: photo),
             );
           },
         ),
       ),
     );
   }
+}
 
-  Future<Widget> _buildFullImage(AssetEntity photo) async {
-    final file = await photo.file;
-    return Image.file(
-      file!,
-      fit: BoxFit.fitWidth,
-      width: double.infinity,
-      height: double.infinity,
-      errorBuilder: (context, error, stackTrace) => Container(
-        color: Colors.grey[300],
-        child: Icon(Icons.error, size: 50.sp, color: Colors.red),
-      ),
+/// Full-resolution page in the photo viewer.
+///
+/// Replaces a `FutureBuilder(future: _buildFullImage(...))` that (a) re-read the
+/// file from MediaStore on every rebuild — and a PageView rebuilds constantly
+/// while swiping — and (b) did `Image.file(file!)`, crashing outright whenever
+/// the asset had no local file (deleted, or cloud-only).
+class _FullPhoto extends StatefulWidget {
+  const _FullPhoto({super.key, required this.asset});
+
+  final AssetEntity asset;
+
+  @override
+  State<_FullPhoto> createState() => _FullPhotoState();
+}
+
+class _FullPhotoState extends State<_FullPhoto> {
+  late Future<File?> _file;
+
+  @override
+  void initState() {
+    super.initState();
+    _file = widget.asset.file;
+  }
+
+  @override
+  void didUpdateWidget(_FullPhoto oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.asset.id != widget.asset.id) {
+      _file = widget.asset.file;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<File?>(
+      future: _file,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return AnimatedProgressIndicator();
+        }
+
+        final file = snapshot.data;
+        if (file == null) {
+          return Container(
+            color: Colors.grey[300],
+            padding: EdgeInsets.all(24.sp),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(Icons.broken_image_outlined, size: 48.sp, color: Colors.grey),
+                SizedBox(height: 8.sp),
+                const Text('This file is no longer available'),
+              ],
+            ),
+          );
+        }
+
+        return Image.file(
+          file,
+          fit: BoxFit.fitWidth,
+          width: double.infinity,
+          height: double.infinity,
+          errorBuilder: (context, error, stackTrace) => Container(
+            color: Colors.grey[300],
+            child: Icon(Icons.error, size: 50.sp, color: Colors.red),
+          ),
+        );
+      },
     );
   }
 }

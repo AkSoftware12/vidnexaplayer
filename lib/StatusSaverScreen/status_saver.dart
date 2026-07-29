@@ -266,7 +266,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
                     borderRadius: BorderRadius.circular(22),
                     boxShadow: [
                       BoxShadow(
-                        color: const Color(0xFF25D366).withOpacity(0.35),
+                        color: const Color(0xFF25D366).withValues(alpha:0.35),
                         blurRadius: 20,
                         offset: const Offset(0, 8),
                       ),
@@ -278,7 +278,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
                       Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.2),
+                          color: Colors.white.withValues(alpha:0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(
@@ -301,7 +301,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
                       Text(
                         _lang.headerSubtitle,
                         style: TextStyle(
-                          color: Colors.white.withOpacity(0.85),
+                          color: Colors.white.withValues(alpha:0.85),
                           fontSize: 13,
                           height: 1.5,
                         ),
@@ -471,7 +471,7 @@ class _LangPill extends StatelessWidget {
           boxShadow: active
               ? [
             BoxShadow(
-              color: const Color(0xFF25D366).withOpacity(0.35),
+              color: const Color(0xFF25D366).withValues(alpha:0.35),
               blurRadius: 8,
               offset: const Offset(0, 2),
             ),
@@ -519,7 +519,7 @@ class _StepCard extends StatelessWidget {
         ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.04),
+            color: Colors.black.withValues(alpha:0.04),
             blurRadius: 10,
             offset: const Offset(0, 3),
           ),

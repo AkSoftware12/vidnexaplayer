@@ -181,14 +181,14 @@ class _YouTubePlaylistVideosState extends State<YouTubePlaylistVideos> {
                 curve: Curves.easeOut,
                 padding: const EdgeInsets.all(5),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.18),
+                  color: Colors.white.withValues(alpha:0.18),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
-                    color: Colors.white.withOpacity(0.35),
+                    color: Colors.white.withValues(alpha:0.35),
                   ),
                   boxShadow: [
                     BoxShadow(
-                      color: Colors.black.withOpacity(0.25),
+                      color: Colors.black.withValues(alpha:0.25),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),

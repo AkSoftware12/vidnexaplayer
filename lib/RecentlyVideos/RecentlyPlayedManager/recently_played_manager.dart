@@ -1,39 +1,69 @@
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// Recently-played list keyed by **file path**.
+///
+/// ⚠️ Not currently used anywhere — `VideoProvider` (lib/Home/HomeScreen/home2.dart)
+/// is the live implementation and stores **AssetEntity ids**.
+///
+/// This class used to share `VideoProvider`'s `'recently_played_videos'` key
+/// while storing a completely different kind of value, so enabling it would
+/// have mixed paths and asset ids in one list and corrupted both features. It
+/// now uses its own namespaced key. Prefer deleting this file and using
+/// `VideoProvider` instead of wiring it up.
+@Deprecated('Use VideoProvider in lib/Home/HomeScreen/home2.dart instead.')
 class RecentlyPlayedManager {
-  static const String _key = 'recently_played_videos';
+  RecentlyPlayedManager._();
 
-  // Save a video to the recently played list
+  // Deliberately NOT 'recently_played_videos' — that key belongs to VideoProvider.
+  static const String _key = 'recently_played_video_paths';
+  static const int _maxEntries = 10;
+
+  /// Saves a video path at the top of the list.
   static Future<void> addVideo(String videoPath) async {
-    final prefs = await SharedPreferences.getInstance();
-    List<String> videos = prefs.getStringList(_key) ?? [];
+    if (videoPath.trim().isEmpty) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final videos = prefs.getStringList(_key) ?? <String>[];
 
-    // Avoid duplicates and maintain a limit (e.g., 10 videos)
-    if (videos.contains(videoPath)) {
-      videos.remove(videoPath);
+      videos
+        ..remove(videoPath)
+        ..insert(0, videoPath);
+
+      await prefs.setStringList(
+        _key,
+        videos.length > _maxEntries ? videos.sublist(0, _maxEntries) : videos,
+      );
+    } catch (_) {
+      // Non-fatal.
     }
-    videos.insert(0, videoPath); // Add to the start of the list
-    if (videos.length > 10) {
-      videos = videos.sublist(0, 10); // Limit to 10 videos
-    }
-    await prefs.setStringList(_key, videos);
   }
 
-  // Retrieve the list of recently played videos
   static Future<List<String>> getVideos() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getStringList(_key) ?? [];
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getStringList(_key) ?? <String>[];
+    } catch (_) {
+      return <String>[];
+    }
   }
 
-  // Remove a video from the recently played list
   static Future<void> removeVideo(String videoPath) async {
-    final prefs = await SharedPreferences.getInstance();
-    List<String> videos = prefs.getStringList(_key) ?? [];
-
-    // Remove the specified video path if it exists
-    if (videos.contains(videoPath)) {
-      videos.remove(videoPath);
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final videos = prefs.getStringList(_key) ?? <String>[];
+      if (!videos.remove(videoPath)) return;
       await prefs.setStringList(_key, videos);
+    } catch (_) {
+      // Non-fatal.
+    }
+  }
+
+  static Future<void> clear() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_key);
+    } catch (_) {
+      // Non-fatal.
     }
   }
 }
