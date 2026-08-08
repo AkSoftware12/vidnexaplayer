@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources xmlns:tools="http://schemas.android.com/tools"
+    tools:keep="@drawable/*" />
+
+<!-- Without this, R8's shrinkResources strips ic_stat_music.xml from release
+     builds: audio_service resolves androidNotificationIcon via
+     getResources().getIdentifier(...) at runtime (reflection), which the
+     resource shrinker cannot trace back from AudioServiceConfig, so it
+     never sees the icon as "used". The service then tries to post the
+     foreground notification with a missing/invalid small-icon resource id,
+     which crashes on Android as soon as playback starts — release-only,
+     debug is unaffected because shrinkResources only runs for the release
+     build type. -->
