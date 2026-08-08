@@ -21,10 +21,21 @@ class _GenresViewState extends State<GenresView>
 
   bool isLoading = true;
 
+  late Future<List<GenreModel>> _genresFuture;
+
   @override
   void initState() {
     super.initState();
     // context.read<HomeBloc>().add(GetGenresEvent());
+    // Cached once instead of being rebuilt in build(): a new Future every
+    // rebuild (e.g. switching tabs) made FutureBuilder drop back to its
+    // loading state and re-scan the entire on-device audio library.
+    _genresFuture = audioQuery.queryGenres(
+      sortType: null,
+      orderType: OrderType.ASC_OR_SMALLER,
+      uriType: UriType.EXTERNAL,
+      ignoreCase: true,
+    );
   }
 
   @override
@@ -34,13 +45,7 @@ class _GenresViewState extends State<GenresView>
 
       body: Center(
         child:  FutureBuilder<List<GenreModel>>(
-          // Default values:
-          future: audioQuery.queryGenres(
-            sortType: null,
-            orderType: OrderType.ASC_OR_SMALLER,
-            uriType: UriType.EXTERNAL,
-            ignoreCase: true,
-          ),
+          future: _genresFuture,
           builder: (context, item) {
             // Display error, if any.
             if (item.hasError) {

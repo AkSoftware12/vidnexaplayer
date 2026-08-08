@@ -64,7 +64,12 @@ class _SplashScreenState extends State<SplashScreen> {
 
     final navigator = Navigator.of(context);
 
-    await navigator.pushReplacement(
+    // Not awaited: pushReplacement's Future only completes once the pushed
+    // route (Home) is later POPPED, not once it finishes pushing — Home is
+    // the app's root route and is essentially never popped, so awaiting it
+    // here silently stalled everything below forever, including the pending
+    // video push.
+    navigator.pushReplacement(
       MaterialPageRoute(
         builder: (_) => onboardingDone
             ? const HomeBottomNavigation()
@@ -72,21 +77,28 @@ class _SplashScreenState extends State<SplashScreen> {
       ),
     );
 
+    // From this point on, a proactively-pushed video (native "Open with"
+    // arriving while the app is already alive) is safe to push directly —
+    // see VideoIntentService._bootComplete for why that matters.
+    VideoIntentService.markBootComplete();
+
     // If the app was launched via "Open with", open the video on top of Home so
     // pressing back returns to the app instead of an empty splash route.
     final pending = VideoIntentService.consumePendingVideo();
     if (pending == null) return;
+    // The native side also proactively pushes "newVideoIntent" now — in a
+    // narrow boot-timing race both this poll-based path and that push could
+    // otherwise deliver the same uri and open the player twice.
+    if (!VideoIntentService.claimForOpening(pending)) return;
 
     debugPrint('OPEN WITH URI => $pending');
-    unawaited(
-      navigator.push(
-        MaterialPageRoute(
-          builder: (_) => FullScreenVideoPlayerFixed(
-            videos: const [],
-            initialIndex: 0,
-            // media_kit opens content:// and file:// uris directly.
-            initialUrl: pending,
-          ),
+    navigator.push(
+      MaterialPageRoute(
+        builder: (_) => FullScreenVideoPlayerFixed(
+          videos: const [],
+          initialIndex: 0,
+          // media_kit opens content:// and file:// uris directly.
+          initialUrl: pending,
         ),
       ),
     );

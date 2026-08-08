@@ -34,7 +34,11 @@ class StatusItem {
 
   bool get isImage => !isVideo;
   String get typeLabel => isVideo ? 'Video' : 'Image';
-  String get id => document?.uri ?? localFile!.path;
+  // Falls back to `name` instead of `localFile!.path` — nothing enforces
+  // "at least one of document/localFile is non-null" as an invariant, so a
+  // bare `!` here would crash on any future call site that doesn't follow
+  // today's construction convention.
+  String get id => document?.uri ?? localFile?.path ?? name;
 
   Future<File?> previewFile() async {
     if (localFile != null) return localFile;
@@ -719,10 +723,12 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
         ..._downloads.where((entry) => entry.id != item.id),
       ];
 
-      setState(() {
-        _downloads = updated;
-        _downloadedIds = updated.map((entry) => entry.id).toSet();
-      });
+      // Update the fields regardless of `mounted` — persistence below must
+      // still happen even if the user navigated away right as the save
+      // finished. Only the `setState` UI-rebuild call needs the guard.
+      _downloads = updated;
+      _downloadedIds = updated.map((entry) => entry.id).toSet();
+      if (mounted) setState(() {});
 
       await _persistDownloads();
 

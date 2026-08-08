@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 import '../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
 
@@ -16,7 +15,6 @@ class GenrePage extends StatefulWidget {
 
 class _GenrePageState extends State<GenrePage> {
   late List<SongModel> _songs;
-  final AudioPlayer audioPlayer = AudioPlayer();
   final audio = GlobalAudioController();
 
   @override
@@ -37,6 +35,7 @@ class _GenrePageState extends State<GenrePage> {
     // remove songs less than 10 seconds long (10,000 milliseconds)
     songs.removeWhere((song) => (song.duration ?? 0) < 10000);
 
+    if (!mounted) return;
     setState(() {
       _songs = songs;
     });

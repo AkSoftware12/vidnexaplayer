@@ -352,9 +352,20 @@ class _TextScrollState extends State<TextScroll> {
 
     /// If fade border is enabled
     if (widget.fadedBorder) {
+      // `assert` is stripped in release builds, so a caller passing
+      // fadedBorderWidth: 0 (or leaving it null) would divide by zero /
+      // null-check crash below in release. Fall back to the documented
+      // default (0.2) instead of trusting the assert alone.
+      final double borderWidth =
+      (widget.fadedBorderWidth != null &&
+          widget.fadedBorderWidth! > 0 &&
+          widget.fadedBorderWidth! <= 1)
+          ? widget.fadedBorderWidth!
+          : 0.2;
+
       ///Fill list with amount of transparent colors to make the text visible
       final List<Color> colors =
-      List.generate(1 ~/ widget.fadedBorderWidth! - 1, (index) {
+      List.generate(1 ~/ borderWidth - 1, (index) {
         return Colors.transparent;
       }, growable: true);
 
@@ -374,8 +385,8 @@ class _TextScrollState extends State<TextScroll> {
 
       ///Calculate the stops for the gradient
       final List<double> stops =
-      List.generate(1 ~/ widget.fadedBorderWidth!, (index) {
-        return (index + 1) * widget.fadedBorderWidth!;
+      List.generate(1 ~/ borderWidth, (index) {
+        return (index + 1) * borderWidth;
       }, growable: true);
 
       ///Add first stop to list

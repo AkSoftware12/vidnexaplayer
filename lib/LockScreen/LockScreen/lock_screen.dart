@@ -230,7 +230,11 @@ class _VaultScreenState extends State<VaultScreen> {
 
   Future<void> _addFile() async {
     final res = await FilePicker.platform.pickFiles();
-    final path = res?.files.single.path;
+    // `.single` throws if the platform ever hands back more (or fewer) than
+    // exactly one file — some Android file providers do that even without
+    // `allowMultiple` set. `.first` degrades gracefully instead of crashing.
+    final path =
+    (res != null && res.files.isNotEmpty) ? res.files.first.path : null;
     if (path == null || !mounted) return;
 
     setState(() => busy = true);

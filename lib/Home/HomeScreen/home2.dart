@@ -11,6 +11,7 @@ import '../../VideoPLayer/4kPlayer/4k_player.dart';
 import '../../VideoPLayer/VideoList/video_list.dart';
 import '../../ads/BannerAdsList/banner_ad_list.dart';
 import '../../ads/app_open_ad_manager.dart';
+import '../../main.dart';
 import 'BannerSlider/banner_slider.dart';
 import 'BottomsheetHomeScreen/bottomsheet_menu_button.dart';
 import 'HorizontalGridList/horizontal_gridlist.dart';
@@ -610,16 +611,21 @@ class AlbumTile extends StatelessWidget {
 
         return GestureDetector(
           onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder:
-                    (context) => VideoFolderScreen(
+            appOpenManager.showInterstitialIfAllowed(
+              onContinue: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => VideoFolderScreen(
                       folderName: album.name,
                       videos: album,
                     ),
-              ),
+                  ),
+                );
+              },
             );
+
           },
           child: AnimatedScale(
             duration: Duration(milliseconds: 500),

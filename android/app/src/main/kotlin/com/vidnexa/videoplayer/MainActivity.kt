@@ -2,6 +2,7 @@ package com.vidnexa.videoplayer
 
 import android.content.Intent
 import android.os.Bundle
+import android.util.Log
 import com.ryanheise.audioservice.AudioServiceActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -23,6 +24,27 @@ class MainActivity : AudioServiceActivity() {
     /// Guards against replaying the same intent after a configuration change.
     private var consumed = false
 
+    /// So [handleIntent] can push straight to Dart. `getVideoPath` alone only
+    /// covers a TRUE cold start — Dart asks for it exactly once, from
+    /// `MyApp.initState`. Two other cases need the proactive push instead:
+    ///  - Warm start: app already foreground/backgrounded with its Activity
+    ///    alive — Android delivers the new intent via `onNewIntent`, and
+    ///    nothing would otherwise poll for it again.
+    ///  - "Zombie" start: the user swiped the app away from Recents. That
+    ///    only tears down the Activity/Task — `AudioServiceActivity` (via
+    ///    `provideFlutterEngine`) keeps the Flutter engine and Dart isolate
+    ///    alive in the background so audio playback can continue. A fresh
+    ///    `MainActivity` then goes through `onCreate` (not `onNewIntent`),
+    ///    but `MyApp.initState()` never runs again on that already-running
+    ///    isolate, so polling alone would silently drop the video here too.
+    /// Both are covered by always attempting the push, from both lifecycle
+    /// callbacks. If Dart hasn't registered a handler yet (a genuine first
+    /// cold boot, where this fires before `main()` has even started), the
+    /// call is simply a safe no-op and `getVideoPath` polling covers it
+    /// instead — `consumed` is deliberately NOT set here, only by
+    /// `getVideoPath` itself, so that fallback always stays available.
+    private var channel: MethodChannel? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
@@ -35,6 +57,7 @@ class MainActivity : AudioServiceActivity() {
     }
 
     private fun handleIntent(intent: Intent?) {
+        Log.d("VidnexaIntent", "handleIntent: action=${intent?.action} data=${intent?.data}")
         if (intent?.action != Intent.ACTION_VIEW) return
         val uri = intent.data ?: return
 
@@ -50,25 +73,30 @@ class MainActivity : AudioServiceActivity() {
 
         openedVideoUri = uri.toString()
         consumed = false
+
+        channel?.invokeMethod("newVideoIntent", openedVideoUri)
     }
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
-            .setMethodCallHandler { call, result ->
-                when (call.method) {
-                    "getVideoPath" -> {
-                        // Deliver once; a second call (e.g. after rotation) returns null
-                        // so the player is not pushed onto the stack twice.
-                        if (consumed) {
-                            result.success(null)
-                        } else {
-                            consumed = true
-                            result.success(openedVideoUri)
+        channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
+            .apply {
+                setMethodCallHandler { call, result ->
+                    when (call.method) {
+                        "getVideoPath" -> {
+                            // Deliver once; a second call (e.g. after rotation) returns null
+                            // so the player is not pushed onto the stack twice.
+                            Log.d("VidnexaIntent", "getVideoPath called: consumed=$consumed openedVideoUri=$openedVideoUri")
+                            if (consumed) {
+                                result.success(null)
+                            } else {
+                                consumed = true
+                                result.success(openedVideoUri)
+                            }
                         }
+                        else -> result.notImplemented()
                     }
-                    else -> result.notImplemented()
                 }
             }
     }

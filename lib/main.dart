@@ -186,6 +186,7 @@ class _MyAppState extends State<MyApp> {
     // and the splash's own pushReplacement then destroyed the player route.
     if (Platform.isAndroid) {
       VideoIntentService.fetchLaunchUri();
+      VideoIntentService.startListening();
     }
   }
 

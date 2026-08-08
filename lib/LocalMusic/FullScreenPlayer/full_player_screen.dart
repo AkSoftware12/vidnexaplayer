@@ -1099,19 +1099,23 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
         audio.currentIndex.value = (newQ.isEmpty) ? 0 : newQ.length - 1;
       }
 
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Deleted: ${song.title}", style: GoogleFonts.poppins()),
-          backgroundColor: const Color(0xFF1E1E1E),
-        ),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Deleted: ${song.title}", style: GoogleFonts.poppins()),
+            backgroundColor: const Color(0xFF1E1E1E),
+          ),
+        );
+      }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text("Delete failed", style: GoogleFonts.poppins()),
-          backgroundColor: Colors.redAccent,
-        ),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text("Delete failed", style: GoogleFonts.poppins()),
+            backgroundColor: Colors.redAccent,
+          ),
+        );
+      }
     }
   }
 
@@ -1303,6 +1307,32 @@ class SongArtwork extends StatelessWidget {
     this.borderRadius = const BorderRadius.all(Radius.circular(12)),
   });
 
+  // Shared across every SongArtwork instance (song lists, now-playing view,
+  // queue sheet, MiniPlayer all use this widget for the same songs) so the
+  // same song's artwork isn't re-decoded from the platform channel on every
+  // single rebuild. Capped so a long session can't grow this unboundedly —
+  // a full clear-on-overflow is enough here, true LRU isn't needed.
+  static final Map<int, Future<Uint8List?>> _artworkCache = {};
+  static const int _artworkCacheLimit = 300;
+
+  Future<Uint8List?> _artworkFuture(OnAudioQuery audioQuery) {
+    final cached = _artworkCache[songId];
+    if (cached != null) return cached;
+
+    if (_artworkCache.length >= _artworkCacheLimit) {
+      _artworkCache.clear();
+    }
+
+    final future = audioQuery.queryArtwork(
+      songId,
+      ArtworkType.AUDIO,
+      size: 800, // quality
+      quality: 100, // 0-100
+    );
+    _artworkCache[songId] = future;
+    return future;
+  }
+
   @override
   Widget build(BuildContext context) {
     final audioQuery = OnAudioQuery();
@@ -1310,12 +1340,7 @@ class SongArtwork extends StatelessWidget {
     return ClipRRect(
       borderRadius: borderRadius,
       child: FutureBuilder<Uint8List?>(
-        future: audioQuery.queryArtwork(
-          songId,
-          ArtworkType.AUDIO,
-          size: 800,      // quality
-          quality: 100,   // 0-100
-        ),
+        future: _artworkFuture(audioQuery),
         builder: (context, snapshot) {
           final bytes = snapshot.data;
 

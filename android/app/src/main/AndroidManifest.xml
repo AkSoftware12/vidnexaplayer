@@ -69,10 +69,19 @@
 
         <!-- Launcher + "Open with" handler.
              MainActivity extends AudioServiceActivity, so audio_service still
-             works while our open_video_channel MethodChannel stays reachable. -->
+             works while our open_video_channel MethodChannel stays reachable.
+
+             launchMode must be singleTask, not singleTop: when another app
+             (a file manager) sends the ACTION_VIEW intent without
+             FLAG_ACTIVITY_NEW_TASK, singleTop still lets us land inside the
+             CALLER's task instead of our own. Riding on that task made our
+             process an easy target for the OEM's aggressive background killer —
+             it got reaped as "cached" seconds after opening, before the video
+             ever rendered. singleTask forces Android to open/reuse our own task
+             regardless of what flags the caller used. -->
         <activity
             android:name=".MainActivity"
-            android:launchMode="singleTop"
+            android:launchMode="singleTask"
             android:theme="@style/LaunchTheme"
             android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
             android:hardwareAccelerated="true"

@@ -16,6 +16,7 @@ import 'package:volume_controller/volume_controller.dart';
 
 import '../../Home/HomeScreen/home2.dart';
 import '../../NotifyListeners/PlayPauseSync/play_pause.dart';
+import '../../ads/app_open_ad_manager.dart';
 import '../custom_video_appBar.dart';
 import 'FlotingVideo/floting_video.dart';
 import 'HDR/hdr.dart';
@@ -55,6 +56,9 @@ class FullScreenVideoPlayerFixed extends StatefulWidget {
 
 class _FullScreenVideoPlayerSystemVolumeState
     extends State<FullScreenVideoPlayerFixed> {
+  // Singleton — initialised once in main.dart, never disposed by a screen.
+  final appOpenManager = AppOpenAdManager();
+
   late int _currentIndex;
   late final Player _player;
   late final VideoController _controller;
@@ -493,10 +497,27 @@ class _FullScreenVideoPlayerSystemVolumeState
 
     final file = await widget.videos[_currentIndex].file;
 
+    // The file lookup above can take a while (MediaStore/cloud-backed
+    // resolution); if the user backed out of the screen while it was
+    // pending, `dispose()` already tore `_player` down — using it here
+    // would throw on a disposed native player.
+    if (!mounted) return;
+
     if (file != null) {
-      await _player.open(Media(file.path), play: false);
-      await Future.delayed(const Duration(milliseconds: 100));
-      await _player.play();
+      try {
+        await _player.open(Media(file.path), play: false);
+        await Future.delayed(const Duration(milliseconds: 100));
+        await _player.play();
+      } catch (e) {
+        if (mounted) {
+          Fluttertoast.showToast(
+            msg: "Playback failed: $e",
+            gravity: ToastGravity.CENTER,
+            backgroundColor: Colors.red,
+            textColor: Colors.white,
+          );
+        }
+      }
     } else {
       Fluttertoast.showToast(
         msg: "Video file not found",
@@ -2660,10 +2681,15 @@ class _FullScreenVideoPlayerSystemVolumeState
                                 SystemUiOverlay.values,
                               );
                             } else {
-                              ScreenBrightness()
-                                  .resetApplicationScreenBrightness()
-                                  .catchError((Object _) {});
-                              Navigator.pop(context);
+                              appOpenManager.showInterstitialIfAllowed(
+                                onContinue: () {
+                                  if (!mounted) return;
+                                  ScreenBrightness()
+                                      .resetApplicationScreenBrightness()
+                                      .catchError((Object _) {});
+                                  Navigator.pop(context);
+                                },
+                              );
                             }
                           },
                           currentIndex: _currentIndex,
@@ -2690,10 +2716,15 @@ class _FullScreenVideoPlayerSystemVolumeState
                           child: _StreamTopBar(
                             title: appBarTitle,
                             onBack: () {
-                              ScreenBrightness()
-                                  .resetApplicationScreenBrightness()
-                                  .catchError((Object _) {});
-                              Navigator.pop(context);
+                              appOpenManager.showInterstitialIfAllowed(
+                                onContinue: () {
+                                  if (!mounted) return;
+                                  ScreenBrightness()
+                                      .resetApplicationScreenBrightness()
+                                      .catchError((Object _) {});
+                                  Navigator.pop(context);
+                                },
+                              );
                             },
                           ),
                         ),
@@ -2945,7 +2976,11 @@ class _FullScreenVideoPlayerSystemVolumeState
   }
 
   Future<void> _togglePlayPause() async {
-    _player.state.playing ? _player.pause() : _player.play();
+    try {
+      await (_player.state.playing ? _player.pause() : _player.play());
+    } catch (_) {
+      // Transient native-player state; nothing else to do about it here.
+    }
   }
 
   Future<void> _seekBy(Duration offset) async {

@@ -66,7 +66,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   void _loadExitAd() {
     _exitBannerAd = BannerAd(
       // TODO: Google TEST ad unit ID — release se pehle apni real ID lagana!
-      adUnitId: 'ca-app-pub-3940256099942544/6300978111',
+      adUnitId: AdUnits.banner,
       size: AdSize.mediumRectangle, // 300x250 — dialog ke liye best fit
       request: const AdRequest(),
       listener: BannerAdListener(
@@ -116,6 +116,14 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       await Future.delayed(const Duration(milliseconds: 900));
       if (!mounted) return;
       await RatingPopup.onAppOpen(context);
+    });
+
+    // Moved out of build(): it used to run there unconditionally, so every
+    // rebuild of this shell (e.g. every tab switch) re-triggered a
+    // SharedPreferences read. Needed once, at startup.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      Provider.of<AppBarColorProvider>(context, listen: false).loadColor();
     });
   }
 
@@ -366,11 +374,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   }
   @override
   Widget build(BuildContext context) {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (!mounted) return;
-      Provider.of<AppBarColorProvider>(context, listen: false).loadColor();
-    });
-
     return PopScope(
       // Block the automatic pop so we can ask first.
       canPop: false,
@@ -452,9 +455,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                 ],
               ),
               // Grid icon
-              // SizedBox(
-              //   height: 40.sp,
-              //     child: Image.asset('assets/logo_blue_text.png')),
+              SizedBox(
+                height: 35.sp,
+                  child: Image.network('https://cdn.vidnexaplayer.com/images/logo_text.webp')),
 
               Row(
                 children: [
@@ -574,6 +577,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   void _getUsername() async {
     AppStore appStore = AppStore();
     String name = await appStore.getUserName();
+    if (!mounted) return;
     setState(() {
       userName = name;
     });
@@ -1052,8 +1056,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           SizedBox(
             height: 28.h,
-            child: Image.asset('assets/logo_blue_text.png'),
-          ),
+          child: Image.network('https://cdn.vidnexaplayer.com/images/logo_text.webp')),
+
           const Spacer(),
           GestureDetector(
             onTap: () => Navigator.of(context).pop(),

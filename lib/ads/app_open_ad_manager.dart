@@ -19,15 +19,13 @@ class AdUnits {
   // ---- Live units (release builds) ----
   static const String _liveAppOpen = 'ca-app-pub-6478840988045325/9137962029';
   static const String _liveBanner = 'ca-app-pub-6478840988045325/7764390357';
-  static const String _liveInterstitial =
-      'ca-app-pub-6478840988045325/2955697053';
+  static const String _liveInterstitial = 'ca-app-pub-6478840988045325/2955697053';
 
   // ---- Google's public test units (debug builds) ----
   // https://developers.google.com/admob/android/test-ads
   static const String _testAppOpen = 'ca-app-pub-3940256099942544/9257395921';
   static const String _testBanner = 'ca-app-pub-3940256099942544/6300978111';
-  static const String _testInterstitial =
-      'ca-app-pub-3940256099942544/1033173712';
+  static const String _testInterstitial = 'ca-app-pub-3940256099942544/1033173712';
 
   static const String appOpen = kDebugMode ? _testAppOpen : _liveAppOpen;
   static const String banner = kDebugMode ? _testBanner : _liveBanner;
@@ -267,16 +265,21 @@ class AppOpenAdManager with WidgetsBindingObserver {
       return;
     }
 
+    // Claim the ad synchronously, before the `await` below — otherwise a
+    // second overlapping call (e.g. app-resume firing while the splash
+    // screen's own call is still awaiting _canShowAd()'s SharedPreferences
+    // round-trip) would also read a non-null `_appOpenAd`/`_isShowingAd ==
+    // false`, and both calls would go on to show() the same single-use ad.
+    _appOpenAd = null;
+    _isShowingAd = true;
+
     if (!await _canShowAd()) {
+      // Not actually showing after all — release the claim.
+      _appOpenAd = ad;
+      _isShowingAd = false;
       finish();
       return;
     }
-
-    // Detach before showing so a second call can never reach the same ad —
-    // an AppOpenAd is single-use and calling show() twice (or after dispose)
-    // crashes.
-    _appOpenAd = null;
-    _isShowingAd = true;
 
     ad.fullScreenContentCallback = FullScreenContentCallback(
       onAdDismissedFullScreenContent: (ad) async {

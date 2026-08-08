@@ -44,10 +44,12 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
 
   Future<void> _requestPermissionAndLoadAlbums() async {
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
+    if (!mounted) return;
     if (ps.isAuth) {
       final List<AssetPathEntity> albums = await PhotoManager.getAssetPathList(
         type: RequestType.image,
       );
+      if (!mounted) return;
       setState(() {
         _albums = albums;
         _isLoading = false;
@@ -274,6 +276,7 @@ class _PhotosScreenState extends State<PhotosScreen> with SingleTickerProviderSt
 
   Future<void> _loadPhotos() async {
     final List<AssetEntity> photos = await widget.album.getAssetListRange(start: 0, end: 1000);
+    if (!mounted) return;
     setState(() {
       _photos = photos;
       _isLoading = false;

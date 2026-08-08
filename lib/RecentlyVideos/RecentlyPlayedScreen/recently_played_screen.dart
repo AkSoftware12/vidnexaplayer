@@ -168,7 +168,12 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                   color: Colors.transparent,
                   child: InkWell(
                     borderRadius: BorderRadius.circular(22.r),
-                    onTap: () => _showClearSinglePopup(context, _recentEntities.last), // ✅ Clear All popup
+                    // `_recentEntities` loads asynchronously and can still be
+                    // empty here even though the section is already showing —
+                    // disable the tap instead of crashing on `.last`.
+                    onTap: _recentEntities.isEmpty
+                        ? null
+                        : () => _showClearSinglePopup(context, _recentEntities.last),
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 4.h),
                       decoration: BoxDecoration(

@@ -68,7 +68,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     SizeConfig().init(context);
 
     return Scaffold(
-      backgroundColor: colors[_currentPage],
+      // Clamped: `colors` and the onboarding page count are two separate
+      // lists that happen to both be length 3 today — nothing keeps them in
+      // sync, so indexing past either end would throw a RangeError.
+      backgroundColor: colors[_currentPage.clamp(0, colors.length - 1)],
       body: Column(
         children: [
           SizedBox(height: 20.sp),

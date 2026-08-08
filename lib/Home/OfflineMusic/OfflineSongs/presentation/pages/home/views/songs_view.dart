@@ -2,7 +2,6 @@ import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 import '../../../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
 
@@ -21,18 +20,27 @@ class SongsView extends StatefulWidget {
 
 class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMixin {
   final audioQuery = OnAudioQuery();
-  final audioPlayer = AudioPlayer();
 
   List<SongModel> items = [];
 
   final audio = GlobalAudioController();
 
+  late Future<List<SongModel>> _songsFuture;
 
   bool isLoading = true;
   // List<SongModel> filteredItems = [];
   @override
   void initState() {
     super.initState();
+    // Cached once instead of being rebuilt in build(): a new Future every
+    // rebuild (e.g. switching tabs) made FutureBuilder drop back to its
+    // loading state and re-scan the entire on-device audio library.
+    _songsFuture = audioQuery.querySongs(
+      sortType: null,
+      orderType: OrderType.ASC_OR_SMALLER,
+      uriType: UriType.EXTERNAL,
+      ignoreCase: true,
+    );
   }
 
 
@@ -143,13 +151,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
       body: Container(
         color: widget.color,
         child: FutureBuilder<List<SongModel>>(
-          // Default values:
-          future: audioQuery.querySongs(
-            sortType: null,
-            orderType: OrderType.ASC_OR_SMALLER,
-            uriType: UriType.EXTERNAL,
-            ignoreCase: true,
-          ),
+          future: _songsFuture,
           builder: (context, item) {
             // Display error, if any.
             if (item.hasError) {

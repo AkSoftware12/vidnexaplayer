@@ -5,6 +5,7 @@ import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:icons_plus/icons_plus.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:videoplayer/Photo/image_album.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -87,6 +88,11 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
   final int _sizePerPage = 50;
   AssetPathEntity? _path;
 
+  // Was a hardcoded 'v2.4.1' that never matched the actual installed build
+  // (pubspec.yaml's real version). Filled in from the platform at runtime,
+  // same as the app-update-check version display in HomeBottomnavigation.
+  String _appVersion = '';
+
   late AnimationController _fadeCtrl, _slideCtrl;
   late Animation<double>   _fadeAnim;
   late Animation<Offset>   _slideAnim;
@@ -115,6 +121,18 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
 
     // ✅ FIX 4: Assets load in background — does NOT block screen
     _requestAssets();
+
+    _loadAppVersion();
+  }
+
+  Future<void> _loadAppVersion() async {
+    try {
+      final info = await PackageInfo.fromPlatform();
+      if (!mounted) return;
+      setState(() => _appVersion = info.version);
+    } catch (e) {
+      debugPrint('PackageInfo failed: $e');
+    }
   }
 
   @override
@@ -159,7 +177,12 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
     final dir   = await getApplicationDocumentsDirectory();
     final dest  = File('${dir.path}/profile_${DateTime.now().millisecondsSinceEpoch}.png');
     final saved = await File(f.path).copy(dest.path);
-    local(() => _pickedImage = saved);
+    // The Edit Profile sheet may have been dismissed while the picker/file
+    // copy was still pending — `local` (its StatefulBuilder's StateSetter)
+    // throws if called after the sheet's element is already gone.
+    try {
+      local(() => _pickedImage = saved);
+    } catch (_) {}
     if (mounted) setState(() {});
   }
 
@@ -383,7 +406,7 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
                     SizedBox(height: 20.sp),
                     Center(
                       child: Text(
-                        'VIDNEXA  v2.4.1',
+                        _appVersion.isEmpty ? 'VIDNEXA' : 'VIDNEXA  v$_appVersion',
                         style: _T.outfit(size: 10, color: _T.textS),
                       ),
                     ),

@@ -23,6 +23,22 @@ class _ArtistsViewState extends State<ArtistsView> {
 
   ArtistSort _sort = ArtistSort.az;
 
+  late Future<List<ArtistModel>> _artistsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    // Cached once instead of being rebuilt in build(): a new Future every
+    // rebuild (e.g. switching tabs) made FutureBuilder drop back to its
+    // loading state and re-scan the entire on-device audio library.
+    _artistsFuture = _audioQuery.queryArtists(
+      sortType: null,
+      orderType: OrderType.ASC_OR_SMALLER,
+      uriType: UriType.EXTERNAL,
+      ignoreCase: true,
+    );
+  }
+
   @override
   void dispose() {
     _search.dispose();
@@ -68,12 +84,7 @@ class _ArtistsViewState extends State<ArtistsView> {
     return Container(
       color: bg,
       child: FutureBuilder<List<ArtistModel>>(
-        future: _audioQuery.queryArtists(
-          sortType: null,
-          orderType: OrderType.ASC_OR_SMALLER,
-          uriType: UriType.EXTERNAL,
-          ignoreCase: true,
-        ),
+        future: _artistsFuture,
         builder: (context, snap) {
           if (snap.hasError) {
             return Center(

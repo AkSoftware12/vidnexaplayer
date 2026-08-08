@@ -4,7 +4,7 @@ class AppStore{
 
   setUserImage(String value)async{
     SharedPreferences sp = await SharedPreferences.getInstance();
-    sp.setString('user_image', value);
+    await sp.setString('user_image', value);
   }
   Future<String>getUserImage()async{
     SharedPreferences sp = await SharedPreferences.getInstance();
@@ -13,7 +13,7 @@ class AppStore{
 
   setUserName(String value)async{
     SharedPreferences sp = await SharedPreferences.getInstance();
-    sp.setString('user_name', value);
+    await sp.setString('user_name', value);
   }
 
   Future<String>getUserName()async{
@@ -24,7 +24,7 @@ class AppStore{
 
   setUserToken(String value)async{
     SharedPreferences sp = await SharedPreferences.getInstance();
-    sp.setString('user_token', value);
+    await sp.setString('user_token', value);
   }
 
   Future<String>getUserToken()async{
@@ -35,6 +35,6 @@ class AppStore{
 
   removeToken()async{
     SharedPreferences sp = await SharedPreferences.getInstance();
-    sp.remove('user_token');
+    await sp.remove('user_token');
   }
 }

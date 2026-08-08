@@ -292,6 +292,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
   ) async {
     // 1️⃣ Permission check
     final permission = await PhotoManager.requestPermissionExtend();
+    if (!context.mounted) return;
     if (!permission.isAuth) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -332,6 +333,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
     );
 
     if (confirm != true) return;
+    if (!context.mounted) return;
 
     // 3️⃣ Fetch all video asset paths
     final paths = await PhotoManager.getAssetPathList(type: RequestType.video);
@@ -344,8 +346,10 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
       for (final asset in assets) {
         final file = await asset.file;
         if (file != null && file.path == videoPath) {
+          if (!context.mounted) return;
           try {
             final result = await PhotoManager.editor.deleteWithIds([asset.id]);
+            if (!context.mounted) return;
             if (result.isNotEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
@@ -363,12 +367,14 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
               );
             }
           } catch (e) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text("Error deleting video: $e"),
-                backgroundColor: Colors.red,
-              ),
-            );
+            if (context.mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text("Error deleting video: $e"),
+                  backgroundColor: Colors.red,
+                ),
+              );
+            }
           }
           return; // Exit once video is deleted
         }
@@ -381,12 +387,16 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
 
       final file = File(videoPath);
       if (!await file.exists()) {
-        Navigator.pop(context);
+        // No loading dialog/route is pushed before this method is called
+        // (see the onShare callers above) — this used to pop the actual
+        // VideoFolderScreen itself instead of just showing the snackbar.
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('❌ File not found')),
         );
         return;
       }
+      if (!context.mounted) return;
 
       final ext = path.extension(videoPath).replaceFirst('.', '').toLowerCase();
       final shareFile = XFile(videoPath, mimeType: 'video/$ext');
@@ -405,31 +415,22 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
 
     } catch (e, st) {
       debugPrint('Error sharing: $e\n$st');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('❌ Failed to share video')),
-      );
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('❌ Failed to share video')),
+        );
+      }
     } finally {
       // Navigator.pop(context); // hide loader
     }
   }
 
   Future<void> _showVideoInfo(AssetEntity photo) async {
-    if (photo.file.toString().startsWith('http')) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Text(
-            'Info not available for network videos',
-            style: TextStyle(color: Colors.white),
-          ),
-          backgroundColor: Colors.orange,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-          margin: EdgeInsets.all(16),
-        ),
-      );
-      return;
-    }
-
+    // `photo` is always a local-gallery AssetEntity here (this screen is fed
+    // from PhotoManager, never a network stream), so `photo.file` is a
+    // Future<File?> whose `.toString()` — e.g. "Instance of 'Future<File?>'"
+    // — can never actually start with "http". This "network video" guard
+    // never triggered; removed rather than left as dead/misleading code.
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -655,54 +656,7 @@ class PhotoTile extends StatelessWidget {
                       ),
                     ),
                     SizedBox(height: 5.sp),
-                    FutureBuilder<File?>(
-                      future: photo.file,
-                      builder: (context, snapshot) {
-                        double sizeMB = 0;
-                        Duration? duration;
-
-                        if (snapshot.hasData && snapshot.data != null) {
-                          final file = snapshot.data!;
-                          try {
-                            if (file.existsSync()) {
-                              sizeMB = file.lengthSync() / (1024 * 1024);
-                            } else {
-                              sizeMB = 0; // File missing, fallback to 0
-                            }
-                          } catch (e) {
-                            // If any unexpected error occurs while reading file
-                            debugPrint('Error reading file size: $e');
-                            sizeMB = 0;
-                          }
-
-                          duration = photo.videoDuration;
-                        }
-
-                        return Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              sizeMB > 0 ? '${sizeMB.toStringAsFixed(2)} MB' : 'File missing',
-                              style: GoogleFonts.poppins(
-                                fontSize: 10.sp,
-                                color: sizeMB > 0 ? Colors.grey[600] : Colors.redAccent,
-                                fontWeight: FontWeight.w600,
-                              ),
-                            ),
-
-                            if (duration != null)
-                              Text(
-                                _formatDuration(duration),
-                                style: GoogleFonts.poppins(
-                                  fontSize: 10.sp,
-                                  color: Colors.grey[700],
-                                  fontWeight: FontWeight.w500,
-                                ),
-                              ),
-                          ],
-                        );
-                      },
-                    ),
+                    _PhotoTileFileInfo(photo: photo),
                   ],
                 ),
               ),
@@ -791,6 +745,114 @@ class PhotoTile extends StatelessWidget {
     final minutes = twoDigits(duration.inMinutes.remainder(60));
     final seconds = twoDigits(duration.inSeconds.remainder(60));
     return "${duration.inHours > 0 ? '${twoDigits(duration.inHours)}:' : ''}$minutes:$seconds";
+  }
+}
+
+/// Shows a video tile's file size + duration.
+///
+/// The old inline version built a fresh `photo.file` Future (and did
+/// `existsSync()`/`lengthSync()` disk I/O) directly inside `PhotoTile.build()`,
+/// so every rebuild of every visible tile — every scroll frame — re-resolved
+/// and re-stat'd the file. `_FileSizeBadge` elsewhere in this file already
+/// fixed the same anti-pattern for the grid view; this mirrors it for the
+/// list view.
+class _PhotoTileFileInfo extends StatefulWidget {
+  const _PhotoTileFileInfo({required this.photo});
+
+  final AssetEntity photo;
+
+  /// asset id -> size in MB (null == missing/unavailable).
+  static final Map<String, double?> _cache = <String, double?>{};
+
+  @override
+  State<_PhotoTileFileInfo> createState() => _PhotoTileFileInfoState();
+}
+
+class _PhotoTileFileInfoState extends State<_PhotoTileFileInfo> {
+  double? _sizeMB;
+  bool _resolved = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _resolve();
+  }
+
+  @override
+  void didUpdateWidget(_PhotoTileFileInfo oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.photo.id != widget.photo.id) {
+      _resolved = false;
+      _resolve();
+    }
+  }
+
+  Future<void> _resolve() async {
+    final id = widget.photo.id;
+
+    if (_PhotoTileFileInfo._cache.containsKey(id)) {
+      final cached = _PhotoTileFileInfo._cache[id];
+      if (mounted) setState(() {
+        _sizeMB = cached;
+        _resolved = true;
+      });
+      return;
+    }
+
+    double? size;
+    try {
+      final file = await widget.photo.file;
+      if (file != null && await file.exists()) {
+        size = (await file.length()) / (1024 * 1024);
+      }
+    } catch (e) {
+      debugPrint('Error reading file size: $e');
+      size = null;
+    }
+
+    _PhotoTileFileInfo._cache[id] = size;
+    if (!mounted) return;
+    setState(() {
+      _sizeMB = size;
+      _resolved = true;
+    });
+  }
+
+  String _formatDuration(Duration duration) {
+    String twoDigits(int n) => n.toString().padLeft(2, "0");
+    final minutes = twoDigits(duration.inMinutes.remainder(60));
+    final seconds = twoDigits(duration.inSeconds.remainder(60));
+    return "${duration.inHours > 0 ? '${twoDigits(duration.inHours)}:' : ''}$minutes:$seconds";
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final sizeMB = _sizeMB ?? 0;
+    final duration = widget.photo.videoDuration;
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          !_resolved
+              ? ''
+              : (sizeMB > 0 ? '${sizeMB.toStringAsFixed(2)} MB' : 'File missing'),
+          style: GoogleFonts.poppins(
+            fontSize: 10.sp,
+            color: sizeMB > 0 ? Colors.grey[600] : Colors.redAccent,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        Text(
+          _formatDuration(duration),
+          style: GoogleFonts.poppins(
+            fontSize: 10.sp,
+            color: Colors.grey[700],
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+      ],
+    );
   }
 }
 
