@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:provider/provider.dart';
 
 import '../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
+import '../../../../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../../../../NotifyListeners/LanguageProvider/music_strings.dart';
 
 class ArtistPage extends StatefulWidget {
   final ArtistModel artist;
@@ -109,20 +112,20 @@ class _ArtistPageState extends State<ArtistPage> {
     setState(() => _filtered = list);
   }
 
-  String _sortLabel(SongSort s) {
+  String _sortLabel(SongSort s, String lang) {
     switch (s) {
       case SongSort.az:
-        return "A - Z";
+        return MusicStrings.t(lang, 'music_sort_az');
       case SongSort.za:
-        return "Z - A";
+        return MusicStrings.t(lang, 'music_sort_za');
       case SongSort.durationHigh:
-        return "Long → Short";
+        return MusicStrings.t(lang, 'music_sort_duration_high');
       case SongSort.durationLow:
-        return "Short → Long";
+        return MusicStrings.t(lang, 'music_sort_duration_low');
       case SongSort.newest:
-        return "Newest";
+        return MusicStrings.t(lang, 'music_sort_newest');
       case SongSort.oldest:
-        return "Oldest";
+        return MusicStrings.t(lang, 'music_sort_oldest');
     }
   }
 
@@ -147,6 +150,7 @@ class _ArtistPageState extends State<ArtistPage> {
   Widget build(BuildContext context) {
     final textColor = widget.colortext;
     final bg = widget.color;
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return Scaffold(
       backgroundColor: bg,
@@ -217,8 +221,8 @@ class _ArtistPageState extends State<ArtistPage> {
                           children: [
                             Text(
                               _loading
-                                  ? "Loading..."
-                                  : "${_songs.length} Songs",
+                                  ? MusicStrings.t(lang, 'music_loading')
+                                  : "${_songs.length} ${MusicStrings.t(lang, 'music_songs_suffix_cap')}",
                               style: TextStyle(
                                 color: textColor.withValues(alpha:0.75),
                                 fontWeight: FontWeight.w600,
@@ -234,7 +238,8 @@ class _ArtistPageState extends State<ArtistPage> {
                                   child: _SearchField(
                                     controller: _search,
                                     textColor: textColor,
-                                    hint: "Search song / album...",
+                                    hint: MusicStrings.t(
+                                        lang, 'music_search_song_album_hint'),
                                     onClear: () {
                                       _search.clear();
                                       _applyFilterSort();
@@ -245,8 +250,8 @@ class _ArtistPageState extends State<ArtistPage> {
                                 _SortButton(
                                   textColor: textColor,
                                   icon: _sortIcon(_sort),
-                                  label: _sortLabel(_sort),
-                                  onTap: () => _openSortSheet(textColor),
+                                  label: _sortLabel(_sort, lang),
+                                  onTap: () => _openSortSheet(textColor, lang),
                                 ),
                               ],
                             ),
@@ -268,7 +273,7 @@ class _ArtistPageState extends State<ArtistPage> {
                   : _filtered.isEmpty
                   ? Center(
                 child: Text(
-                  "No songs found",
+                  MusicStrings.t(lang, 'music_no_songs_found'),
                   style: TextStyle(
                     color: textColor.withValues(alpha:0.75),
                     fontWeight: FontWeight.w600,
@@ -296,7 +301,7 @@ class _ArtistPageState extends State<ArtistPage> {
     );
   }
 
-  void _openSortSheet(Color textColor) {
+  void _openSortSheet(Color textColor, String lang) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -320,7 +325,7 @@ class _ArtistPageState extends State<ArtistPage> {
                 ),
               ),
               _SortTile(
-                title: "A - Z",
+                title: MusicStrings.t(lang, 'music_sort_az'),
                 selected: _sort == SongSort.az,
                 onTap: () {
                   setState(() => _sort = SongSort.az);
@@ -329,7 +334,7 @@ class _ArtistPageState extends State<ArtistPage> {
                 },
               ),
               _SortTile(
-                title: "Z - A",
+                title: MusicStrings.t(lang, 'music_sort_za'),
                 selected: _sort == SongSort.za,
                 onTap: () {
                   setState(() => _sort = SongSort.za);
@@ -338,7 +343,7 @@ class _ArtistPageState extends State<ArtistPage> {
                 },
               ),
               _SortTile(
-                title: "Long → Short",
+                title: MusicStrings.t(lang, 'music_sort_duration_high'),
                 selected: _sort == SongSort.durationHigh,
                 onTap: () {
                   setState(() => _sort = SongSort.durationHigh);
@@ -347,7 +352,7 @@ class _ArtistPageState extends State<ArtistPage> {
                 },
               ),
               _SortTile(
-                title: "Short → Long",
+                title: MusicStrings.t(lang, 'music_sort_duration_low'),
                 selected: _sort == SongSort.durationLow,
                 onTap: () {
                   setState(() => _sort = SongSort.durationLow);
@@ -356,7 +361,7 @@ class _ArtistPageState extends State<ArtistPage> {
                 },
               ),
               _SortTile(
-                title: "Newest",
+                title: MusicStrings.t(lang, 'music_sort_newest'),
                 selected: _sort == SongSort.newest,
                 onTap: () {
                   setState(() => _sort = SongSort.newest);
@@ -365,7 +370,7 @@ class _ArtistPageState extends State<ArtistPage> {
                 },
               ),
               _SortTile(
-                title: "Oldest",
+                title: MusicStrings.t(lang, 'music_sort_oldest'),
                 selected: _sort == SongSort.oldest,
                 onTap: () {
                   setState(() => _sort = SongSort.oldest);
@@ -454,6 +459,8 @@ class _SongTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Material(
       color: Colors.white.withValues(alpha:0.06),
       borderRadius: BorderRadius.circular(18),
@@ -501,7 +508,7 @@ class _SongTile extends StatelessWidget {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "${song.artist ?? "Unknown"} • ${song.album ?? "Unknown"}",
+                      "${song.artist ?? MusicStrings.t(lang, 'music_unknown')} • ${song.album ?? MusicStrings.t(lang, 'music_unknown')}",
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(

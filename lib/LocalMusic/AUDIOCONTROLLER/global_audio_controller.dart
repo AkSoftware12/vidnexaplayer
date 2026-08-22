@@ -140,6 +140,36 @@ class GlobalAudioController {
     }
   }
 
+  // ---------------- Play a single external "Open with" audio file ----------------
+  /// Plays an arbitrary `content://`/`file://` audio uri handed to the app by
+  /// another app (file manager, WhatsApp, etc.) via "Open with". Unlike
+  /// [playSongs] this has no [SongModel] from the device library to work
+  /// with, so it builds a single-item queue directly and clears
+  /// [currentSongs] — the full-player artwork carousel falls back to a plain
+  /// music-note icon for it instead of crashing on a fake id.
+  Future<void> playExternalUri(String uriString, {String? title}) async {
+    final uri = Uri.tryParse(uriString);
+    if (uri == null) return;
+
+    final item = MediaItem(
+      id: uriString,
+      title: (title == null || title.trim().isEmpty) ? 'Audio' : title.trim(),
+      artist: 'Unknown',
+    );
+
+    currentSongs.value = [];
+    currentIndex.value = 0;
+
+    await handler.setPlaylist(
+      items: [item],
+      sources: [AudioSource.uri(uri, tag: item)],
+      initialIndex: 0,
+      autoplay: true,
+    );
+
+    hasPlayedOnce.value = true;
+  }
+
   // ---------------- Play playlist ----------------
   /// How many artworks around the current track are pre-cached.
   ///

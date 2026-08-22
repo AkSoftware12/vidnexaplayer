@@ -9,9 +9,12 @@ import 'package:lottie/lottie.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../Home/HomeBottomnavigation/home_bottomNavigation.dart';
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../NotifyListeners/LanguageProvider/profile_strings.dart';
 
 class PermissionPage extends StatefulWidget {
   const PermissionPage({super.key});
@@ -111,11 +114,11 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
       }
 
       if (!mounted) return;
+      final lang = context.read<LocaleProvider>().locale.languageCode;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
+        SnackBar(
           content: Text(
-            'Media access is needed to show your videos. '
-            'You can grant it later from Settings.',
+            ProfileStrings.t(lang, 'perm_media_access_snackbar'),
           ),
         ),
       );
@@ -148,22 +151,22 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
   /// Actually opens app settings — the old `openAppSettingsDialog()` just
   /// navigated to the home screen despite its name.
   Future<void> _showOpenSettingsDialog() async {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     final open = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
-        title: const Text('Permission needed'),
-        content: const Text(
-          'Media access was permanently denied. Enable it in App settings to '
-          'see your videos.',
+        title: Text(ProfileStrings.t(lang, 'perm_permission_needed_title')),
+        content: Text(
+          ProfileStrings.t(lang, 'perm_permission_needed_body'),
         ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(dialogContext, false),
-            child: const Text('Not now'),
+            child: Text(ProfileStrings.t(lang, 'perm_not_now')),
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(dialogContext, true),
-            child: const Text('Open settings'),
+            child: Text(ProfileStrings.t(lang, 'perm_open_settings')),
           ),
         ],
       ),
@@ -176,6 +179,8 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => ProfileStrings.t(lang, key);
     return Scaffold(
       backgroundColor: HexColor('#081740'),
       body: SingleChildScrollView(
@@ -220,7 +225,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
 
                     // Title
                     Text(
-                      'Grant Permissions',
+                      t('perm_grant_permissions_title'),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.openSans(
                         fontSize: 18.sp,
@@ -233,7 +238,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
 
                     // Subtitle
                     Text(
-                      'Please grant access to all video files on your device for the best experience',
+                      t('perm_grant_permissions_sub'),
                       textAlign: TextAlign.center,
                       style: GoogleFonts.openSans(
                         fontSize: 12.sp,
@@ -247,14 +252,14 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                     // Features section with cards
                     _buildFeatureCard(
                       iconPath: 'assets/video_camera.png',
-                      title: 'All Video Formats',
-                      subtitle: 'Support for MP4, AVI, MKV & more',
+                      title: t('perm_all_video_formats_title'),
+                      subtitle: t('perm_all_video_formats_sub'),
                     ),
                     SizedBox(height: 10.sp),
                     _buildFeatureCard(
                       iconPath: 'assets/subtitle.png',
-                      title: 'Subtitle Files',
-                      subtitle: 'SRT, ASS, VTT & embedded subs',
+                      title: t('perm_subtitle_files_title'),
+                      subtitle: t('perm_subtitle_files_sub'),
                     ),
                     SizedBox(height: 50.sp),
 
@@ -294,7 +299,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                                   Icon(Icons.security, size: 17.sp),
                                 SizedBox(width: 8.sp),
                                 Text(
-                                  'Grant All Permissions',
+                                  t('perm_grant_all_button'),
                                   style: GoogleFonts.openSans(
                                     fontSize: 15.sp,
                                     fontWeight: FontWeight.w600,
@@ -318,7 +323,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                       // reappeared on every launch.
                       onTap: _continueToApp,
                       child: Text(
-                        'Skip for now ',
+                        t('perm_skip_for_now'),
                         style: GoogleFonts.openSans(
                           fontSize: 13.sp,
                           fontWeight: FontWeight.w500,

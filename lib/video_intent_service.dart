@@ -3,8 +3,43 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+import 'LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
 import 'VideoPLayer/4kPlayer/4k_player.dart';
 import 'app_globals.dart';
+
+/// Media handed to the app by another app via "Open with", plus the
+/// mimeType/display-name the native side resolved for it.
+class PendingIntentMedia {
+  final String uri;
+  final String? mimeType;
+  final String? name;
+
+  const PendingIntentMedia({required this.uri, this.mimeType, this.name});
+
+  /// Audio must land in the mini player on Home, not the full-screen video
+  /// player — everything else (including an unknown/null mimeType) is
+  /// treated as video, matching the old plain-video-only behaviour.
+  bool get isAudio => mimeType?.startsWith('audio/') ?? false;
+
+  static PendingIntentMedia? fromChannel(dynamic raw) {
+    if (raw == null) return null;
+    if (raw is String) {
+      // Defensive: an older native build (pre-mimeType) sent a plain string.
+      if (raw.trim().isEmpty) return null;
+      return PendingIntentMedia(uri: raw.trim());
+    }
+    if (raw is Map) {
+      final uri = (raw['uri'] as String?)?.trim();
+      if (uri == null || uri.isEmpty) return null;
+      return PendingIntentMedia(
+        uri: uri,
+        mimeType: raw['mimeType'] as String?,
+        name: raw['name'] as String?,
+      );
+    }
+    return null;
+  }
+}
 
 /// Bridge to the native "Open with" intent handled by `MainActivity`.
 class VideoIntentService {
@@ -14,21 +49,21 @@ class VideoIntentService {
 
   static bool _listening = false;
 
-  /// Uri the app was launched with, waiting to be opened.
+  /// Media the app was launched with, waiting to be opened.
   ///
   /// `main.dart` fetches it at start-up and parks it here; the splash screen
   /// consumes it *after* it has put the home screen on the stack, so backing
   /// out of the player lands on Home rather than on a dead splash route.
-  static String? _pending;
+  static PendingIntentMedia? _pending;
 
-  /// `true` when a video from an external intent is waiting to be shown.
+  /// `true` when media from an external intent is waiting to be shown.
   static bool get hasPendingVideo => _pending != null;
 
-  /// Returns the pending uri exactly once.
-  static String? consumePendingVideo() {
-    final uri = _pending;
+  /// Returns the pending media exactly once.
+  static PendingIntentMedia? consumePendingVideo() {
+    final media = _pending;
     _pending = null;
-    return uri;
+    return media;
   }
 
   /// Last uri actually opened, so a genuine cold boot can't double-open one
@@ -68,14 +103,15 @@ class VideoIntentService {
   /// Asks the native side for the launch uri (`content://…` or `file://…`) and
   /// stores it. Returns `true` when there is something to open.
   ///
-  /// The native side returns the raw uri string — media_kit can open content
-  /// uris directly, so nothing is copied into the cache directory.
+  /// The native side returns the raw uri (plus mimeType/name) — media_kit can
+  /// open content uris directly, so nothing is copied into the cache directory.
   static Future<bool> fetchLaunchUri() async {
     try {
-      final uri = await _channel.invokeMethod<String>('getVideoPath');
-      debugPrint('VidnexaIntent: fetchLaunchUri got uri=$uri');
-      if (uri == null || uri.trim().isEmpty) return false;
-      _pending = uri.trim();
+      final raw = await _channel.invokeMethod('getVideoPath');
+      debugPrint('VidnexaIntent: fetchLaunchUri got raw=$raw');
+      final media = PendingIntentMedia.fromChannel(raw);
+      if (media == null) return false;
+      _pending = media;
       return true;
     } on MissingPluginException {
       // Channel not registered (e.g. a platform without our MainActivity).
@@ -105,21 +141,32 @@ class VideoIntentService {
     _channel.setMethodCallHandler((call) async {
       if (call.method != 'newVideoIntent') return;
 
-      final uri = (call.arguments as String?)?.trim();
-      if (uri == null || uri.isEmpty) return;
+      final media = PendingIntentMedia.fromChannel(call.arguments);
+      if (media == null) return;
 
       if (!_bootComplete) {
         // Home isn't up yet — defer to `_pending` so this rides the same
         // sequenced path as `fetchLaunchUri()` instead of racing ahead of
         // it and getting wiped out by splash's own delayed pushReplacement.
-        _pending = uri;
+        _pending = media;
         return;
       }
 
-      if (!claimForOpening(uri)) return;
+      if (!claimForOpening(media.uri)) return;
 
       final navigator = navigatorKey.currentState;
       if (navigator == null) return;
+
+      if (media.isAudio) {
+        await GlobalAudioController().playExternalUri(
+          media.uri,
+          title: media.name,
+        );
+        // Reveal Home (with the mini player) instead of stacking on top of
+        // whatever screen the user happened to be on.
+        navigator.popUntil((route) => route.isFirst);
+        return;
+      }
 
       unawaited(
         navigator.push(
@@ -128,7 +175,7 @@ class VideoIntentService {
               videos: const [],
               initialIndex: 0,
               // media_kit opens content:// and file:// uris directly.
-              initialUrl: uri,
+              initialUrl: media.uri,
             ),
           ),
         ),

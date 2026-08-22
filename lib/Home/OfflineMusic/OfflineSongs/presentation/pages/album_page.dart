@@ -2,8 +2,11 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart'
     show SongModel, AlbumModel, OnAudioQuery, AudiosFromType, ArtworkType, QueryArtworkWidget;
+import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
 import '../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
+import '../../../../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../../../../NotifyListeners/LanguageProvider/music_strings.dart';
 
 class AlbumPage extends StatefulWidget {
   final AlbumModel album;
@@ -63,6 +66,7 @@ class _AlbumPageState extends State<AlbumPage> {
   @override
   Widget build(BuildContext context) {
     final top = MediaQuery.of(context).padding.top;
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return Scaffold(
       backgroundColor: widget.color,
@@ -165,7 +169,8 @@ class _AlbumPageState extends State<AlbumPage> {
                                   ),
                                   const SizedBox(height: 6),
                                   Text(
-                                    widget.album.artist ?? 'Unknown',
+                                    widget.album.artist ??
+                                        MusicStrings.t(lang, 'music_unknown'),
                                     maxLines: 1,
                                     overflow: TextOverflow.ellipsis,
                                     style: TextStyle(
@@ -179,12 +184,13 @@ class _AlbumPageState extends State<AlbumPage> {
                                     children: [
                                       _pillInfo(
                                         icon: Icons.library_music_rounded,
-                                        text: "${_songs.length} songs",
+                                        text:
+                                            "${_songs.length} ${MusicStrings.t(lang, 'music_songs_count_suffix')}",
                                       ),
                                       const SizedBox(width: 10),
                                       _pillInfo(
                                         icon: Icons.album_rounded,
-                                        text: "Album",
+                                        text: MusicStrings.t(lang, 'music_album_tag'),
                                       ),
                                     ],
                                   ),
@@ -209,7 +215,7 @@ class _AlbumPageState extends State<AlbumPage> {
                     Expanded(
                       child: _primaryButton(
                         icon: Icons.play_arrow_rounded,
-                        text: "Play All",
+                        text: MusicStrings.t(lang, 'music_play_all'),
                         onTap: _songs.isEmpty
                             ? null
                             : () {
@@ -221,7 +227,7 @@ class _AlbumPageState extends State<AlbumPage> {
                     Expanded(
                       child: _secondaryButton(
                         icon: Icons.shuffle_rounded,
-                        text: "Shuffle",
+                        text: MusicStrings.t(lang, 'music_shuffle'),
                         onTap: _songs.isEmpty
                             ? null
                             : () {
@@ -243,7 +249,7 @@ class _AlbumPageState extends State<AlbumPage> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      "Tracks",
+                      MusicStrings.t(lang, 'music_tracks_title'),
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w800,
@@ -251,7 +257,9 @@ class _AlbumPageState extends State<AlbumPage> {
                       ),
                     ),
                     Text(
-                      _songs.isEmpty ? "" : "Tap to play",
+                      _songs.isEmpty
+                          ? ""
+                          : MusicStrings.t(lang, 'music_tap_to_play'),
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
@@ -279,6 +287,7 @@ class _AlbumPageState extends State<AlbumPage> {
                     child: _songTile(
                       index: index,
                       song: song,
+                      lang: lang,
                       onTap: () => audio.playSongs(_songs, index),
                     ),
                   );
@@ -291,7 +300,7 @@ class _AlbumPageState extends State<AlbumPage> {
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(18, 40, 18, 18),
-                  child: _emptyState(),
+                  child: _emptyState(lang),
                 ),
               ),
           ],
@@ -388,6 +397,7 @@ class _AlbumPageState extends State<AlbumPage> {
     required int index,
     required SongModel song,
     required VoidCallback onTap,
+    required String lang,
   }) {
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
@@ -444,7 +454,7 @@ class _AlbumPageState extends State<AlbumPage> {
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      "${song.artist ?? "Unknown"}  •  ${song.album ?? ""}",
+                      "${song.artist ?? MusicStrings.t(lang, 'music_unknown')}  •  ${song.album ?? ""}",
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: TextStyle(
@@ -483,7 +493,7 @@ class _AlbumPageState extends State<AlbumPage> {
     );
   }
 
-  Widget _emptyState() {
+  Widget _emptyState(String lang) {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
@@ -508,7 +518,7 @@ class _AlbumPageState extends State<AlbumPage> {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              "No songs found in this album.",
+              MusicStrings.t(lang, 'music_album_empty'),
               style: TextStyle(
                 fontSize: 13.5,
                 fontWeight: FontWeight.w600,

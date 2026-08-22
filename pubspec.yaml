@@ -2,7 +2,7 @@ name: videoplayer
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.24+24
+version: 1.0.25+25
 
 environment:
   sdk: ^3.7.0
@@ -130,6 +130,10 @@ dependencies:
 
   docman: ^1.2.0
   gal: ^1.9.1
+
+  # ✅ Voice command video search (offline-first local index)
+  speech_to_text: ^7.0.0
+  sqflite: ^2.4.1
 
 
 

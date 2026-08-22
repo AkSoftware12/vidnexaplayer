@@ -3,6 +3,9 @@ import 'package:file_manager/file_manager.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:provider/provider.dart';
+import '../NotifyListeners/LanguageProvider/home_strings.dart';
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
 
 class DirectoryFolder extends StatelessWidget {
@@ -12,6 +15,7 @@ class DirectoryFolder extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       appBar: AppBar(
         title: ValueListenableBuilder<String>(
@@ -65,7 +69,7 @@ class DirectoryFolder extends StatelessWidget {
                           showFileExtension: true),
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
-                    subtitle: _subtitle(entity),
+                    subtitle: _subtitle(entity, lang),
                     onTap: () async {
                       if (FileManager.isDirectory(entity)) {
                         controller.openDirectory(entity);
@@ -129,7 +133,7 @@ class DirectoryFolder extends StatelessWidget {
   }
 
   // ---------------- SUBTITLE ----------------
-  Widget _subtitle(FileSystemEntity entity) {
+  Widget _subtitle(FileSystemEntity entity, String lang) {
     return FutureBuilder<FileStat>(
       future: entity.stat(),
       builder: (_, snap) {
@@ -137,7 +141,7 @@ class DirectoryFolder extends StatelessWidget {
         if (FileManager.isFile(entity)) {
           return Text(FileManager.formatBytes(snap.data!.size));
         }
-        return const Text("Folder");
+        return Text(HomeStrings.t(lang, 'dir_folder_label'));
       },
     );
   }
@@ -194,6 +198,7 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
   @override
   Widget build(BuildContext context) {
     final file = File(widget.imagePath);
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -217,10 +222,10 @@ class _FullScreenImageViewerState extends State<FullScreenImageViewer> {
                 ),
               ),
             )
-                : const Center(
+                : Center(
               child: Text(
-                'Image not found',
-                style: TextStyle(color: Colors.white),
+                HomeStrings.t(lang, 'dir_image_not_found'),
+                style: const TextStyle(color: Colors.white),
               ),
             ),
           ),

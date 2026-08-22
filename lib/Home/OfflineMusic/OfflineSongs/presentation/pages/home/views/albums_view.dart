@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:provider/provider.dart';
 
+import '../../../../../../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../../../../../../NotifyListeners/LanguageProvider/music_strings.dart';
 import '../../album_page.dart';
 
 enum AlbumSortBy { az, za, artistAz, artistZa }
@@ -95,6 +98,8 @@ class _AlbumsViewState extends State<AlbumsView> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Scaffold(
       backgroundColor: widget.color,
       body: SafeArea(
@@ -129,7 +134,8 @@ class _AlbumsViewState extends State<AlbumsView> {
                                   fontWeight: FontWeight.w500,
                                 ),
                                 decoration: InputDecoration(
-                                  hintText: "Search albums / artist...",
+                                  hintText: MusicStrings.t(
+                                      lang, 'music_search_albums_artist_hint'),
                                   hintStyle: TextStyle(
                                     color: widget.colortext.withValues(alpha:0.55),
                                     fontSize: 13.sp,
@@ -159,7 +165,7 @@ class _AlbumsViewState extends State<AlbumsView> {
                     ),
                   ),
                   SizedBox(width: 10.w),
-                  Card(child: _sortButton(context)),
+                  Card(child: _sortButton(context, lang)),
                 ],
               ),
             ),
@@ -171,7 +177,8 @@ class _AlbumsViewState extends State<AlbumsView> {
                 builder: (context, snap) {
                   if (snap.hasError) {
                     return Center(
-                      child: Text("Error: ${snap.error}",
+                      child: Text(
+                          "${MusicStrings.t(lang, 'music_error_prefix')}${snap.error}",
                           style: TextStyle(color: widget.colortext)),
                     );
                   }
@@ -185,7 +192,7 @@ class _AlbumsViewState extends State<AlbumsView> {
                   if (albums.isEmpty) {
                     return Center(
                       child: Text(
-                        "No match found!",
+                        MusicStrings.t(lang, 'music_no_match_found'),
                         style: TextStyle(color: widget.colortext, fontSize: 14.sp),
                       ),
                     );
@@ -243,10 +250,10 @@ class _AlbumsViewState extends State<AlbumsView> {
     );
   }
 
-  Widget _sortButton(BuildContext context) {
+  Widget _sortButton(BuildContext context, String lang) {
     return InkWell(
       borderRadius: BorderRadius.circular(14.r),
-      onTap: () => _openSortSheet(context),
+      onTap: () => _openSortSheet(context, lang),
       child: Container(
         height: 30.h,
         padding: EdgeInsets.symmetric(horizontal: 12.w),
@@ -261,7 +268,7 @@ class _AlbumsViewState extends State<AlbumsView> {
                 color: widget.colortext.withValues(alpha:0.8), size: 20.sp),
             SizedBox(width: 6.w),
             Text(
-              "Sort",
+              MusicStrings.t(lang, 'music_sort_label'),
               style: TextStyle(
                 color: widget.colortext.withValues(alpha:0.9),
                 fontSize: 12.5.sp,
@@ -274,7 +281,7 @@ class _AlbumsViewState extends State<AlbumsView> {
     );
   }
 
-  void _openSortSheet(BuildContext context) {
+  void _openSortSheet(BuildContext context, String lang) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -298,10 +305,10 @@ class _AlbumsViewState extends State<AlbumsView> {
                   borderRadius: BorderRadius.circular(99),
                 ),
               ),
-              _sortTile("Album A → Z", AlbumSortBy.az),
-              _sortTile("Album Z → A", AlbumSortBy.za),
-              _sortTile("Artist A → Z", AlbumSortBy.artistAz),
-              _sortTile("Artist Z → A", AlbumSortBy.artistZa),
+              _sortTile(MusicStrings.t(lang, 'music_sort_album_az'), AlbumSortBy.az),
+              _sortTile(MusicStrings.t(lang, 'music_sort_album_za'), AlbumSortBy.za),
+              _sortTile(MusicStrings.t(lang, 'music_sort_artist_az'), AlbumSortBy.artistAz),
+              _sortTile(MusicStrings.t(lang, 'music_sort_artist_za'), AlbumSortBy.artistZa),
             ],
           ),
         );
@@ -347,6 +354,8 @@ class _AlbumCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return InkWell(
       borderRadius: BorderRadius.circular(10.r),
       onTap: onTap,
@@ -396,7 +405,7 @@ class _AlbumCard extends StatelessWidget {
             Padding(
               padding: EdgeInsets.symmetric(horizontal: 5.w, vertical: 0.h),
               child: Text(
-                album.artist ?? "Unknown Artist",
+                album.artist ?? MusicStrings.t(lang, 'music_unknown_artist'),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -419,7 +428,7 @@ class _AlbumCard extends StatelessWidget {
                   border: Border.all(color: Colors.white.withValues(alpha:0.12)),
                 ),
                 child: Text(
-                  "Album",
+                  MusicStrings.t(lang, 'music_album_tag'),
                   style: TextStyle(
                     color: textColor.withValues(alpha:0.85),
                     fontSize: 10.sp,

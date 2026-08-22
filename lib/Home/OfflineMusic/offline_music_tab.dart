@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 
 import 'package:videoplayer/Utils/color.dart';
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../NotifyListeners/LanguageProvider/music_strings.dart';
 import '../../Utils/textSize.dart';
 
 import 'OfflineSongs/presentation/pages/home/views/albums_view.dart';
@@ -137,20 +140,22 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       body: ScrollConfiguration(
         behavior: const ConstantScrollBehavior(),
         child: Column(
           children: [
-            _buildTopTabs(),
+            _buildTopTabs(lang),
 
             Expanded(
               child: _hasPermissions
                   ? _buildTabsPageView()
                   : (!_permissionChecked)
                   ? const SizedBox() // ✅ NO permission card flash
-                  : _buildPermissionDeniedCard(),
+                  : _buildPermissionDeniedCard(lang),
             ),
           ],
         ),
@@ -158,7 +163,7 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
     );
   }
 
-  Widget _buildTopTabs() {
+  Widget _buildTopTabs(String lang) {
     return AppBar(
       backgroundColor: Theme.of(context).colorScheme.surface,
       automaticallyImplyLeading: false,
@@ -167,10 +172,10 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
         child: ListView(
           scrollDirection: Axis.horizontal,
           children: [
-            _buildTab('Songs', 0),
-            _buildTab('Artists', 1),
-            _buildTab('Albums', 2),
-            _buildTab('Genres', 3),
+            _buildTab(MusicStrings.t(lang, 'music_tab_songs'), 0),
+            _buildTab(MusicStrings.t(lang, 'music_tab_artists'), 1),
+            _buildTab(MusicStrings.t(lang, 'music_tab_albums'), 2),
+            _buildTab(MusicStrings.t(lang, 'music_tab_genres'), 3),
           ],
         ),
       ),
@@ -232,7 +237,7 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
     );
   }
 
-  Widget _buildPermissionDeniedCard() {
+  Widget _buildPermissionDeniedCard(String lang) {
     return Padding(
       padding: EdgeInsets.all(16.sp),
       child: Card(
@@ -248,7 +253,7 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
               Icon(Icons.music_off_rounded, color: Colors.red, size: 48.sp),
               SizedBox(height: 16.sp),
               Text(
-                'Music Permission Required',
+                MusicStrings.t(lang, 'music_permission_required_title'),
                 style: GoogleFonts.poppins(
                   textStyle: TextStyle(
                     fontSize: 18.sp,
@@ -260,7 +265,7 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
               ),
               SizedBox(height: 8.sp),
               Text(
-                'Offline songs show karne ke liye audio/storage permission chahiye.',
+                MusicStrings.t(lang, 'music_permission_required_desc'),
                 style: GoogleFonts.poppins(
                   textStyle: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
                 ),
@@ -278,7 +283,7 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
                     ),
                   ),
                   child: Text(
-                    'Open Settings',
+                    MusicStrings.t(lang, 'music_open_settings'),
                     style: GoogleFonts.poppins(
                       textStyle: TextStyle(
                         fontSize: 14.sp,
@@ -298,7 +303,7 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
                     ),
                   ),
                   child: Text(
-                    'Allow Permission',
+                    MusicStrings.t(lang, 'music_allow_permission'),
                     style: GoogleFonts.poppins(
                       textStyle: TextStyle(
                         fontSize: 14.sp,

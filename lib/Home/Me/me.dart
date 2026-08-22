@@ -21,8 +21,12 @@ import '../../NetWork Stream/stream_video.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/AppBar/colorList.dart';
+import '../../NotifyListeners/LanguageProvider/language_picker_sheet.dart';
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../NotifyListeners/LanguageProvider/profile_strings.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
 import '../../StatusSaverScreen/whatsapp_download.dart';
+import '../../Utils/rating_popup.dart';
 import '../HomeBottomnavigation/home_bottomNavigation.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -190,6 +194,8 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
   void _openEditSheet(BuildContext ctx, UserModel user) {
     // `user.name` is non-nullable, so `?? ''` was dead.
     _nameController.text = user.name;
+    final lang = context.read<LocaleProvider>().locale.languageCode;
+    String t(String key) => ProfileStrings.t(lang, key);
     showModalBottomSheet(
       context: ctx,
       isScrollControlled: true,
@@ -217,7 +223,7 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text('Edit Profile', style: _T.orbitron(size: 17, w: FontWeight.w700, spacing: 0.5)),
+                      Text(t('profile_edit_title'), style: _T.orbitron(size: 17, w: FontWeight.w700, spacing: 0.5)),
                       GestureDetector(
                         onTap: () => Navigator.pop(sCtx),
                         child: Container(
@@ -272,9 +278,9 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    _Chip(icon: Icons.camera_alt_outlined,    label: 'Camera',  onTap: () => _pickImage(local, src: ImageSource.camera)),
+                    _Chip(icon: Icons.camera_alt_outlined,    label: t('profile_camera'),  onTap: () => _pickImage(local, src: ImageSource.camera)),
                     const SizedBox(width: 12),
-                    _Chip(icon: Icons.photo_library_outlined, label: 'Gallery', onTap: () => _pickImage(local, src: ImageSource.gallery)),
+                    _Chip(icon: Icons.photo_library_outlined, label: t('profile_gallery'), onTap: () => _pickImage(local, src: ImageSource.gallery)),
                   ],
                 ),
                 const SizedBox(height: 24),
@@ -288,7 +294,7 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
                     style: _T.outfit(size: 15, color: _T.textH),
                     cursorColor: _T.accent,
                     decoration: InputDecoration(
-                      labelText: 'Display Name',
+                      labelText: t('profile_display_name'),
                       labelStyle: _T.outfit(size: 12, color: _T.textS),
                       prefixIcon: Icon(Icons.person_outline, color: _T.textS),
                       suffixIcon: _nameController.text.isNotEmpty
@@ -334,7 +340,7 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
                         children: [
                           const Icon(Icons.check_circle_outline, color: Colors.white, size: 20),
                           const SizedBox(width: 10),
-                          Text('Save Changes', style: _T.outfit(size: 14, w: FontWeight.w700, color: Colors.white)),
+                          Text(t('profile_save_changes'), style: _T.outfit(size: 14, w: FontWeight.w700, color: Colors.white)),
                         ],
                       ),
                     ),
@@ -354,6 +360,7 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
   Widget build(BuildContext context) {
     final theme = Provider.of<ThemeProvider>(context);
     final user  = Provider.of<UserModel>(context);
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     // ✅ FIX 8: Removed addPostFrameCallback from build() — moved to initState()
 
@@ -387,19 +394,19 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
                   delegate: SliverChildListDelegate([
                     SizedBox(height: 5.sp),
 
-                    _SectionHeader(title: 'Storage Overview'),
+                    _SectionHeader(title: ProfileStrings.t(lang, 'profile_storage_overview')),
                     SizedBox(height: 10.sp),
                     _StorageRow(isLoading: _isLoading, totalImages: _totalEntitiesCount),
 
                     SizedBox(height: 15.sp),
 
-                    _SectionHeader(title: 'Quick Actions'),
+                    _SectionHeader(title: ProfileStrings.t(lang, 'profile_quick_actions')),
                     SizedBox(height: 10.sp),
                     const _QuickActionsGrid(),
 
                     SizedBox(height: 15.sp),
 
-                    _SectionHeader(title: 'Settings & More'),
+                    _SectionHeader(title: ProfileStrings.t(lang, 'profile_settings_more')),
                     SizedBox(height: 10.sp),
                     _SettingsCard(themeProvider: theme),
 
@@ -433,6 +440,7 @@ class _HeroBanner extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Container(
@@ -495,7 +503,7 @@ class _HeroBanner extends StatelessWidget {
                           // `user.name` is non-nullable, so `?? 'Guest User'`
                           // never fired — a user who had not set a name saw a
                           // blank line instead of the placeholder.
-                          user.name.trim().isEmpty ? 'Guest User' : user.name,
+                          user.name.trim().isEmpty ? ProfileStrings.t(lang, 'profile_guest_user') : user.name,
                           style: GoogleFonts.outfit(
                             fontSize: 17.sp, fontWeight: FontWeight.w700,
                             color: _T.textH, letterSpacing: 0.5,
@@ -517,7 +525,7 @@ class _HeroBanner extends StatelessWidget {
                               Icon(Icons.workspace_premium, color: _T.gold, size: 13),
                               const SizedBox(width: 5),
                               Text(
-                                'PREMIUM MEMBER',
+                                ProfileStrings.t(lang, 'profile_premium_member'),
                                 style: GoogleFonts.outfit(
                                   fontSize: 9.sp, fontWeight: FontWeight.w700,
                                   color: _T.accent, letterSpacing: 1.2,
@@ -569,18 +577,19 @@ class _StorageRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     final cards = [
-      _SC(icon: Icons.folder_rounded,        label: 'Files',   sub: '3.2 GB',
+      _SC(icon: Icons.folder_rounded,        label: ProfileStrings.t(lang, 'profile_files'),   sub: '3.2 GB',
           grad: [const Color(0xFF1D4ED8), const Color(0xFF3B82F6)],
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DeviceSpaceScreen()))),
-      _SC(icon: Icons.video_library_rounded,  label: 'Videos',  sub: '124 GB',
+      _SC(icon: Icons.video_library_rounded,  label: ProfileStrings.t(lang, 'profile_videos'),  sub: '124 GB',
           grad: [const Color(0xFFD97706), const Color(0xFFFBBF24)], onTap: () {}),
       _SC(icon: Icons.photo_rounded,
-          label: isLoading ? '—' : '$totalImages', sub: 'Images',
+          label: isLoading ? '—' : '$totalImages', sub: ProfileStrings.t(lang, 'profile_images'),
           grad: [const Color(0xFFDC2626), const Color(0xFFF87171)],
           isLoading: isLoading,
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AlbumScreen()))),
-      _SC(icon: Icons.music_note_rounded,     label: 'Music',   sub: '5.6 GB',
+      _SC(icon: Icons.music_note_rounded,     label: ProfileStrings.t(lang, 'profile_music'),   sub: '5.6 GB',
           grad: [const Color(0xFF7C3AED), const Color(0xFFA78BFA)],
           onTap: () => Navigator.push(context,
               MaterialPageRoute(builder: (_) => const HomeBottomNavigation(bottomIndex: 1)))),
@@ -653,15 +662,16 @@ class _QuickActionsGrid extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     final items = [
-      _QA(icon: Icons.folder_open_rounded, label: 'Folders',   sub: '3.2 GB',
+      _QA(icon: Icons.folder_open_rounded, label: ProfileStrings.t(lang, 'profile_folders'),   sub: '3.2 GB',
           color: const Color(0xFF16A34A), bg: const Color(0xFFDCFCE7), onTap: () {}),
-      _QA(icon: Icons.download_rounded,    label: 'Downloads', sub: '124 GB',
+      _QA(icon: Icons.download_rounded,    label: ProfileStrings.t(lang, 'profile_downloads'), sub: '124 GB',
           color: const Color(0xFF2563EB), bg: const Color(0xFFDBEAFE), onTap: () {}),
-      _QA(icon: Icons.lock_rounded,        label: 'Private',   sub: 'Vault',
+      _QA(icon: Icons.lock_rounded,        label: ProfileStrings.t(lang, 'profile_private'),   sub: ProfileStrings.t(lang, 'profile_vault'),
           color: const Color(0xFF7C3AED), bg: const Color(0xFFEDE9FE),
           onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VaultScreen()))),
-      _QA(icon: Icons.add_circle_rounded,  label: 'Add New',   sub: 'Playlist',
+      _QA(icon: Icons.add_circle_rounded,  label: ProfileStrings.t(lang, 'profile_add_new'),   sub: ProfileStrings.t(lang, 'profile_playlist'),
           color: _T.accent, bg: _T.accentSoft, onTap: () {}),
     ];
 
@@ -716,6 +726,8 @@ class _SettingsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => ProfileStrings.t(lang, key);
     return Container(
       decoration: BoxDecoration(
         color: _T.white,
@@ -727,12 +739,25 @@ class _SettingsCard extends StatelessWidget {
         children: [
 
           // ── FEATURES ─────────────────────────────────────────────────
-          _Sub('✦  Features'),
+          _Sub(t('profile_section_features')),
 
+
+
+          // _Tile(icon: Icons.star_rounded,
+          //     iColor: const Color(0xFF0EA5E9), iBg: const Color(0xFFE0F2FE),
+          //     title: 'Rating App', sub: 'Play online videos & IPTV',
+          //     badge: _Badge(text: 'NEW', color: _T.accent),
+          //   onTap: () => RatingPopup.forceShow(context),
+          //
+          //
+          //
+          // ),
+
+          _Div(),
           _Tile(icon: Icons.cast_rounded,
               iColor: const Color(0xFF0EA5E9), iBg: const Color(0xFFE0F2FE),
-              title: 'Stream', sub: 'Play online videos & IPTV',
-              badge: _Badge(text: 'NEW', color: _T.accent),
+              title: t('profile_stream_title'), sub: t('profile_stream_sub'),
+              badge: _Badge(text: t('profile_badge_new'), color: _T.accent),
               onTap: () {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerStream()));
               }),
@@ -740,8 +765,8 @@ class _SettingsCard extends StatelessWidget {
 
           _Tile(icon: Icons.download_for_offline_rounded,
               iColor: const Color(0xFF16A34A), iBg: const Color(0xFFDCFCE7),
-              title: 'Status Saver', sub: 'Save WhatsApp & Instagram status',
-              badge: _Badge(text: 'HOT', color: const Color(0xFFEA580C)),
+              title: t('profile_status_saver_title'), sub: t('profile_status_saver_sub'),
+              badge: _Badge(text: t('profile_badge_hot'), color: const Color(0xFFEA580C)),
               onTap: () {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => StatusSaverHomePage()));
               }),
@@ -749,22 +774,22 @@ class _SettingsCard extends StatelessWidget {
 
           _Tile(icon: Icons.style_rounded,
               iColor: const Color(0xFF7C3AED), iBg: const Color(0xFFEDE9FE),
-              title: 'Themes', sub: 'Customize your app look',
+              title: t('profile_themes_title'), sub: t('profile_themes_sub'),
               onTap: () {}),
 
           // ── PREFERENCES ───────────────────────────────────────────────
-          _Sub('✦  Preferences'),
+          _Sub(t('profile_section_preferences')),
 
           _Tile(icon: Icons.notifications_none_rounded,
               iColor: const Color(0xFF8B5CF6), iBg: const Color(0xFFF3E8FF),
-              title: 'Notifications', sub: 'Stay updated, never miss out',
+              title: t('profile_notifications_title'), sub: t('profile_notifications_sub'),
               onTap: () => Navigator.push(context,
                   MaterialPageRoute(builder: (_) => NotificationScreen()))),
           _Div(),
 
           _Tile(icon: HeroIcons.paint_brush,
               iColor: _T.accent, iBg: _T.accentSoft,
-              title: 'Toolbar Color', sub: 'Personalize your theme',
+              title: t('profile_toolbar_color_title'), sub: t('profile_toolbar_color_sub'),
               onTap: () => showModalBottomSheet(
                 context: context,
                 shape: const RoundedRectangleBorder(
@@ -776,9 +801,15 @@ class _SettingsCard extends StatelessWidget {
           _NightTile(themeProvider: themeProvider),
           _Div(),
 
+          _Tile(icon: Icons.language_rounded,
+              iColor: const Color(0xFF0891B2), iBg: const Color(0xFFE0F7FA),
+              title: t('profile_language_title'), sub: t('profile_language_sub'),
+              onTap: () => showLanguagePickerSheet(context)),
+          _Div(),
+
           _Tile(svgAsset: 'assets/privacy.svg',
               iColor: const Color(0xFF64748B), iBg: const Color(0xFFF1F5F9),
-              title: 'Privacy Policy', sub: 'Privacy & security',
+              title: t('profile_privacy_title'), sub: t('profile_privacy_sub'),
               onTap: () async {
                 final uri = Uri.parse(
                     'https://www.freeprivacypolicy.com/live/3a47e749-0364-44f5-8cc3-559f2cd90336');
@@ -788,15 +819,15 @@ class _SettingsCard extends StatelessWidget {
               }),
 
           // ── PREMIUM ───────────────────────────────────────────────────
-          _Sub('✦  Premium'),
+          _Sub(t('profile_section_premium')),
           const _RemoveAdsTile(),
 
           // ── SUPPORT ───────────────────────────────────────────────────
-          _Sub('✦  Support'),
+          _Sub(t('profile_section_support')),
 
           _Tile(icon: Icons.help_outline_rounded,
               iColor: const Color(0xFF0284C7), iBg: const Color(0xFFE0F2FE),
-              title: 'Help & Support', sub: 'Get assistance anytime',
+              title: t('profile_help_support_title'), sub: t('profile_help_support_sub'),
               onTap: () => showHelpSupportSheet(context)),
           _Div(),
 
@@ -805,13 +836,13 @@ class _SettingsCard extends StatelessWidget {
 
           _Tile(icon: Icons.chat_bubble_outline_rounded,
               iColor: const Color(0xFF059669), iBg: const Color(0xFFD1FAE5),
-              title: 'Feedback', sub: 'Share your thoughts with us',
+              title: t('profile_feedback_title'), sub: t('profile_feedback_sub'),
               onTap: () {}),
           _Div(),
 
           _Tile(icon: Icons.share_rounded,
               iColor: const Color(0xFF2563EB), iBg: const Color(0xFFDBEAFE),
-              title: 'Share App', sub: 'Invite your friends',
+              title: t('profile_share_app_title'), sub: t('profile_share_app_sub'),
               isLast: true,
               onTap: () => SharePlus.instance.share(
                 ShareParams(
@@ -944,6 +975,7 @@ class _NightTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isDark = themeProvider.themeDataStyle == ThemeDataStyle.dark;
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 14.sp, vertical: 10.sp),
       child: Row(
@@ -961,8 +993,8 @@ class _NightTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('Night Mode', style: _T.outfit(size: 13, w: FontWeight.w600, color: _T.textH)),
-                Text(isDark ? 'Dark theme active' : 'Light theme active',
+                Text(ProfileStrings.t(lang, 'profile_night_mode_title'), style: _T.outfit(size: 13, w: FontWeight.w600, color: _T.textH)),
+                Text(isDark ? ProfileStrings.t(lang, 'profile_night_mode_dark') : ProfileStrings.t(lang, 'profile_night_mode_light'),
                     style: _T.outfit(size: 10.5, color: _T.textS)),
               ],
             ),
@@ -990,6 +1022,7 @@ class _RemoveAdsTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 10.sp, vertical: 6.sp),
       child: GestureDetector(
@@ -1020,7 +1053,7 @@ class _RemoveAdsTile extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text('Remove Ads',
+                        Text(ProfileStrings.t(lang, 'profile_remove_ads_title'),
                             style: _T.outfit(size: 13, w: FontWeight.w700, color: _T.textH)),
                         const SizedBox(width: 7),
                         Container(
@@ -1029,7 +1062,7 @@ class _RemoveAdsTile extends StatelessWidget {
                             gradient: _T.goldGrad,
                             borderRadius: BorderRadius.circular(6),
                           ),
-                          child: Text('PRO',
+                          child: Text(ProfileStrings.t(lang, 'profile_badge_pro'),
                               style: GoogleFonts.outfit(
                                   fontSize: 7.sp, fontWeight: FontWeight.w700,
                                   color: Colors.white, letterSpacing: 0.8)),
@@ -1037,7 +1070,7 @@ class _RemoveAdsTile extends StatelessWidget {
                       ],
                     ),
                     SizedBox(height: 2.sp),
-                    Text('Enjoy an ad-free experience',
+                    Text(ProfileStrings.t(lang, 'profile_remove_ads_sub'),
                         style: _T.outfit(size: 10.5, color: _T.textS)),
                   ],
                 ),
@@ -1049,7 +1082,7 @@ class _RemoveAdsTile extends StatelessWidget {
                   borderRadius: BorderRadius.circular(10),
                   boxShadow: [BoxShadow(color: _T.gold.withValues(alpha:0.3), blurRadius: 10)],
                 ),
-                child: Text('Upgrade',
+                child: Text(ProfileStrings.t(lang, 'profile_upgrade'),
                     style: GoogleFonts.outfit(
                         fontSize: 11.sp, fontWeight: FontWeight.w700,
                         color: Colors.white)),
@@ -1083,6 +1116,7 @@ class _RateUsTileState extends State<_RateUsTile> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -1105,7 +1139,7 @@ class _RateUsTileState extends State<_RateUsTile> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('Rate Us', style: _T.outfit(size: 13, w: FontWeight.w600, color: _T.textH)),
+                    Text(ProfileStrings.t(lang, 'profile_rate_us_title'), style: _T.outfit(size: 13, w: FontWeight.w600, color: _T.textH)),
                     SizedBox(height: 4.sp),
                     Row(
                       children: List.generate(5, (i) => GestureDetector(
@@ -1183,6 +1217,8 @@ class _HelpSupportSheet extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => ProfileStrings.t(lang, key);
     return DraggableScrollableSheet(
       initialChildSize: 0.75,
       minChildSize: 0.5,
@@ -1217,13 +1253,13 @@ class _HelpSupportSheet extends StatelessWidget {
                       child: const Icon(Icons.help_outline_rounded, color: Color(0xFF0284C7), size: 26),
                     ),
                     const SizedBox(width: 14),
-                    const Column(
+                    Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text('Help & Support',
-                            style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
-                        Text('Get assistance anytime',
-                            style: TextStyle(fontSize: 13, color: Color(0xFF64748B))),
+                        Text(t('profile_help_support_title'),
+                            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: Color(0xFF0F172A))),
+                        Text(t('profile_help_support_sub'),
+                            style: const TextStyle(fontSize: 13, color: Color(0xFF64748B))),
                       ],
                     ),
                   ],
@@ -1238,13 +1274,13 @@ class _HelpSupportSheet extends StatelessWidget {
                     color: const Color(0xFFF1F5F9),
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Row(
+                  child: Row(
                     children: [
-                      SizedBox(width: 14),
-                      Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
-                      SizedBox(width: 10),
-                      Text('Search help articles...',
-                          style: TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
+                      const SizedBox(width: 14),
+                      const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
+                      const SizedBox(width: 10),
+                      Text(t('profile_search_help'),
+                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
                     ],
                   ),
                 ),
@@ -1255,42 +1291,42 @@ class _HelpSupportSheet extends StatelessWidget {
                   controller: controller,
                   padding: const EdgeInsets.symmetric(horizontal: 24),
                   children: [
-                    const Text('Quick Actions',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                    Text(t('profile_quick_actions'),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                             color: Color(0xFF64748B), letterSpacing: 0.5)),
                     const SizedBox(height: 12),
                     Row(
                       children: [
-                        _QuickActionCard(icon: Icons.chat_bubble_outline_rounded, label: 'Live Chat',
+                        _QuickActionCard(icon: Icons.chat_bubble_outline_rounded, label: t('profile_live_chat'),
                             color: const Color(0xFF0284C7), bg: const Color(0xFFE0F2FE), onTap: () {}),
                         const SizedBox(width: 12),
-                        _QuickActionCard(icon: Icons.phone_outlined, label: 'Call Us',
+                        _QuickActionCard(icon: Icons.phone_outlined, label: t('profile_call_us'),
                             color: const Color(0xFF16A34A), bg: const Color(0xFFDCFCE7), onTap: () {}),
                         const SizedBox(width: 12),
-                        _QuickActionCard(icon: Icons.email_outlined, label: 'Email',
+                        _QuickActionCard(icon: Icons.email_outlined, label: t('profile_email'),
                             color: const Color(0xFF9333EA), bg: const Color(0xFFF3E8FF), onTap: () {}),
                       ],
                     ),
                     const SizedBox(height: 28),
-                    const Text('Frequently Asked',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
+                    Text(t('profile_frequently_asked'),
+                        style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                             color: Color(0xFF64748B), letterSpacing: 0.5)),
                     const SizedBox(height: 12),
                     _FaqTile(
-                      question: 'How do I reset my password?',
-                      answer: 'Go to Login screen → tap "Forgot Password" → enter your email and follow the instructions sent to you.',
+                      question: t('profile_faq_q1'),
+                      answer: t('profile_faq_a1'),
                     ),
                     _FaqTile(
-                      question: 'How to update my profile details?',
-                      answer: 'Navigate to Profile → Edit Profile → update the required fields and tap Save.',
+                      question: t('profile_faq_q2'),
+                      answer: t('profile_faq_a2'),
                     ),
                     _FaqTile(
-                      question: 'Where can I see my fee receipts?',
-                      answer: 'Go to Fees section → tap on any paid fee → download or view the receipt from there.',
+                      question: t('profile_faq_q3'),
+                      answer: t('profile_faq_a3'),
                     ),
                     _FaqTile(
-                      question: 'How do I join a video class?',
-                      answer: 'Open the Timetable → select the ongoing class card → tap Join Class button.',
+                      question: t('profile_faq_q4'),
+                      answer: t('profile_faq_a4'),
                     ),
                     const SizedBox(height: 28),
                     Container(
@@ -1304,15 +1340,15 @@ class _HelpSupportSheet extends StatelessWidget {
                       ),
                       child: Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                Text('Still need help?',
-                                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
-                                SizedBox(height: 4),
-                                Text('Our support team is\navailable 24/7 for you.',
-                                    style: TextStyle(color: Color(0xFFBAE6FD), fontSize: 13)),
+                                Text(t('profile_still_need_help'),
+                                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
+                                const SizedBox(height: 4),
+                                Text(t('profile_support_247'),
+                                    style: const TextStyle(color: Color(0xFFBAE6FD), fontSize: 13)),
                               ],
                             ),
                           ),
@@ -1325,7 +1361,7 @@ class _HelpSupportSheet extends StatelessWidget {
                               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                               padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
                             ),
-                            child: const Text('Contact', style: TextStyle(fontWeight: FontWeight.w700)),
+                            child: Text(t('profile_contact'), style: const TextStyle(fontWeight: FontWeight.w700)),
                           ),
                         ],
                       ),

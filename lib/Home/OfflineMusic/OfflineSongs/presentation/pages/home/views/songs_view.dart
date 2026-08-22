@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:provider/provider.dart';
 import '../../../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
+import '../../../../../../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../../../../../../NotifyListeners/LanguageProvider/music_strings.dart';
 
 
 
@@ -45,6 +48,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
 
 
   void _showBottomSheet(BuildContext context) {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
@@ -53,7 +57,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
           children: [
             ListTile(
               leading: Icon(Icons.play_arrow),
-              title: Text('Play'),
+              title: Text(MusicStrings.t(lang, 'music_play')),
               onTap: () {
                 Navigator.pop(context);
                 // Add action for 'Play'
@@ -61,7 +65,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
             ),
             ListTile(
               leading: Icon(Icons.playlist_play),
-              title: Text('Play Next'),
+              title: Text(MusicStrings.t(lang, 'music_play_next')),
               onTap: () {
                 Navigator.pop(context);
                 // Add action for 'Play Next'
@@ -69,7 +73,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
             ),
             ListTile(
               leading: Icon(Icons.library_music),
-              title: Text('Lyrics'),
+              title: Text(MusicStrings.t(lang, 'music_lyrics')),
               onTap: () {
                 Navigator.pop(context);
                 // Add action for 'Lyrics'
@@ -77,7 +81,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
             ),
             ListTile(
               leading: Icon(Icons.cut),
-              title: Text('Ringtone Maker'),
+              title: Text(MusicStrings.t(lang, 'music_ringtone_maker')),
               trailing: Icon(Icons.circle, color: Colors.red, size: 10),
               onTap: () {
                 Navigator.pop(context);
@@ -86,7 +90,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
             ),
             ListTile(
               leading: Icon(Icons.playlist_add),
-              title: Text('Add to playlist'),
+              title: Text(MusicStrings.t(lang, 'music_add_to_playlist')),
               onTap: () {
                 Navigator.pop(context);
                 // Add action for 'Add to playlist'
@@ -94,7 +98,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
             ),
             ListTile(
               leading: Icon(Icons.lock),
-              title: Text('Lock'),
+              title: Text(MusicStrings.t(lang, 'music_lock')),
               onTap: () {
                 Navigator.pop(context);
                 // Add action for 'Lock'
@@ -102,7 +106,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
             ),
             ListTile(
               leading: Icon(Icons.share),
-              title: Text('Share'),
+              title: Text(MusicStrings.t(lang, 'music_share')),
               onTap: () {
                 Navigator.pop(context);
                 // Add action for 'Share'
@@ -110,7 +114,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
             ),
             ListTile(
               leading: Icon(Icons.queue_music),
-              title: Text('Add to Queue'),
+              title: Text(MusicStrings.t(lang, 'music_add_to_queue')),
               onTap: () {
                 Navigator.pop(context);
                 // Add action for 'Add to Queue'
@@ -118,7 +122,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
             ),
             ListTile(
               leading: Icon(Icons.notifications),
-              title: Text('Set as ringtone'),
+              title: Text(MusicStrings.t(lang, 'music_set_as_ringtone')),
               onTap: () {
                 Navigator.pop(context);
                 // Add action for 'Set as ringtone'
@@ -126,7 +130,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
             ),
             ListTile(
               leading: Icon(Icons.delete),
-              title: Text('Delete'),
+              title: Text(MusicStrings.t(lang, 'music_delete')),
               onTap: () {
                 Navigator.pop(context);
                 // Add action for 'Delete'
@@ -134,7 +138,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
             ),
             ListTile(
               leading: Icon(Icons.info),
-              title: Text('Properties'),
+              title: Text(MusicStrings.t(lang, 'music_properties')),
               onTap: () {
                 Navigator.pop(context);
                 // Add action for 'Properties'
@@ -147,6 +151,8 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
   }
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Scaffold(
       body: Container(
         color: widget.color,
@@ -165,7 +171,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
 
             // 'Library' is empty.
             if (item.data!.isEmpty) {
-              return const Text("Nothing found!");
+              return Text(MusicStrings.t(lang, 'music_nothing_found'));
             }
 
             // You can use [item.data!] direct or you can create a:
@@ -198,7 +204,8 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
                                 ),
                               ),
                               subtitle: Text(
-                                item.data![index].artist ?? "No Artist",
+                                item.data![index].artist ??
+                                    MusicStrings.t(lang, 'music_no_artist'),
                                 style: GoogleFonts.poppins(
                                   textStyle: TextStyle(
                                     color: Colors.grey,

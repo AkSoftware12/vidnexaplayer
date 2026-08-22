@@ -4,7 +4,10 @@ import 'package:flutter/material.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:provider/provider.dart';
 import 'package:videoplayer/Home/YoutubeScreen/playlistvideos.dart';
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../NotifyListeners/LanguageProvider/video_strings.dart';
 
 /// ✅ Full code with Hive cache (per user 24 hours me 1 bar API hit)
 /// NOTE: main.dart me Hive.initFlutter() + Hive.openBox('yt_cache') required.
@@ -183,6 +186,7 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     final categories = categoryPlaylists.keys.toList();
 
     return Scaffold(
@@ -200,12 +204,12 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
         )
             : (categories.isEmpty
             ? ListView(
-          children: const [
-            SizedBox(height: 200),
+          children: [
+            const SizedBox(height: 200),
             Center(
               child: Text(
-                "No playlists found",
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                VideoStrings.t(lang, 'yt_no_playlists_found'),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),
           ],

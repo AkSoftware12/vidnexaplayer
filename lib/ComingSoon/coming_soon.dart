@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
+import '../NotifyListeners/LanguageProvider/home_strings.dart';
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
 
 
 class ComingSoonScreen extends StatelessWidget {
@@ -10,6 +13,7 @@ class ComingSoonScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -49,7 +53,7 @@ class ComingSoonScreen extends StatelessWidget {
                 padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
               ),
               child: Text(
-                'Go Back',
+                HomeStrings.t(lang, 'coming_soon_go_back'),
                 style: GoogleFonts.openSans(
                   textStyle: TextStyle(
                     color: Colors.white,

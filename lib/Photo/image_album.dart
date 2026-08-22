@@ -5,8 +5,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
 
+import '../NotifyListeners/LanguageProvider/device_strings.dart';
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../Utils/video_thumb.dart';
 import '../ads/app_open_ad_manager.dart';
 
@@ -59,9 +62,10 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
       setState(() {
         _isLoading = false;
       });
+      final lang = context.read<LocaleProvider>().locale.languageCode;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Permission denied to access photos', style: TextStyle(color: Colors.white)),
+          content: Text(DeviceStrings.t(lang, 'album_permission_denied'), style: TextStyle(color: Colors.white)),
           backgroundColor: Colors.red,
           duration: Duration(seconds: 3),
         ),
@@ -71,11 +75,13 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Scaffold(
       appBar: AppBar(
         iconTheme: IconThemeData(color: Colors.white),
         title:Text(
-          'Photo Albums',
+          DeviceStrings.t(lang, 'album_title'),
           style: GoogleFonts.openSans(
             color: Colors.white,
             fontSize: 16.sp,
@@ -88,7 +94,7 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
       body: _isLoading
           ? Center(child: AnimatedProgressIndicator())
           : _albums.isEmpty
-          ? Center(child: Text('No albums found', style: Theme.of(context).textTheme.bodyMedium))
+          ? Center(child: Text(DeviceStrings.t(lang, 'album_no_albums'), style: Theme.of(context).textTheme.bodyMedium))
           : FadeTransition(
         opacity: _fadeAnimation,
         child: GridView.builder(
@@ -155,6 +161,8 @@ class AlbumTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return FutureBuilder<int>(
       future: album.assetCountAsync,
       builder: (context, snapshot) {
@@ -221,7 +229,8 @@ class AlbumTile extends StatelessWidget {
                         ),
                         SizedBox(height: 0.h),
                         Text(
-                          '${snapshot.data ?? 0} photos',
+                          DeviceStrings.t(lang, 'album_photos_count')
+                              .replaceAll('{count}', '${snapshot.data ?? 0}'),
                           style: GoogleFonts.poppins(
                             color: Colors.grey[600],
                             fontSize: 11.sp,
@@ -290,6 +299,8 @@ class _PhotosScreenState extends State<PhotosScreen> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Scaffold(
       appBar: AppBar(
         iconTheme: IconThemeData(color: Colors.white),
@@ -313,7 +324,7 @@ class _PhotosScreenState extends State<PhotosScreen> with SingleTickerProviderSt
       body: _isLoading
           ? Center(child: AnimatedProgressIndicator())
           : _photos.isEmpty
-          ? Center(child: Text('No photos in this album', style: Theme.of(context).textTheme.bodyMedium))
+          ? Center(child: Text(DeviceStrings.t(lang, 'album_no_photos_in_album'), style: Theme.of(context).textTheme.bodyMedium))
           : FadeTransition(
         opacity: _fadeAnimation,
         child: GridView.builder(
@@ -417,20 +428,21 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
   }
 
   Future<void> _deletePhoto(BuildContext context) async {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     bool? confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Text('Delete Photo', style: Theme.of(context).textTheme.titleLarge),
-        content: Text('Are you sure you want to delete this photo?', style: Theme.of(context).textTheme.bodyMedium),
+        title: Text(DeviceStrings.t(lang, 'album_delete_title'), style: Theme.of(context).textTheme.titleLarge),
+        content: Text(DeviceStrings.t(lang, 'album_delete_confirm'), style: Theme.of(context).textTheme.bodyMedium),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text('Cancel', style: TextStyle(color: Colors.teal)),
+            child: Text(DeviceStrings.t(lang, 'album_cancel'), style: TextStyle(color: Colors.teal)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete', style: TextStyle(color: Colors.red)),
+            child: Text(DeviceStrings.t(lang, 'album_delete'), style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -454,7 +466,7 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Photo deleted successfully', style: TextStyle(color: Colors.white)),
+              content: Text(DeviceStrings.t(lang, 'album_delete_success'), style: TextStyle(color: Colors.white)),
               backgroundColor: Colors.green,
               duration: Duration(seconds: 2),
             ),
@@ -463,7 +475,7 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text('Failed to delete photo', style: TextStyle(color: Colors.white)),
+              content: Text(DeviceStrings.t(lang, 'album_delete_failed'), style: TextStyle(color: Colors.white)),
               backgroundColor: Colors.red,
               duration: Duration(seconds: 2),
             ),
@@ -472,7 +484,7 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error deleting photo: $e', style: TextStyle(color: Colors.white)),
+            content: Text('${DeviceStrings.t(lang, 'album_delete_error_prefix')}$e', style: TextStyle(color: Colors.white)),
             backgroundColor: Colors.red,
             duration: Duration(seconds: 3),
           ),
@@ -483,6 +495,8 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Scaffold(
       appBar: AppBar(
         iconTheme: IconThemeData(color: Colors.white),
@@ -506,7 +520,7 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
       body: Container(
         color: _backgroundColor,
         child: _photos.isEmpty
-            ? Center(child: Text('No photos available', style: Theme.of(context).textTheme.bodyMedium))
+            ? Center(child: Text(DeviceStrings.t(lang, 'album_no_photos_available'), style: Theme.of(context).textTheme.bodyMedium))
             : PageView.builder(
           controller: _pageController,
           itemCount: _photos.length,
@@ -561,6 +575,8 @@ class _FullPhotoState extends State<_FullPhoto> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return FutureBuilder<File?>(
       future: _file,
       builder: (context, snapshot) {
@@ -578,7 +594,7 @@ class _FullPhotoState extends State<_FullPhoto> {
               children: [
                 Icon(Icons.broken_image_outlined, size: 48.sp, color: Colors.grey),
                 SizedBox(height: 8.sp),
-                const Text('This file is no longer available'),
+                Text(DeviceStrings.t(lang, 'album_file_unavailable')),
               ],
             ),
           );

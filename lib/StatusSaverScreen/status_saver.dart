@@ -1,94 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:android_intent_plus/android_intent.dart';
 import 'package:android_intent_plus/flag.dart';
-
-// ─── Language Model ────────────────────────────────────────────────────────────
-class _Lang {
-  final String appTitle;
-  final String headerTitle;
-  final String headerSubtitle;
-  final String guideTitle;
-  final String quickAccess;
-  final String openButton;
-  final String tip;
-  final List<Map<String, String>> steps;
-
-  const _Lang({
-    required this.appTitle,
-    required this.headerTitle,
-    required this.headerSubtitle,
-    required this.guideTitle,
-    required this.quickAccess,
-    required this.openButton,
-    required this.tip,
-    required this.steps,
-  });
-}
-
-final _Lang _english = _Lang(
-  appTitle: 'Instructions',
-  headerTitle: 'How to Save WhatsApp Status?',
-  headerSubtitle: 'Follow the steps below to save your friends\' statuses easily.',
-  guideTitle: 'Step-by-Step Guide',
-  quickAccess: 'Quick Access',
-  openButton: 'Open WhatsApp',
-  tip: 'Tip: After viewing a status, come back here and save it.',
-  steps: [
-    {
-      'title': 'Open WhatsApp',
-      'subtitle': 'Use the button below or open WhatsApp manually.',
-    },
-    {
-      'title': 'Go to Status Tab',
-      'subtitle': 'Tap the "Status" tab at the bottom of WhatsApp.',
-    },
-    {
-      'title': 'View the Status',
-      'subtitle': 'Watch the status you want to save completely.',
-    },
-    {
-      'title': 'Come Back Here',
-      'subtitle': 'After viewing, return to this app.',
-    },
-    {
-      'title': 'Select & Save',
-      'subtitle': 'Choose the status from the list and tap Save.',
-    },
-  ],
-);
-
-final _Lang _hindi = _Lang(
-  appTitle: 'निर्देश',
-  headerTitle: 'WhatsApp Status कैसे Save करें?',
-  headerSubtitle:
-  'नीचे दिए गए स्टेप्स फॉलो करें और आसानी से Status Save करें।',
-  guideTitle: 'स्टेप-बाय-स्टेप गाइड',
-  quickAccess: 'जल्दी खोलें',
-  openButton: 'WhatsApp खोलें',
-  tip: 'टिप: Status देखने के बाद यहाँ वापस आएं और Save करें।',
-  steps: [
-    {
-      'title': 'WhatsApp खोलें',
-      'subtitle': 'नीचे दिए बटन से या खुद WhatsApp खोलें।',
-    },
-    {
-      'title': 'Status Tab पर जाएं',
-      'subtitle': 'WhatsApp में नीचे "Status" टैब पर टैप करें।',
-    },
-    {
-      'title': 'Status देखें',
-      'subtitle': 'जो Status Save करना है, उसे पूरा देख लें।',
-    },
-    {
-      'title': 'वापस आएं',
-      'subtitle': 'Status देखने के बाद इस App में वापस आएं।',
-    },
-    {
-      'title': 'Select करें & Save करें',
-      'subtitle': 'लिस्ट से Status चुनें और Save बटन दबाएं।',
-    },
-  ],
-);
+import 'package:provider/provider.dart';
+import '../NotifyListeners/LanguageProvider/device_strings.dart';
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
 
 const List<IconData> _stepIcons = [
   Icons.open_in_new_rounded,
@@ -108,11 +23,8 @@ class StatusSaverScreen extends StatefulWidget {
 
 class _StatusSaverScreenState extends State<StatusSaverScreen>
     with SingleTickerProviderStateMixin {
-  bool _isHindi = false;
   late AnimationController _animController;
   late Animation<double> _fadeAnim;
-
-  _Lang get _lang => _isHindi ? _hindi : _english;
 
   @override
   void initState() {
@@ -133,15 +45,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
     super.dispose();
   }
 
-  void _toggleLanguage(bool toHindi) {
-    if (_isHindi == toHindi) return;
-    _animController.reverse().then((_) {
-      setState(() => _isHindi = toHindi);
-      _animController.forward();
-    });
-  }
-
-  Future<void> _openWhatsApp() async {
+  Future<void> _openWhatsApp(String lang) async {
     final AndroidIntent intent = AndroidIntent(
       action: 'android.intent.action.MAIN',
       package: 'com.whatsapp',
@@ -175,9 +79,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              _isHindi
-                  ? 'WhatsApp इंस्टॉल नहीं है!'
-                  : 'WhatsApp is not installed!',
+              DeviceStrings.t(lang, 'guide_whatsapp_not_installed'),
             ),
             backgroundColor: const Color(0xFF25D366),
             behavior: SnackBarBehavior.floating,
@@ -192,6 +94,16 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => DeviceStrings.t(lang, key);
+    final steps = List.generate(
+      5,
+      (i) => {
+        'title': t('guide_step${i + 1}_title'),
+        'subtitle': t('guide_step${i + 1}_subtitle'),
+      },
+    );
+
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -202,7 +114,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
           children: [
             const SizedBox(width: 10),
             Text(
-              _lang.appTitle,
+              t('guide_appbar_title'),
               style: const TextStyle(
                 color: Color(0xFF0D1B2A),
                 fontWeight: FontWeight.w800,
@@ -212,37 +124,6 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
             ),
           ],
         ),
-        actions: [
-          // ── Language Toggle Pill ──
-          Container(
-            margin: const EdgeInsets.only(right: 16),
-            padding: const EdgeInsets.all(3),
-            decoration: BoxDecoration(
-              color: const Color(0xFFF0F4F0),
-              borderRadius: BorderRadius.circular(30),
-              border: Border.all(
-                color: const Color(0xFFDDEDD8),
-                width: 1,
-              ),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _LangPill(
-                  label: 'EN',
-                  active: !_isHindi,
-                  onTap: () => _toggleLanguage(false),
-                ),
-                const SizedBox(width: 3),
-                _LangPill(
-                  label: 'हिं',
-                  active: _isHindi,
-                  onTap: () => _toggleLanguage(true),
-                ),
-              ],
-            ),
-          ),
-        ],
       ),
       body: SafeArea(
         child: FadeTransition(
@@ -289,7 +170,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
                       ),
                       const SizedBox(height: 12),
                       Text(
-                        _lang.headerTitle,
+                        t('guide_header_title'),
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 17,
@@ -299,7 +180,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
                       ),
                       const SizedBox(height: 6),
                       Text(
-                        _lang.headerSubtitle,
+                        t('guide_header_subtitle'),
                         style: TextStyle(
                           color: Colors.white.withValues(alpha:0.85),
                           fontSize: 13,
@@ -314,7 +195,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
 
                 // ── Guide Title ──
                 Text(
-                  _lang.guideTitle,
+                  t('guide_title'),
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
@@ -326,12 +207,12 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
 
                 // ── Step Cards ──
                 ...List.generate(
-                  _lang.steps.length,
+                  steps.length,
                       (i) => _StepCard(
                     index: i + 1,
                     icon: _stepIcons[i],
-                    title: _lang.steps[i]['title']!,
-                    subtitle: _lang.steps[i]['subtitle']!,
+                    title: steps[i]['title']!,
+                    subtitle: steps[i]['subtitle']!,
                   ),
                 ),
 
@@ -349,7 +230,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Text(
-                        _lang.quickAccess,
+                        t('guide_quick_access'),
                         style: TextStyle(
                           fontSize: 12,
                           color: Colors.grey.shade400,
@@ -373,10 +254,10 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
                   width: double.infinity,
                   height: 56,
                   child: ElevatedButton.icon(
-                    onPressed: _openWhatsApp,
+                    onPressed: () => _openWhatsApp(lang),
                     icon: const Icon(Icons.open_in_new_rounded, size: 20),
                     label: Text(
-                      _lang.openButton,
+                      t('guide_open_whatsapp'),
                       style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
@@ -421,7 +302,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
                       const SizedBox(width: 10),
                       Expanded(
                         child: Text(
-                          _lang.tip,
+                          t('guide_tip'),
                           style: TextStyle(
                             color: Colors.amber.shade800,
                             fontSize: 13,
@@ -437,53 +318,6 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
                 const SizedBox(height: 24),
               ],
             ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ─── Language Toggle Pill ──────────────────────────────────────────────────────
-class _LangPill extends StatelessWidget {
-  final String label;
-  final bool active;
-  final VoidCallback onTap;
-
-  const _LangPill({
-    required this.label,
-    required this.active,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 250),
-        curve: Curves.easeInOut,
-        padding:
-        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-        decoration: BoxDecoration(
-          color: active ? const Color(0xFF25D366) : Colors.transparent,
-          borderRadius: BorderRadius.circular(25),
-          boxShadow: active
-              ? [
-            BoxShadow(
-              color: const Color(0xFF25D366).withValues(alpha:0.35),
-              blurRadius: 8,
-              offset: const Offset(0, 2),
-            ),
-          ]
-              : [],
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: active ? Colors.white : Colors.grey.shade500,
-            fontWeight: FontWeight.w700,
-            fontSize: 13,
           ),
         ),
       ),

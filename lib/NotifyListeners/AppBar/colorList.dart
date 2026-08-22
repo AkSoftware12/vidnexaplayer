@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'app_bar_color.dart';
+import '../LanguageProvider/language_provider.dart';
+import '../LanguageProvider/misc_strings.dart';
 
 class ColorPickerBottomSheet extends StatelessWidget {
   const ColorPickerBottomSheet({super.key});
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Container(
       padding: const EdgeInsets.all(16.0),
       height: MediaQuery.of(context).size.height * 0.4,
@@ -21,9 +24,9 @@ class ColorPickerBottomSheet extends StatelessWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text(
-                'Select ToolBar Color',
-                style: TextStyle(
+              Text(
+                MiscStrings.t(lang, 'colorpicker_title'),
+                style: const TextStyle(
                   fontSize: 20,
                   fontWeight: FontWeight.bold,
                 ),
@@ -104,9 +107,9 @@ class ColorPickerBottomSheet extends StatelessWidget {
               backgroundColor: Colors.purple,
               padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 12),
             ),
-            child: const Text(
-              'Reset',
-              style: TextStyle(fontSize: 16),
+            child: Text(
+              MiscStrings.t(lang, 'reset'),
+              style: const TextStyle(fontSize: 16),
             ),
           ),
         ],

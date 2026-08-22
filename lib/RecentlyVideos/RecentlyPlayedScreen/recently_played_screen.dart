@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 import '../../Home/HomeScreen/home2.dart'; // VideoProvider yahi se aa raha hai
+import '../../NotifyListeners/LanguageProvider/home_strings.dart';
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../Utils/video_thumb.dart';
 
 class RecentlyPlayedSection extends StatefulWidget {
@@ -95,6 +97,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     final provider = context.watch<VideoProvider>();
     final ids = provider.recentlyPlayed;
 
@@ -138,7 +141,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
-                        "Recently Played",
+                        HomeStrings.t(lang, 'home_recently_played_title'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
@@ -148,7 +151,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                         ),
                       ),
                       Text(
-                        "Your last watched videos (${ _recentEntities.length})",
+                        '${HomeStrings.t(lang, 'home_recently_played_subtitle')} (${_recentEntities.length})',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: GoogleFonts.poppins(
@@ -196,7 +199,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                               size: 12.sp, color: Colors.white),
                           SizedBox(width: 3.w),
                           Text(
-                            "Clear",
+                            HomeStrings.t(lang, 'home_clear'),
                             style: GoogleFonts.poppins(
                               fontSize: 12.sp,
                               fontWeight: FontWeight.w600,
@@ -308,6 +311,7 @@ class _ClearSingleDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     final media = MediaQuery.of(context);
     final maxH = media.size.height * 0.78;
 
@@ -364,7 +368,7 @@ class _ClearSingleDialog extends StatelessWidget {
                       SizedBox(height: 12.h),
 
                       Text(
-                        "Remove this video?",
+                        HomeStrings.t(lang, 'recent_remove_video_title'),
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(
                           fontSize: 16.sp,
@@ -375,7 +379,7 @@ class _ClearSingleDialog extends StatelessWidget {
                       SizedBox(height: 6.h),
 
                       Text(
-                        "This will remove only this item from Recently Played.",
+                        HomeStrings.t(lang, 'recent_remove_video_desc'),
                         textAlign: TextAlign.center,
                         style: GoogleFonts.poppins(
                           fontSize: 12.5.sp,
@@ -404,7 +408,7 @@ class _ClearSingleDialog extends StatelessWidget {
                                 ),
                                 child: Center(
                                   child: Text(
-                                    "Cancel",
+                                    HomeStrings.t(lang, 'recent_cancel'),
                                     style: GoogleFonts.poppins(
                                       fontSize: 13.sp,
                                       fontWeight: FontWeight.w700,
@@ -440,7 +444,7 @@ class _ClearSingleDialog extends StatelessWidget {
                                 ),
                                 child: Center(
                                   child: Text(
-                                    "Remove This",
+                                    HomeStrings.t(lang, 'recent_remove_this'),
                                     style: GoogleFonts.poppins(
                                       fontSize: 13.sp,
                                       fontWeight: FontWeight.w800,
@@ -470,7 +474,7 @@ class _ClearSingleDialog extends StatelessWidget {
                           ),
                           child: Center(
                             child: Text(
-                              "Clear All Recently Played",
+                              HomeStrings.t(lang, 'recent_clear_all'),
                               style: GoogleFonts.poppins(
                                 fontSize: 12.5.sp,
                                 fontWeight: FontWeight.w700,

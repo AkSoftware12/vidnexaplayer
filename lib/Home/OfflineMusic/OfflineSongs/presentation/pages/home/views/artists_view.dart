@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
 
+import '../../../../../../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../../../../../../NotifyListeners/LanguageProvider/music_strings.dart';
 import '../../artist_page.dart';
 
 class ArtistsView extends StatefulWidget {
@@ -80,6 +83,7 @@ class _ArtistsViewState extends State<ArtistsView> {
   Widget build(BuildContext context) {
     final bg = widget.color;
     final textColor = widget.colortext;
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return Container(
       color: bg,
@@ -103,7 +107,7 @@ class _ArtistsViewState extends State<ArtistsView> {
           if (raw.isEmpty) {
             return Center(
               child: Text(
-                "Nothing found!",
+                MusicStrings.t(lang, 'music_nothing_found'),
                 style: TextStyle(color: textColor.withValues(alpha:0.75)),
               ),
             );
@@ -123,15 +127,15 @@ class _ArtistsViewState extends State<ArtistsView> {
                         child: _SearchField(
                           controller: _search,
                           textColor: textColor,
-                          hint: "Search artists...",
+                          hint: MusicStrings.t(lang, 'music_search_artists_hint'),
                           onChanged: (_) => setState(() {}),
                           onClear: () => setState(() => _search.clear()),
                         ),
                       ),
                       const SizedBox(width: 10),
                       _SortButton(
-                        label: _sortLabel(_sort),
-                        onTap: () => _openSortSheet(textColor),
+                        label: _sortLabel(_sort, lang),
+                        onTap: () => _openSortSheet(textColor, lang),
                       ),
                     ],
                   ),
@@ -192,20 +196,20 @@ class _ArtistsViewState extends State<ArtistsView> {
     );
   }
 
-  String _sortLabel(ArtistSort s) {
+  String _sortLabel(ArtistSort s, String lang) {
     switch (s) {
       case ArtistSort.az:
-        return "A-Z";
+        return MusicStrings.t(lang, 'music_sort_az_short');
       case ArtistSort.za:
-        return "Z-A";
+        return MusicStrings.t(lang, 'music_sort_za_short');
       case ArtistSort.mostSongs:
-        return "Most";
+        return MusicStrings.t(lang, 'music_sort_most');
       case ArtistSort.leastSongs:
-        return "Least";
+        return MusicStrings.t(lang, 'music_sort_least');
     }
   }
 
-  void _openSortSheet(Color textColor) {
+  void _openSortSheet(Color textColor, String lang) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -229,22 +233,22 @@ class _ArtistsViewState extends State<ArtistsView> {
                 ),
               ),
               _SortTile(
-                title: "A - Z",
+                title: MusicStrings.t(lang, 'music_sort_az'),
                 selected: _sort == ArtistSort.az,
                 onTap: () => setState(() => _sort = ArtistSort.az),
               ),
               _SortTile(
-                title: "Z - A",
+                title: MusicStrings.t(lang, 'music_sort_za'),
                 selected: _sort == ArtistSort.za,
                 onTap: () => setState(() => _sort = ArtistSort.za),
               ),
               _SortTile(
-                title: "Most Songs",
+                title: MusicStrings.t(lang, 'music_sort_most_songs'),
                 selected: _sort == ArtistSort.mostSongs,
                 onTap: () => setState(() => _sort = ArtistSort.mostSongs),
               ),
               _SortTile(
-                title: "Least Songs",
+                title: MusicStrings.t(lang, 'music_sort_least_songs'),
                 selected: _sort == ArtistSort.leastSongs,
                 onTap: () => setState(() => _sort = ArtistSort.leastSongs),
               ),
@@ -273,6 +277,7 @@ class _ArtistCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final songs = artist.numberOfTracks ?? 0;
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return Material(
       color: Colors.white.withValues(alpha:1),
@@ -372,7 +377,7 @@ class _ArtistCard extends StatelessWidget {
                   border: Border.all(color: Colors.white.withValues(alpha:0.08)),
                 ),
                 child: Text(
-                  "$songs songs",
+                  "$songs ${MusicStrings.t(lang, 'music_songs_count_suffix')}",
                   style: TextStyle(
                     color: textColor.withValues(alpha:0.75),
                     fontWeight: FontWeight.w600,

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:provider/provider.dart';
+import '../../../../../../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../../../../../../NotifyListeners/LanguageProvider/music_strings.dart';
 import '../../genre_page.dart';
 
 class GenresView extends StatefulWidget {
@@ -40,6 +43,8 @@ class _GenresViewState extends State<GenresView>
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Scaffold(
       backgroundColor: widget.color,
 
@@ -59,7 +64,7 @@ class _GenresViewState extends State<GenresView>
 
             // 'Library' is empty.
             if (item.data!.isEmpty) {
-              return const Text("Nothing found!");
+              return Text(MusicStrings.t(lang, 'music_nothing_found'));
             }
 
             return  ListView.builder(
@@ -117,7 +122,7 @@ class _GenresViewState extends State<GenresView>
                         ),
                       ),
                       subtitle: Text(
-                        '${genre.numOfSongs} song${genre.numOfSongs == 1 ? '' : 's'}',
+                        '${genre.numOfSongs} ${genre.numOfSongs == 1 ? MusicStrings.t(lang, 'music_song_singular') : MusicStrings.t(lang, 'music_song_plural')}',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style:  TextStyle(color: widget.colortext,),

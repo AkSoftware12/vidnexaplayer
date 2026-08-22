@@ -2,8 +2,11 @@ import 'package:disk_space_plus/disk_space_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
 import '../DirectoryFolder/directory_folder.dart';
+import '../NotifyListeners/LanguageProvider/device_strings.dart';
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../ads/app_open_ad_manager.dart';
 
 class DeviceSpaceScreen extends StatefulWidget {
@@ -51,14 +54,17 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
 
   String gb(double value) => value.toStringAsFixed(1);
 
+
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Scaffold(
       backgroundColor: Theme.of(context).colorScheme.surface,
       appBar: AppBar(
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(
-          'Directory',
+          DeviceStrings.t(lang, 'device_appbar_title'),
           style: GoogleFonts.radioCanada(
             color: Theme.of(context).colorScheme.secondary,
             fontSize: 15.sp,
@@ -84,7 +90,7 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
               ),
             ),
             title: Text(
-              'Internal Storage',
+              DeviceStrings.t(lang, 'device_internal_storage'),
               style: GoogleFonts.poppins(
                 color: Theme.of(context).colorScheme.secondary,
                 fontSize: 13.sp,
@@ -92,7 +98,9 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
               ),
             ),
             subtitle: Text(
-              'Free ${gb(_freeDiskSpaceGB)} GB of ${gb(_totalDiskSpaceGB)} GB',
+              DeviceStrings.t(lang, 'device_storage_free_of')
+                  .replaceAll('{free}', gb(_freeDiskSpaceGB))
+                  .replaceAll('{total}', gb(_totalDiskSpaceGB)),
               style: GoogleFonts.poppins(
                 color: Colors.grey,
                 fontSize: 11.sp,

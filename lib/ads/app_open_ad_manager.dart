@@ -2,7 +2,11 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../NotifyListeners/LanguageProvider/misc_strings.dart';
 
 /// Ad unit ids in one place instead of scattered string literals.
 ///
@@ -532,6 +536,7 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
 
     if (widget.bare) return adView;
 
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Container(
       margin: widget.margin ?? EdgeInsets.zero,
       decoration: BoxDecoration(
@@ -553,7 +558,7 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
             child: Padding(
               padding: const EdgeInsets.only(right: 2),
               child: Text(
-                'Sponsored',
+                MiscStrings.t(lang, 'ads_sponsored'),
                 style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
               ),
             ),

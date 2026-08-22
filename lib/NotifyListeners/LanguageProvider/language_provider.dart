@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import 'app_language.dart';
+
 /// Holds the selected app locale and persists it.
 ///
 /// The locale used to reset to English on every launch because nothing was
@@ -8,11 +10,11 @@ import 'package:shared_preferences/shared_preferences.dart';
 class LocaleProvider with ChangeNotifier {
   static const String _prefsKey = 'app_locale';
 
-  /// Locales the app declares in `MaterialApp.supportedLocales`.
-  static const List<Locale> supported = [
-    Locale('en'),
-    Locale('hi'),
-  ];
+  /// Locales the app declares in `MaterialApp.supportedLocales` — one per
+  /// entry in the language picker (see [kAppLanguages]), so every language a
+  /// user can pick is one Flutter's own widgets actually recognize.
+  static final List<Locale> supported =
+      kAppLanguages.map((l) => Locale(l.code)).toList();
 
   Locale _locale = const Locale('en');
 

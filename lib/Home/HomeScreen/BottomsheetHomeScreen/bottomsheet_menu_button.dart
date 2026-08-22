@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:provider/provider.dart';
+import '../../../NotifyListeners/LanguageProvider/home_strings.dart';
+import '../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../VideoPLayer/VideoList/video_list.dart';
 import '../DialogHomeScreen/FolderInfoDialog/folder_info_dialog.dart';
 
@@ -15,6 +18,7 @@ class FolderBottomSheet {
         required String location,
         required String date,
       }) {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
@@ -124,7 +128,7 @@ class FolderBottomSheet {
                   _buildOptionCard(
                     context,
                     Icons.folder,
-                    'Open',
+                    HomeStrings.t(lang, 'home_menu_open'),
                     Colors.blue,
                     onTap: () {
                       Navigator.pop(context);
@@ -142,7 +146,7 @@ class FolderBottomSheet {
                   _buildOptionCard(
                     context,
                     Icons.delete,
-                    'Delete',
+                    HomeStrings.t(lang, 'home_menu_delete'),
                     Theme.of(context).colorScheme.error,
                     onTap: () {
                       Navigator.pop(context);
@@ -152,7 +156,7 @@ class FolderBottomSheet {
                   _buildOptionCard(
                     context,
                     Icons.info_outline,
-                    'Info',
+                    HomeStrings.t(lang, 'home_menu_info'),
                     Theme.of(context).colorScheme.secondary,
                     onTap: () {
                       Navigator.pop(context);
@@ -169,14 +173,14 @@ class FolderBottomSheet {
                   _buildOptionCard(
                     context,
                     Icons.copy,
-                    'Copy',
+                    HomeStrings.t(lang, 'home_menu_copy'),
                     Theme.of(context).colorScheme.secondary,
                     onTap: () {},
                   ),
                   _buildOptionCard(
                     context,
                     Icons.visibility_off,
-                    'Hide',
+                    HomeStrings.t(lang, 'home_menu_hide'),
                     Theme.of(context).colorScheme.secondary,
                     onTap: () {},
                   ),

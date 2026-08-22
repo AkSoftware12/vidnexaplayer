@@ -15,6 +15,8 @@ import 'package:videoplayer/Utils/color.dart';
 import 'package:volume_controller/volume_controller.dart';
 
 import '../../Home/HomeScreen/home2.dart';
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../NotifyListeners/LanguageProvider/video_strings.dart';
 import '../../NotifyListeners/PlayPauseSync/play_pause.dart';
 import '../../ads/app_open_ad_manager.dart';
 import '../custom_video_appBar.dart';
@@ -82,6 +84,12 @@ class _FullScreenVideoPlayerSystemVolumeState
   bool _controlsVisible = true;
   Timer? _hideTimer;
 
+  // Cached at the top of build() (context.watch) so a language change
+  // triggers a rebuild; reused from callbacks/dialogs outside build() where
+  // `context.watch` cannot be called.
+  String _lang = 'en';
+  String _t(String key) => VideoStrings.t(_lang, key);
+
   bool _isLoading = true;
   String _selectedFilter = 'normal';
   Timer? _systemUiTimer;
@@ -128,7 +136,7 @@ class _FullScreenVideoPlayerSystemVolumeState
   bool _panIsVertical = false;
 
   Offset _panStart = Offset.zero;
-  double _panStartVolume = 0; // 0..100
+  double _panStartVolume = 0; // 0.._maxBoost (0..100 system, 100+ boost)
   double _panStartBrightness = 0; // 0..1
   Duration _panStartPos = Duration.zero;
 
@@ -166,9 +174,101 @@ class _FullScreenVideoPlayerSystemVolumeState
   Timer? _seekBubbleTimer;
   Duration _bubblePos = Duration.zero;
 
-  // haptic edge control (volume 0/100)
-  int _lastHapticEdge = -1; // -1 none, 0 min, 1 max
+  // haptic edge control (volume 0 / boost-gate / max)
+  int _lastHapticEdge = -1; // -1 none, 0 min, 1 boost gate, 2 max
   DateTime _lastHapticAt = DateTime.fromMillisecondsSinceEpoch(0);
+
+  // =========================================================
+  // ✅ VOLUME BOOST (player-side gain)
+  // =========================================================
+  /// Player gain in percent. 100 = normal, up to [_maxBoost].
+  ///
+  /// This sits ON TOP of the device volume: `VolumeController` still owns the
+  /// hardware 0..100, and everything above that is software gain applied by the
+  /// player itself. The swipe gesture treats both as ONE continuous scale
+  /// (0.._maxBoost) so the meter never restarts from the bottom when the boost
+  /// range is entered — it simply keeps filling, in a different colour.
+  double _volumeBoost = 100.0;
+  static const double _maxBoost = 150.0;
+
+  /// True once `volume-max` was successfully raised on the native player.
+  /// While false we simply never go past 100 — no crash, no silent no-op.
+  bool _boostReady = false;
+
+  /// Whether the soft-clip limiter is currently in the audio filter chain.
+  bool _limiterOn = false;
+
+  bool get _isBoosting => _volumeBoost > 100.5;
+
+  /// mpv clamps `volume` to `volume-max` (default 130), so the ceiling has to
+  /// be raised first or anything above 100 would be quietly ignored.
+  Future<void> _initVolumeBoost() async {
+    final p = _player.platform;
+    if (p is! NativePlayer) return; // web / unsupported -> boost stays off
+    try {
+      await p.setProperty('volume-max', _maxBoost.toStringAsFixed(0));
+      _boostReady = true;
+      await _applyPlayerVolume();
+    } catch (_) {
+      _boostReady = false;
+    }
+  }
+
+  /// The single place the player's gain is set: boost × equalizer.
+  ///
+  /// Previously the equalizer and the volume dialog each called `setVolume()`
+  /// independently, so whichever ran last silently wiped the other one out.
+  Future<void> _applyPlayerVolume() async {
+    final weightedGain =
+        (bassGain * 0.6 + midGain * 0.3 + trebleGain * 0.1) / 15.0;
+    final eqFactor = (1.0 + weightedGain).clamp(0.5, 1.5);
+
+    final target =
+    (_volumeBoost * eqFactor).clamp(0.0, _boostReady ? _maxBoost : 100.0);
+
+    try {
+      await _player.setVolume(target);
+
+      // Some media_kit versions clamp setVolume() at 100, so write the mpv
+      // property directly once we are above that.
+      final p = _player.platform;
+      if (_boostReady && target > 100 && p is NativePlayer) {
+        await p.setProperty('volume', target.toStringAsFixed(1));
+      }
+    } catch (_) {}
+
+    await _applyLimiter(target > 105);
+  }
+
+  /// Above 100% samples clip and the audio turns harsh; the limiter keeps it
+  /// clean.
+  ///
+  /// Only toggled on a boundary crossing: setting `af` rebuilds the whole audio
+  /// filter chain (a small audible hiccup), so it must never run on every drag
+  /// frame.
+  Future<void> _applyLimiter(bool on) async {
+    if (on == _limiterOn) return;
+    final p = _player.platform;
+    if (p is! NativePlayer) return;
+    try {
+      await p.setProperty('af', on ? 'lavfi=[alimiter=limit=0.92]' : '');
+      _limiterOn = on;
+    } catch (_) {}
+  }
+
+  Future<void> _setVolumeBoost(double percent) async {
+    final v = percent.clamp(100.0, _maxBoost);
+    if (mounted) setState(() => _volumeBoost = v);
+    await _applyPlayerVolume();
+  }
+
+  /// Gesture-space value on ONE continuous scale:
+  /// 0..100 = device volume, 100.._maxBoost = software boost.
+  ///
+  /// The old version remapped the boost range onto 100..200, which meant the
+  /// meter's fraction was computed against a different scale the moment boost
+  /// kicked in — that is why the bar appeared to jump back to the bottom.
+  double get _combinedVolume => _isBoosting ? _volumeBoost : _systemVolume;
 
   // =========================================================
   // ✅ PINCH TO ZOOM (2-finger)
@@ -307,8 +407,14 @@ class _FullScreenVideoPlayerSystemVolumeState
       });
     }
 
-    // Set player's internal volume to 100% so system volume controls the loudness.
-    _player.setVolume(100);
+    // ✅ Player gain init (boost ceiling + current gain).
+    //    The mpv context is not ready the instant the Player is constructed, so
+    //    this is deferred; every `open()` re-checks it as a safety net.
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      await Future.delayed(const Duration(milliseconds: 300));
+      if (!mounted) return;
+      await _initVolumeBoost();
+    });
 
     // Initialise brightness.
     // screen_brightness 2.1 deprecated `current` / `setScreenBrightness` /
@@ -412,7 +518,23 @@ class _FullScreenVideoPlayerSystemVolumeState
     _playingSub = _player.stream.playing.listen((playing) {
       if (!mounted) return;
       globalPlayPause.update(playing);
+      // `globalPlayPause` is not listened to by this widget, so without an
+      // explicit rebuild the center overlay and the bottom bar icon would keep
+      // showing the previous state until some other setState happened to fire.
+      setState(() {});
     });
+  }
+
+  /// Re-applies the gain after a new media is opened.
+  ///
+  /// mpv keeps `volume` across files, but `volume-max` and the filter chain can
+  /// be reset by a fresh context, so both are re-established here.
+  Future<void> _restoreGainAfterOpen() async {
+    if (!_boostReady) {
+      await _initVolumeBoost();
+    } else {
+      await _applyPlayerVolume();
+    }
   }
 
   Future<void> _playFromUrl(String url) async {
@@ -424,11 +546,12 @@ class _FullScreenVideoPlayerSystemVolumeState
       });
 
       await _player.open(Media(url), play: true);
+      await _restoreGainAfterOpen();
 
       _syncFromPlayerState();
     } catch (e) {
       Fluttertoast.showToast(
-        msg: "Link play failed: $e",
+        msg: "${_t('player_link_play_failed_prefix')} $e",
         toastLength: Toast.LENGTH_SHORT,
         gravity: ToastGravity.CENTER,
         backgroundColor: Colors.red,
@@ -506,12 +629,13 @@ class _FullScreenVideoPlayerSystemVolumeState
     if (file != null) {
       try {
         await _player.open(Media(file.path), play: false);
+        await _restoreGainAfterOpen();
         await Future.delayed(const Duration(milliseconds: 100));
         await _player.play();
       } catch (e) {
         if (mounted) {
           Fluttertoast.showToast(
-            msg: "Playback failed: $e",
+            msg: "${_t('player_playback_failed_prefix')} $e",
             gravity: ToastGravity.CENTER,
             backgroundColor: Colors.red,
             textColor: Colors.white,
@@ -520,7 +644,7 @@ class _FullScreenVideoPlayerSystemVolumeState
       }
     } else {
       Fluttertoast.showToast(
-        msg: "Video file not found",
+        msg: _t('player_video_file_not_found'),
         gravity: ToastGravity.CENTER,
         backgroundColor: Colors.red,
         textColor: Colors.white,
@@ -531,11 +655,8 @@ class _FullScreenVideoPlayerSystemVolumeState
   }
 
   Future<void> _applyEqualizer() async {
-    final weightedGain =
-        (bassGain * 0.6 + midGain * 0.3 + trebleGain * 0.1) / 15.0;
-    final factor = (1.0 + weightedGain).clamp(0.5, 1.5);
-    final newVolume = (factor * 100).clamp(0.0, 100.0);
-    await _player.setVolume(newVolume);
+    // Gain now flows through exactly one path (boost × equalizer).
+    await _applyPlayerVolume();
   }
 
   Future<void> _playNext() async {
@@ -883,7 +1004,7 @@ class _FullScreenVideoPlayerSystemVolumeState
       if (data == null) {
         if (context.mounted) {
           Fluttertoast.showToast(
-            msg: 'Screenshot failed: empty frame',
+            msg: _t('player_screenshot_failed_empty_frame'),
             toastLength: Toast.LENGTH_SHORT,
             gravity: ToastGravity.CENTER,
             backgroundColor: Colors.red,
@@ -899,7 +1020,7 @@ class _FullScreenVideoPlayerSystemVolumeState
       if (!ps.hasAccess) {
         if (context.mounted) {
           Fluttertoast.showToast(
-            msg: 'Storage permission denied',
+            msg: _t('player_storage_permission_denied'),
             toastLength: Toast.LENGTH_SHORT,
             gravity: ToastGravity.CENTER,
             backgroundColor: Colors.red,
@@ -921,8 +1042,8 @@ class _FullScreenVideoPlayerSystemVolumeState
       if (context.mounted) {
         Fluttertoast.showToast(
           msg: saved != null
-              ? 'Screenshot saved to gallery'
-              : 'Screenshot save failed',
+              ? _t('player_screenshot_saved')
+              : _t('player_screenshot_save_failed'),
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.CENTER,
           backgroundColor: saved != null ? Colors.green : Colors.red,
@@ -934,7 +1055,7 @@ class _FullScreenVideoPlayerSystemVolumeState
       if (context.mounted) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(SnackBar(content: Text('Screenshot failed: $e')));
+        ).showSnackBar(SnackBar(content: Text('${_t('player_screenshot_failed_prefix')} $e')));
       }
     }
   }
@@ -985,13 +1106,107 @@ class _FullScreenVideoPlayerSystemVolumeState
     VolumeDialog.show(
       context,
       currentVolume: _systemVolume / 100.0,
+      currentBoost: _volumeBoost,
+      maxBoostPercent: _maxBoost,
+      boostEnabled: _boostReady,
       onVolumeChange: (v) async {
         final clamped = v.clamp(0.0, 1.0);
         await VolumeController.instance.setVolume(clamped);
+        if (!mounted) return;
         setState(() {
           _systemVolume = clamped * 100;
         });
       },
+      onBoostChange: (b) async {
+        await _setVolumeBoost(b);
+      },
+    );
+  }
+
+  /// ✅ Manual boost control (100–150%) for people who don't want to swipe.
+  void _openBoostDialog() {
+    if (!_boostReady) {
+      showCenterToast(context, _t('player_boost_not_supported'));
+      return;
+    }
+
+    double temp = _volumeBoost;
+
+    showDialog(
+      context: context,
+      builder: (_) => StatefulBuilder(
+        builder: (ctx, setLocal) => AlertDialog(
+          backgroundColor: const Color(0xFF11131A),
+          shape:
+          RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+          title: Row(
+            children: [
+              const Icon(Icons.graphic_eq_rounded, color: Color(0xFFFF8A00)),
+              const SizedBox(width: 10),
+              Text(
+                _t('volume_boost_title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '${temp.round()}%',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 30,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              Slider(
+                value: temp,
+                min: 100,
+                max: _maxBoost,
+                divisions: ((_maxBoost - 100) / 10).round(),
+                activeColor: const Color(0xFFFF8A00),
+                inactiveColor: Colors.white24,
+                onChanged: (v) {
+                  setLocal(() => temp = v);
+                  _setVolumeBoost(v); // live apply
+                },
+              ),
+              Text(
+                // _maxBoost is 150 now, so the old `temp > 200` check could
+                // never fire — the distortion hint starts in the top third.
+                temp > 130
+                    ? _t('volume_hint_distort')
+                    : _t('player_boost_hint_normal'),
+                style: TextStyle(
+                  color: temp > 130 ? Colors.orangeAccent : Colors.white54,
+                  fontSize: 11,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () {
+                _setVolumeBoost(100);
+                Navigator.pop(ctx);
+              },
+              child:
+              Text(_t('common_reset'), style: const TextStyle(color: Colors.white54)),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: Text(_t('common_done'),
+                  style: const TextStyle(color: Colors.greenAccent)),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -1150,7 +1365,9 @@ class _FullScreenVideoPlayerSystemVolumeState
 
     _panStart = localPosition;
     _panStartPos = _player.state.position;
-    _panStartVolume = _systemVolume;
+
+    // ✅ boost-aware: one continuous 0.._maxBoost scale
+    _panStartVolume = _combinedVolume;
 
     // ✅ immediate default so first swipe has no jitter
     _panStartBrightness = _brightness;
@@ -1205,7 +1422,7 @@ class _FullScreenVideoPlayerSystemVolumeState
       // of video, no matter how long the clip is.
       final relative = dxTotal / size.width;
       final offsetMs =
-          (relative * _seekSecondsPerScreenWidth * 1000).toInt();
+      (relative * _seekSecondsPerScreenWidth * 1000).toInt();
 
       int newMs = _panStartPos.inMilliseconds + offsetMs;
       newMs = newMs.clamp(0, duration.inMilliseconds);
@@ -1245,18 +1462,28 @@ class _FullScreenVideoPlayerSystemVolumeState
           if (mounted) setState(() => _showBrightnessOverlay = false);
         });
       } else if (_verticalDragRight) {
-        final v = (_panStartVolume + dragDelta * _volSpeed).clamp(0.0, 100.0);
+        // ✅ ONE continuous scale: 0..100 moves the device, 100.._maxBoost
+        //    moves the software boost. No remapping, so the meter just keeps
+        //    filling from where it was — it only changes colour at the gate.
+        //    Without boost support the gesture simply stops at 100, as before.
+        final ceiling = _boostReady ? _maxBoost : 100.0;
+        final c = (_panStartVolume + dragDelta * _volSpeed).clamp(0.0, ceiling);
+
+        final double sys = c <= 100 ? c : 100;
+        final double boost = c <= 100 ? 100 : c;
 
         setState(() {
-          _systemVolume = v;
+          _systemVolume = sys;
+          _volumeBoost = boost;
           _showVolumeOverlay = true;
         });
 
-        _handleVolumeEdgeHaptic(v);
+        _handleVolumeEdgeHaptic(c);
 
         _volThrottle?.cancel();
         _volThrottle = Timer(const Duration(milliseconds: 35), () async {
           await VolumeController.instance.setVolume(_systemVolume / 100);
+          await _applyPlayerVolume();
         });
 
         _volumeTimer?.cancel();
@@ -1297,24 +1524,35 @@ class _FullScreenVideoPlayerSystemVolumeState
     });
   }
 
-  void _handleVolumeEdgeHaptic(double v) {
+  /// Haptic ticks at the three meaningful points of the volume swipe:
+  /// silence (0), the boost gate (100 — device maxed, software gain starts)
+  /// and the top of the boost range (_maxBoost).
+  void _handleVolumeEdgeHaptic(double c) {
     final now = DateTime.now();
     if (now.difference(_lastHapticAt).inMilliseconds < 180) return;
 
-    if (v <= 0.0) {
-      if (_lastHapticEdge != 0) {
-        _lastHapticEdge = 0;
-        _lastHapticAt = now;
-        HapticFeedback.mediumImpact();
-      }
-    } else if (v >= 100.0) {
-      if (_lastHapticEdge != 1) {
-        _lastHapticEdge = 1;
-        _lastHapticAt = now;
-        HapticFeedback.mediumImpact();
-      }
-    } else {
+    int edge = -1;
+    if (c <= 0.0) {
+      edge = 0;
+    } else if (c >= _maxBoost - 0.5) {
+      edge = 2;
+    } else if (c >= 99.0 && c <= 101.0) {
+      edge = 1; // boost gate
+    }
+
+    if (edge == -1) {
       _lastHapticEdge = -1;
+      return;
+    }
+    if (edge == _lastHapticEdge) return;
+
+    _lastHapticEdge = edge;
+    _lastHapticAt = now;
+
+    if (edge == 1) {
+      HapticFeedback.selectionClick();
+    } else {
+      HapticFeedback.mediumImpact();
     }
   }
 
@@ -1379,7 +1617,7 @@ class _FullScreenVideoPlayerSystemVolumeState
 
     final newPos = Duration(
       milliseconds:
-          (position.inMilliseconds + deltaMs).clamp(0, duration.inMilliseconds),
+      (position.inMilliseconds + deltaMs).clamp(0, duration.inMilliseconds),
     );
 
     _player.seek(newPos);
@@ -1397,7 +1635,8 @@ class _FullScreenVideoPlayerSystemVolumeState
   /// Hands the live player over to the floating (PiP) window.
   ///
   /// Ownership moves with the player: after this we must NOT dispose it, and
-  /// the floating window becomes responsible for it.
+  /// the floating window becomes responsible for it. The boost gain travels
+  /// with it too, since it lives on the player itself.
   void _moveToFloating() {
     if (!_hasLocalList) return;
     if (FloatingVideoManager.isActive) return;
@@ -1497,7 +1736,7 @@ class _FullScreenVideoPlayerSystemVolumeState
 
     showGeneralDialog(
       context: context,
-      barrierLabel: "Controls",
+      barrierLabel: _t('player_controls_barrier_label'),
       barrierDismissible: true,
       barrierColor: Colors.black.withValues(alpha:0.55),
       transitionDuration: const Duration(milliseconds: 220),
@@ -1531,10 +1770,10 @@ class _FullScreenVideoPlayerSystemVolumeState
                       padding: const EdgeInsets.symmetric(horizontal: 12),
                       child: Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              "Player Controls",
-                              style: TextStyle(
+                              _t('player_controls_title'),
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 15,
                                 fontWeight: FontWeight.w800,
@@ -1559,14 +1798,14 @@ class _FullScreenVideoPlayerSystemVolumeState
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            _sheetTitle("Quick Actions"),
+                            _sheetTitle(_t('player_quick_actions')),
                             const SizedBox(height: 10),
 
                             // ✅ same controls
                             _controlGrid([
                               _controlItem(
                                 icon: Icons.camera_alt,
-                                label: "Screenshot",
+                                label: _t('player_action_screenshot'),
                                 onTap: () async {
                                   Navigator.pop(context);
                                   await _takeScreenshot();
@@ -1574,7 +1813,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                               ),
                               _controlItem(
                                 icon: Icons.screen_rotation,
-                                label: "Rotate",
+                                label: _t('player_action_rotate'),
                                 onTap: () {
                                   Navigator.pop(context);
                                   _toggleOrientation();
@@ -1582,7 +1821,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                               ),
                               _controlItem(
                                 icon: Icons.headphones,
-                                label: _audioOnly ? "Video On" : "Audio Only",
+                                label: _audioOnly ? _t('player_action_video_on') : _t('player_action_audio_only'),
                                 active: _audioOnly,
                                 onTap: () async {
                                   Navigator.pop(context);
@@ -1591,7 +1830,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                               ),
                               _controlItem(
                                 icon: Icons.color_lens,
-                                label: "Filters",
+                                label: _t('player_action_filters'),
                                 onTap: () {
                                   Navigator.pop(context);
                                   FilterPopup.show(
@@ -1604,7 +1843,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                               ),
                               _controlItem(
                                 icon: Icons.hdr_auto_select_sharp,
-                                label: "HDR",
+                                label: _t('player_action_hdr'),
                                 active: _selectedFilter == 'hdr',
                                 onTap: () async {
                                   Navigator.pop(context);
@@ -1613,15 +1852,28 @@ class _FullScreenVideoPlayerSystemVolumeState
                               ),
                               _controlItem(
                                 icon: Icons.volume_up,
-                                label: "Volume",
+                                label: _t('volume_title'),
                                 onTap: () {
                                   Navigator.pop(context);
                                   _openVolumeDialog();
                                 },
                               ),
+                              // ✅ NEW: volume boost
+                              _controlItem(
+                                icon: Icons.graphic_eq,
+                                label: _t('player_action_boost'),
+                                active: _isBoosting,
+                                disabled: !_boostReady,
+                                onTap: !_boostReady
+                                    ? null
+                                    : () {
+                                  Navigator.pop(context);
+                                  _openBoostDialog();
+                                },
+                              ),
                               _controlItem(
                                 icon: Icons.speed,
-                                label: "Speed",
+                                label: _t('player_action_speed'),
                                 onTap: () {
                                   Navigator.pop(context);
                                   _openSpeedDialog();
@@ -1629,7 +1881,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                               ),
                               _controlItem(
                                 icon: Icons.picture_in_picture_alt,
-                                label: "PIP",
+                                label: _t('player_action_pip'),
                                 disabled: !_hasLocalList,
                                 onTap: !_hasLocalList
                                     ? null
@@ -1644,7 +1896,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                             Divider(color: Colors.white.withValues(alpha:0.12)),
                             const SizedBox(height: 12),
 
-                            _sheetTitle("Playback"),
+                            _sheetTitle(_t('player_playback_section')),
                             const SizedBox(height: 10),
 
                             Wrap(
@@ -1654,7 +1906,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                               children: [
                                 _pillButton(
                                   icon: _isLocked ? Icons.lock : Icons.lock_open,
-                                  label: _isLocked ? "Locked" : "Lock",
+                                  label: _isLocked ? _t('player_locked') : _t('player_lock'),
                                   active: _isLocked,
                                   onTap: () {
                                     Navigator.pop(context);
@@ -1674,7 +1926,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                       ? Icons.pause_circle_filled
                                       : Icons.play_circle_fill,
                                   label:
-                                  globalPlayPause.isPlaying ? "Pause" : "Play",
+                                  globalPlayPause.isPlaying ? _t('common_pause') : _t('common_play'),
                                   onTap: () {
                                     Navigator.pop(context);
                                     _togglePlayPause();
@@ -1690,7 +1942,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                 ),
                                 _pillButton(
                                   icon: Icons.skip_previous,
-                                  label: "Prev",
+                                  label: _t('player_prev'),
                                   disabled: !_hasLocalList,
                                   onTap: !_hasLocalList
                                       ? null
@@ -1701,7 +1953,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                 ),
                                 _pillButton(
                                   icon: Icons.skip_next,
-                                  label: "Next",
+                                  label: _t('player_next'),
                                   disabled: !_hasLocalList,
                                   onTap: !_hasLocalList
                                       ? null
@@ -1716,7 +1968,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                       : _resizeMode == VideoResizeMode.fill
                                       ? Icons.crop
                                       : Icons.zoom_in_map,
-                                  label: "Resize",
+                                  label: _t('player_resize'),
                                   onTap: () {
                                     Navigator.pop(context);
                                     _toggleResizeMode();
@@ -1791,10 +2043,10 @@ class _FullScreenVideoPlayerSystemVolumeState
                   padding: const EdgeInsets.symmetric(horizontal: 12),
                   child: Row(
                     children: [
-                      const Expanded(
+                      Expanded(
                         child: Text(
-                          "Player Controls",
-                          style: TextStyle(
+                          _t('player_controls_title'),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 15,
                             fontWeight: FontWeight.w800,
@@ -1818,14 +2070,14 @@ class _FullScreenVideoPlayerSystemVolumeState
                     child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        _sheetTitle("Quick Actions"),
+                        _sheetTitle(_t('player_quick_actions')),
                         const SizedBox(height: 10),
 
                         // ✅ SAME ICONS (fixed size portrait/landscape)
                         _controlGrid([
                           _controlItem(
                             icon: Icons.camera_alt,
-                            label: "Screenshot",
+                            label: _t('player_action_screenshot'),
                             onTap: () async {
                               Navigator.pop(context);
                               await _takeScreenshot();
@@ -1833,7 +2085,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                           ),
                           _controlItem(
                             icon: Icons.screen_rotation,
-                            label: "Rotate",
+                            label: _t('player_action_rotate'),
                             onTap: () {
                               Navigator.pop(context);
                               _toggleOrientation();
@@ -1841,7 +2093,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                           ),
                           _controlItem(
                             icon: Icons.headphones,
-                            label: _audioOnly ? "Video On" : "Audio Only",
+                            label: _audioOnly ? _t('player_action_video_on') : _t('player_action_audio_only'),
                             active: _audioOnly,
                             onTap: () async {
                               Navigator.pop(context);
@@ -1850,7 +2102,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                           ),
                           _controlItem(
                             icon: Icons.color_lens,
-                            label: "Filters",
+                            label: _t('player_action_filters'),
                             onTap: () {
                               Navigator.pop(context);
                               FilterPopup.show(
@@ -1863,7 +2115,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                           ),
                           _controlItem(
                             icon: Icons.hdr_auto_select_sharp,
-                            label: "HDR",
+                            label: _t('player_action_hdr'),
                             active: _selectedFilter == 'hdr',
                             onTap: () async {
                               Navigator.pop(context);
@@ -1872,15 +2124,28 @@ class _FullScreenVideoPlayerSystemVolumeState
                           ),
                           _controlItem(
                             icon: Icons.volume_up,
-                            label: "Volume",
+                            label: _t('volume_title'),
                             onTap: () {
                               Navigator.pop(context);
                               _openVolumeDialog();
                             },
                           ),
+                          // ✅ NEW: volume boost
+                          _controlItem(
+                            icon: Icons.graphic_eq,
+                            label: _t('player_action_boost'),
+                            active: _isBoosting,
+                            disabled: !_boostReady,
+                            onTap: !_boostReady
+                                ? null
+                                : () {
+                              Navigator.pop(context);
+                              _openBoostDialog();
+                            },
+                          ),
                           _controlItem(
                             icon: Icons.speed,
-                            label: "Speed",
+                            label: _t('player_action_speed'),
                             onTap: () {
                               Navigator.pop(context);
                               _openSpeedDialog();
@@ -1888,7 +2153,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                           ),
                           _controlItem(
                             icon: Icons.picture_in_picture_alt,
-                            label: "PIP",
+                            label: _t('player_action_pip'),
                             disabled: !_hasLocalList,
                             onTap: !_hasLocalList
                                 ? null
@@ -1903,7 +2168,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                         Divider(color: Colors.white.withValues(alpha:0.12)),
                         const SizedBox(height: 12),
 
-                        _sheetTitle("Playback"),
+                        _sheetTitle(_t('player_playback_section')),
                         const SizedBox(height: 10),
 
                         Wrap(
@@ -1913,7 +2178,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                           children: [
                             _pillButton(
                               icon: _isLocked ? Icons.lock : Icons.lock_open,
-                              label: _isLocked ? "Locked" : "Lock",
+                              label: _isLocked ? _t('player_locked') : _t('player_lock'),
                               active: _isLocked,
                               onTap: () {
                                 Navigator.pop(context);
@@ -1932,7 +2197,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                               icon: globalPlayPause.isPlaying
                                   ? Icons.pause_circle_filled
                                   : Icons.play_circle_fill,
-                              label: globalPlayPause.isPlaying ? "Pause" : "Play",
+                              label: globalPlayPause.isPlaying ? _t('common_pause') : _t('common_play'),
                               onTap: () {
                                 Navigator.pop(context);
                                 _togglePlayPause();
@@ -1948,7 +2213,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                             ),
                             _pillButton(
                               icon: Icons.skip_previous,
-                              label: "Prev",
+                              label: _t('player_prev'),
                               disabled: !_hasLocalList,
                               onTap: !_hasLocalList
                                   ? null
@@ -1959,7 +2224,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                             ),
                             _pillButton(
                               icon: Icons.skip_next,
-                              label: "Next",
+                              label: _t('player_next'),
                               disabled: !_hasLocalList,
                               onTap: !_hasLocalList
                                   ? null
@@ -1974,7 +2239,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                   : _resizeMode == VideoResizeMode.fill
                                   ? Icons.crop
                                   : Icons.zoom_in_map,
-                              label: "Resize",
+                              label: _t('player_resize'),
                               onTap: () {
                                 Navigator.pop(context);
                                 _toggleResizeMode();
@@ -2192,15 +2457,37 @@ class _FullScreenVideoPlayerSystemVolumeState
 
   /// Vertical brightness / volume meter — a matched pair so left (brightness)
   /// and right (volume) read as the same control.
+  ///
+  /// The fill is drawn as TWO stacked segments so the boost range continues
+  /// from where the device volume ended instead of restarting at the bottom:
+  ///
+  ///   [baseFraction]  purple  — device volume (0..100)
+  ///   remainder       orange  — software boost (100.._maxBoost)
+  ///
+  /// [gate] draws a thin tick at the 100% mark so the hand-over point is
+  /// visible. Callers that have a single value (brightness) simply omit both
+  /// and get the old single-colour behaviour.
   Widget _hudMeter({
     required IconData icon,
-    required double fraction, // 0..1
+    required double fraction, // total fill 0..1
     required int value,
+    bool boost = false,
+    double? baseFraction,
+    double? gate,
   }) {
     const double trackH = 150;
     const double trackW = 8;
-    final accent = ColorSelect.maineColor;
+
+    const Color baseA = Color(0xFF7C4DFF);
+    const Color baseB = Color(0xFF9D6BFF);
+    const Color boostA = Color(0xFFFF8A00);
+    const Color boostB = Color(0xFFFFC857);
+
+    final accent = boost ? boostA : ColorSelect.maineColor;
+
     final f = fraction.clamp(0.0, 1.0);
+    final baseF = (baseFraction ?? f).clamp(0.0, f);
+    final boostF = (f - baseF).clamp(0.0, 1.0);
 
     return _hudPopIn(
       child: ClipRRect(
@@ -2226,13 +2513,25 @@ class _FullScreenVideoPlayerSystemVolumeState
               mainAxisSize: MainAxisSize.min,
               children: [
                 Text(
-                  '$value',
-                  style: const TextStyle(
-                    color: Colors.white,
+                  boost ? '$value%' : '$value',
+                  style: TextStyle(
+                    color: boost ? boostB : Colors.white,
                     fontSize: 15,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
+                if (boost) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    _t('volume_boost_badge'),
+                    style: TextStyle(
+                      color: accent,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 1.2,
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 Container(
                   width: trackW,
@@ -2241,32 +2540,73 @@ class _FullScreenVideoPlayerSystemVolumeState
                     color: Colors.white.withValues(alpha: 0.18),
                     borderRadius: BorderRadius.circular(trackW),
                   ),
-                  child: Align(
+                  child: Stack(
                     alignment: Alignment.bottomCenter,
-                    child: AnimatedContainer(
-                      duration: const Duration(milliseconds: 120),
-                      curve: Curves.easeOutCubic,
-                      width: trackW,
-                      height: trackH * f,
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [accent, const Color(0xFF9D6BFF)],
-                        ),
-                        borderRadius: BorderRadius.circular(trackW),
-                        boxShadow: [
-                          BoxShadow(
-                            color: accent.withValues(alpha: 0.6),
-                            blurRadius: 10,
+                    clipBehavior: Clip.none,
+                    children: [
+                      // ---- 100% gate tick ----
+                      if (gate != null)
+                        Positioned(
+                          bottom: trackH * gate.clamp(0.0, 1.0),
+                          child: Container(
+                            width: trackW,
+                            height: 2,
+                            color: Colors.white.withValues(alpha: 0.55),
                           ),
-                        ],
+                        ),
+
+                      // ---- device volume / brightness segment ----
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 120),
+                        curve: Curves.easeOutCubic,
+                        width: trackW,
+                        height: trackH * baseF,
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            begin: Alignment.bottomCenter,
+                            end: Alignment.topCenter,
+                            colors: [baseA, baseB],
+                          ),
+                          borderRadius: BorderRadius.circular(trackW),
+                          boxShadow: [
+                            BoxShadow(
+                              color: baseA.withValues(alpha: 0.5),
+                              blurRadius: 10,
+                            ),
+                          ],
+                        ),
                       ),
-                    ),
+
+                      // ---- boost segment: continues from the gate ----
+                      if (boostF > 0)
+                        Positioned(
+                          bottom: trackH * baseF,
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 120),
+                            curve: Curves.easeOutCubic,
+                            width: trackW,
+                            height: trackH * boostF,
+                            decoration: BoxDecoration(
+                              gradient: const LinearGradient(
+                                begin: Alignment.bottomCenter,
+                                end: Alignment.topCenter,
+                                colors: [boostA, boostB],
+                              ),
+                              borderRadius: BorderRadius.circular(trackW),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: boostA.withValues(alpha: 0.6),
+                                  blurRadius: 12,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),
-                Icon(icon, color: Colors.white, size: 22),
+                Icon(icon, color: boost ? boostB : Colors.white, size: 22),
               ],
             ),
           ),
@@ -2278,6 +2618,7 @@ class _FullScreenVideoPlayerSystemVolumeState
   // =================== BUILD (UI SAME) =====================
   @override
   Widget build(BuildContext context) {
+    _lang = context.watch<LocaleProvider>().locale.languageCode;
     final bool isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
 
@@ -2290,10 +2631,14 @@ class _FullScreenVideoPlayerSystemVolumeState
     final safeMax = (maxMs <= 0 ? 1 : maxMs);
     final posMs = _currentPosition.inMilliseconds.clamp(0, safeMax);
 
+    // ✅ Volume meter geometry — ONE scale for device + boost.
+    final double _volScale = _boostReady ? _maxBoost : 100.0;
+    final double _volTotal = _isBoosting ? _volumeBoost : _systemVolume;
+
     final String appBarTitle =
     _hasLocalList
         ? (widget.videos[_currentIndex].title ?? '')
-        : (_hasUrl ? widget.initialUrl!.trim() : 'Streaming');
+        : (_hasUrl ? widget.initialUrl!.trim() : _t('player_streaming_title'));
 
     // ✅ Transform wrapper for pinch-to-zoom
     final videoWidget = Transform(
@@ -2373,6 +2718,38 @@ class _FullScreenVideoPlayerSystemVolumeState
                 ),
               ),
 
+              // ✅ Center tap zone — single tap toggles play/pause.
+              //    `HitTestBehavior.opaque` keeps the tap here instead of
+              //    letting it fall through to `_onScreenTap` (controls
+              //    show/hide). Pan / pinch still reach the parent detector, so
+              //    seek, brightness, volume and zoom behave exactly as before.
+              //    The icon is only built while paused.
+              if (!_isLocked)
+                Center(
+                  child: SizedBox(
+                    width: MediaQuery.of(context).size.width * 0.32,
+                    height: MediaQuery.of(context).size.height * 0.28,
+                    child: GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: _togglePlayPause,
+                      // Swallow the double tap so the center never triggers the
+                      // ±10 s skip.
+                      onDoubleTap: () {},
+                      child: globalPlayPause.isPlaying
+                          ? const SizedBox.expand()
+                          : Center(
+                        child: IgnorePointer(
+                          child: Icon(
+                            Icons.play_circle_fill,
+                            color: Colors.white,
+                            size: playSize + 30,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
               // ✅ Center seek overlay
               if (_showSeekOverlay)
                 Positioned.fill(
@@ -2423,7 +2800,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                         child: _hudPill(
                           icon: Icons.schedule_rounded,
                           text:
-                              "${_formatDuration(_bubblePos)}  /  ${_formatDuration(_totalDuration)}",
+                          "${_formatDuration(_bubblePos)}  /  ${_formatDuration(_totalDuration)}",
                           fontSize: 13,
                         ),
                       ),
@@ -2446,19 +2823,24 @@ class _FullScreenVideoPlayerSystemVolumeState
                   ),
                 ),
 
-              // volume overlay
+              // ✅ volume overlay (boost-aware, continuous fill)
               if (_showVolumeOverlay)
                 Align(
                   alignment: const Alignment(0.85, 0),
                   child: IgnorePointer(
                     child: _hudMeter(
-                      icon: _systemVolume <= 0
+                      icon: _isBoosting
+                          ? Icons.graphic_eq_rounded
+                          : _systemVolume <= 0
                           ? Icons.volume_off_rounded
                           : _systemVolume < 50
                           ? Icons.volume_down_rounded
                           : Icons.volume_up_rounded,
-                      fraction: _systemVolume / 100,
-                      value: _systemVolume.round(),
+                      fraction: _volTotal / _volScale,
+                      baseFraction: _systemVolume / _volScale,
+                      gate: _boostReady ? 100 / _volScale : null,
+                      value: _volTotal.round(),
+                      boost: _isBoosting,
                     ),
                   ),
                 ),
@@ -2552,7 +2934,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                 ),
                                 const SizedBox(height: 18),
                                 Text(
-                                  "HDR PROCESSING",
+                                  _t('player_hdr_processing'),
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w800,
@@ -2566,8 +2948,8 @@ class _FullScreenVideoPlayerSystemVolumeState
                                 const SizedBox(height: 8),
                                 Text(
                                   _hdrOn
-                                      ? "Turning HDR OFF"
-                                      : "Turning HDR ON",
+                                      ? _t('player_hdr_turning_off')
+                                      : _t('player_hdr_turning_on'),
                                   textAlign: TextAlign.center,
                                   style: TextStyle(
                                     fontSize: 18,
@@ -2797,6 +3179,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                     color: Colors.white,
                                     onPressed: _openVolumeDialog,
                                   ),
+
                                   IconButton(
                                     icon: const Icon(Icons.speed),
                                     color: Colors.white,

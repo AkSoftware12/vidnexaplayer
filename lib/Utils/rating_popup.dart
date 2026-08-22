@@ -2,9 +2,13 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:videoplayer/Utils/color.dart';
+
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../NotifyListeners/LanguageProvider/misc_strings.dart';
 
 /// In-app rating prompt.
 ///
@@ -13,21 +17,20 @@ import 'package:videoplayer/Utils/color.dart';
 ///
 /// Behaviour:
 ///  * shows after [minLaunches] opens
-///  * opens with [defaultRating] stars already selected
 ///  * a dismissal ("Later" / swipe) snoozes for [snoozeDays]
 ///  * a submitted rating starts a [coolDownDays] cooldown
-///  * 4–5 stars sends the user to the Play Store and stops asking afterwards
+///  * 4–5 stars sends the user to the Play Store and never asks again
 ///  * 1–3 stars opens a private feedback sheet instead
 class RatingPopup {
   RatingPopup._();
 
   // ---- Config ----
-  static const String appName = 'Vidnexa';
+  static const String appName = 'Please Rate Vidnexa Player';
   static const int minLaunches = 5;
   static const int coolDownDays = 15;
   static const int snoozeDays = 3;
   static const int positiveThreshold = 4;
-  static const int defaultRating = 5;
+  static const int defaultRating = 0; // 0 = nothing pre-selected
   static const String playStoreUrl =
       'https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer';
 
@@ -39,8 +42,20 @@ class RatingPopup {
   static const String _kNeverAsk = 'rating_never_ask';
   static const String _kLastShownMs = 'rating_last_shown_ms';
   static const String _kSnoozeUntilMs = 'rating_snooze_until_ms';
+  static const String _kRatedPositive = 'rating_rated_positive';
 
   static bool _shownThisSession = false;
+
+  /// True once the user has submitted [positiveThreshold]+ stars. Permanent —
+  /// not even [forceShow] gets past it.
+  static Future<bool> hasRatedPositively() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      return prefs.getBool(_kRatedPositive) ?? false;
+    } catch (_) {
+      return false;
+    }
+  }
 
   /// Call once per app open (from the splash screen).
   static Future<void> onAppOpen(
@@ -56,10 +71,13 @@ class RatingPopup {
       return;
     }
 
+    // Already rated positively -> never ask again, button included.
+    if (prefs.getBool(_kRatedPositive) ?? false) return;
+
     final nowMs = DateTime.now().millisecondsSinceEpoch;
 
-    final launchCount = (prefs.getInt(_kLaunchCount) ?? 0) + 1;
-    await prefs.setInt(_kLaunchCount, launchCount);
+    final launchCount = (prefs.getInt(_kLaunchCount) ?? 0) + (force ? 0 : 1);
+    if (!force) await prefs.setInt(_kLaunchCount, launchCount);
 
     if (!force) {
       if (prefs.getBool(_kNeverAsk) ?? false) return;
@@ -81,9 +99,7 @@ class RatingPopup {
       isScrollControlled: true,
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.6),
-      // Springy entry instead of the default linear-ish slide.
-      transitionAnimationController: null,
+      barrierColor: Colors.black.withValues(alpha: 0.72),
       builder: (_) => const _RatingSheet(),
     );
 
@@ -99,19 +115,28 @@ class RatingPopup {
     await prefs.setInt(_kLaunchCount, 0);
     await prefs.setInt(_kSnoozeUntilMs, 0);
 
-    final done = result.neverAskAgain || result.rating >= positiveThreshold;
-    await prefs.setBool(_kNeverAsk, done);
+    final positive = result.rating >= positiveThreshold;
+
+    // Only ever flip these on — a later low rating must not undo them.
+    if (positive) {
+      await prefs.setBool(_kRatedPositive, true);
+      await prefs.setBool(_kNeverAsk, true);
+    } else if (result.neverAskAgain) {
+      await prefs.setBool(_kNeverAsk, true);
+    }
 
     if (!context.mounted) return;
 
-    if (result.rating >= positiveThreshold) {
-      await _openStore(context);
+    if (positive) {
+      await openStore(context);
     } else {
       await _showFeedbackSheet(context, result.rating);
     }
   }
 
-  static Future<void> _openStore(BuildContext context) async {
+  /// Public so a settings entry can send an already-happy user straight to
+  /// the store without re-running the rating sheet.
+  static Future<void> openStore(BuildContext context) async {
     bool opened = false;
     try {
       opened = await launchUrl(
@@ -123,8 +148,11 @@ class RatingPopup {
     }
 
     if (!opened && context.mounted) {
+      final lang = context.read<LocaleProvider>().locale.languageCode;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the Play Store')),
+        SnackBar(
+          content: Text(MiscStrings.t(lang, 'rating_playstore_open_failed')),
+        ),
       );
     }
   }
@@ -135,7 +163,7 @@ class RatingPopup {
       isScrollControlled: true,
       useRootNavigator: true,
       backgroundColor: Colors.transparent,
-      barrierColor: Colors.black.withValues(alpha: 0.6),
+      barrierColor: Colors.black.withValues(alpha: 0.72),
       builder: (_) => _FeedbackSheet(rating: rating),
     );
   }
@@ -151,6 +179,7 @@ class RatingPopup {
       prefs.remove(_kNeverAsk),
       prefs.remove(_kLastShownMs),
       prefs.remove(_kSnoozeUntilMs),
+      prefs.remove(_kRatedPositive),
     ]);
     _shownThisSession = false;
   }
@@ -168,11 +197,27 @@ class _RatingResult {
 class _Skin {
   static Color get brand => ColorSelect.maineColor;
 
-  static const Color amber = Color(0xFFFFC043);
+  static const Color amber = Color(0xFFFFD466);
   static const Color amberDeep = Color(0xFFF59E0B);
   static const Color onDark = Colors.white;
-  static Color get onDarkSub => Colors.white.withValues(alpha: 0.72);
-  static Color get onDarkFaint => Colors.white.withValues(alpha: 0.28);
+  static Color get onDarkSub => Colors.white.withValues(alpha: 0.70);
+  static Color get onDarkFaint => Colors.white.withValues(alpha: 0.26);
+
+  /// Deep night-sky version of the brand colour — dark, saturated, low
+  /// lightness so the white type and the amber stars both stay legible.
+  static List<Color> get nightGradient {
+    final hsl = HSLColor.fromColor(brand);
+    return [
+      hsl
+          .withLightness((hsl.lightness * 0.55).clamp(0.14, 0.34))
+          .withSaturation((hsl.saturation + 0.25).clamp(0.0, 1.0))
+          .toColor(),
+      hsl
+          .withLightness((hsl.lightness * 0.28).clamp(0.06, 0.20))
+          .withSaturation((hsl.saturation + 0.20).clamp(0.0, 1.0))
+          .toColor(),
+    ];
+  }
 
   static List<Color> get gradient {
     final hsl = HSLColor.fromColor(brand);
@@ -186,8 +231,804 @@ class _Skin {
   }
 }
 
-/// Coloured sheet shell. The gradient slowly drifts and a highlight blob
-/// breathes behind the content, so the sheet never looks like a static image.
+// ---------------------------------------------------------------------------
+// Painters
+// ---------------------------------------------------------------------------
+
+/// Interlaced 5-point star drawn as an outline (pentagram + outer polygon).
+class _StarMarkPainter extends CustomPainter {
+  _StarMarkPainter({required this.progress});
+
+  /// 0 -> 1, used to draw the mark on and to fade the glow in.
+  final double progress;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0) return;
+
+    final c = Offset(size.width / 2, size.height / 2);
+    final r = math.min(size.width, size.height) / 2 - 4;
+
+    final pts = List<Offset>.generate(5, (i) {
+      final a = -math.pi / 2 + i * 2 * math.pi / 5;
+      return c + Offset(math.cos(a), math.sin(a)) * r;
+    });
+
+    // Pentagram: connect every second point.
+    const order = [0, 2, 4, 1, 3];
+    final star = Path()..moveTo(pts[order[0]].dx, pts[order[0]].dy);
+    for (var i = 1; i < order.length; i++) {
+      star.lineTo(pts[order[i]].dx, pts[order[i]].dy);
+    }
+    star.close();
+
+    // Outer pentagon, kept faint so the star reads first.
+    final pentagon = Path()..moveTo(pts[0].dx, pts[0].dy);
+    for (var i = 1; i < pts.length; i++) {
+      pentagon.lineTo(pts[i].dx, pts[i].dy);
+    }
+    pentagon.close();
+
+    canvas.drawPath(
+      star,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 5
+        ..color = Colors.white.withValues(alpha: 0.30 * progress)
+        ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 10),
+    );
+
+    canvas.drawPath(
+      pentagon,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.1
+        ..strokeJoin = StrokeJoin.round
+        ..color = Colors.white.withValues(alpha: 0.22 * progress),
+    );
+
+    canvas.drawPath(
+      star,
+      Paint()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.8
+        ..strokeJoin = StrokeJoin.round
+        ..color = Colors.white.withValues(alpha: 0.92 * progress),
+    );
+  }
+
+  @override
+  bool shouldRepaint(_StarMarkPainter old) => old.progress != progress;
+}
+
+/// Slow sweeping halo behind the content — the light "swoosh" in the design.
+class _AuraPainter extends CustomPainter {
+  _AuraPainter({required this.turn, required this.intensity});
+
+  final double turn; // 0 -> 1, one full rotation
+  final double intensity; // 0 -> 1
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (intensity <= 0) return;
+
+    final c = Offset(size.width * 0.5, size.height * 0.46);
+    final radius = size.width * 0.58;
+    final rect = Rect.fromCircle(center: c, radius: radius);
+
+    canvas.save();
+    canvas.translate(c.dx, c.dy);
+    canvas.rotate(turn * 2 * math.pi);
+    canvas.translate(-c.dx, -c.dy);
+
+    final paint = Paint()
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = size.width * 0.10
+      ..strokeCap = StrokeCap.round
+      ..shader = SweepGradient(
+        colors: [
+          Colors.white.withValues(alpha: 0),
+          Colors.white.withValues(alpha: 0.10 * intensity),
+          Colors.white.withValues(alpha: 0.34 * intensity),
+          Colors.white.withValues(alpha: 0.06 * intensity),
+          Colors.white.withValues(alpha: 0),
+        ],
+        stops: const [0.0, 0.22, 0.44, 0.72, 1.0],
+      ).createShader(rect)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 26);
+
+    canvas.drawArc(rect, 0, math.pi * 1.55, false, paint);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(_AuraPainter old) =>
+      old.turn != turn || old.intensity != intensity;
+}
+
+/// Radiating sparkles, fired when the user lands on 5 stars.
+class _SparklePainter extends CustomPainter {
+  _SparklePainter({required this.progress, required this.seed});
+
+  final double progress; // 0 -> 1
+  final int seed;
+
+  static const int _count = 18;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    if (progress <= 0 || progress >= 1) return;
+
+    final center = Offset(size.width / 2, size.height / 2);
+    final rnd = math.Random(seed);
+    final eased = Curves.easeOutCubic.transform(progress);
+    final fade = (1 - progress).clamp(0.0, 1.0);
+
+    for (var i = 0; i < _count; i++) {
+      final angle = (i / _count) * 2 * math.pi + rnd.nextDouble() * 0.4;
+      final distance =
+          (size.width * 0.40) * eased * (0.7 + rnd.nextDouble() * 0.6);
+      final offset =
+          center + Offset(math.cos(angle), math.sin(angle)) * distance;
+
+      final paint = Paint()
+        ..color = (i.isEven ? _Skin.amber : Colors.white)
+            .withValues(alpha: fade * 0.9);
+
+      final r = (2.0 + rnd.nextDouble() * 2.5) * (0.4 + fade);
+      canvas.drawCircle(offset, r, paint);
+    }
+  }
+
+  @override
+  bool shouldRepaint(_SparklePainter old) =>
+      old.progress != progress || old.seed != seed;
+}
+
+// ---------------------------------------------------------------------------
+// Rating sheet
+// ---------------------------------------------------------------------------
+
+/// Swipe-to-rate sheet: drag the thumb across the track to pick 1–5 stars,
+/// the star arc below reacts, then confirm.
+class _RatingSheet extends StatefulWidget {
+  const _RatingSheet();
+
+  @override
+  State<_RatingSheet> createState() => _RatingSheetState();
+}
+
+class _RatingSheetState extends State<_RatingSheet>
+    with TickerProviderStateMixin {
+  static const int _starCount = 5;
+  static const double _thumbSize = 46;
+  static const double _trackPad = 6;
+
+  int _rating = RatingPopup.defaultRating;
+  bool _neverAsk = false;
+  bool _touched = false;
+  int _burstSeed = 0;
+
+  late final AnimationController _entrance;
+  late final AnimationController _aura; // sweeping halo, loops
+  late final AnimationController _nudge; // "swipe me" hint on the thumb
+  late final AnimationController _burst; // sparkles on 5 stars
+  late final AnimationController _shimmer; // CTA light sweep
+
+  late final Animation<double> _fade;
+  late final Animation<double> _markDraw;
+
+  @override
+  void initState() {
+    super.initState();
+
+    _entrance = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+    _fade = CurvedAnimation(
+      parent: _entrance,
+      curve: const Interval(0.0, 0.5, curve: Curves.easeOut),
+    );
+    _markDraw = CurvedAnimation(
+      parent: _entrance,
+      curve: const Interval(0.0, 0.55, curve: Curves.easeOutCubic),
+    );
+
+    _aura = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 14),
+    )..repeat();
+
+    _nudge = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1500),
+    )..repeat();
+
+    _burst = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 900),
+    );
+
+    _shimmer = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 2200),
+    )..repeat();
+
+    _entrance.forward();
+  }
+
+  @override
+  void dispose() {
+    _entrance.dispose();
+    _aura.dispose();
+    _nudge.dispose();
+    _burst.dispose();
+    _shimmer.dispose();
+    super.dispose();
+  }
+
+  void _fireBurst() {
+    setState(() => _burstSeed = DateTime.now().microsecondsSinceEpoch);
+    _burst.forward(from: 0);
+  }
+
+  void _setRating(int value) {
+    if (!_touched) {
+      _touched = true;
+      _nudge.stop();
+    }
+    if (value == _rating) return;
+
+    HapticFeedback.selectionClick();
+    setState(() => _rating = value);
+    if (value == _starCount) _fireBurst();
+  }
+
+  String _hint(String lang) {
+    switch (_rating) {
+      case 0:
+        return MiscStrings.t(lang, 'rating_hint_0');
+      case 1:
+      case 2:
+        return MiscStrings.t(lang, 'rating_hint_low');
+      case 3:
+        return MiscStrings.t(lang, 'rating_hint_mid');
+      case 4:
+        return MiscStrings.t(lang, 'rating_hint_good');
+      default:
+        return MiscStrings.t(lang, 'rating_hint_great');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // Swipe track
+  // -------------------------------------------------------------------------
+
+  Widget _buildTrack() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final span = constraints.maxWidth - (_trackPad * 2) - _thumbSize;
+
+        void updateFrom(double localDx) {
+          final dx = (localDx - _trackPad - (_thumbSize / 2)).clamp(0.0, span);
+          _setRating((dx / span * _starCount).round().clamp(0, _starCount));
+        }
+
+        final progress = _rating / _starCount;
+
+        return GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTapDown: (d) => updateFrom(d.localPosition.dx),
+          onHorizontalDragStart: (d) => updateFrom(d.localPosition.dx),
+          onHorizontalDragUpdate: (d) => updateFrom(d.localPosition.dx),
+          onHorizontalDragEnd: (_) => HapticFeedback.lightImpact(),
+          child: Semantics(
+            label: 'Rating',
+            value: '$_rating out of $_starCount stars',
+            slider: true,
+            child: Container(
+              height: _thumbSize + (_trackPad * 2),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.10),
+                borderRadius: BorderRadius.circular(40),
+                border: Border.all(
+                  color: Colors.white.withValues(alpha: 0.22),
+                ),
+              ),
+              child: Stack(
+                children: [
+                  // Filled portion behind the thumb.
+                  Positioned(
+                    left: 0,
+                    top: 0,
+                    bottom: 0,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 260),
+                      curve: Curves.easeOutCubic,
+                      width: _trackPad +
+                          (_thumbSize / 2) +
+                          (span * progress) +
+                          (_thumbSize / 2),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(40),
+                        gradient: LinearGradient(
+                          colors: [
+                            Colors.white.withValues(alpha: 0.04),
+                            _Skin.amber.withValues(alpha: 0.28 * progress),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Arrow at the far end, fades out as the thumb approaches.
+                  Positioned(
+                    right: 22,
+                    top: 0,
+                    bottom: 0,
+                    child: Center(
+                      child: AnimatedOpacity(
+                        duration: const Duration(milliseconds: 220),
+                        opacity: (1 - progress).clamp(0.0, 1.0) * 0.9,
+                        child: Icon(
+                          Icons.arrow_forward_rounded,
+                          color: Colors.white.withValues(alpha: 0.85),
+                          size: 24,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Thumb.
+                  AnimatedBuilder(
+                    animation: _nudge,
+                    builder: (context, child) {
+                      // Gentle right-ward nudge until the user touches it.
+                      final n = _touched
+                          ? 0.0
+                          : math.sin(_nudge.value * math.pi * 2).clamp(0.0, 1.0) *
+                          10;
+                      return AnimatedPositioned(
+                        duration: const Duration(milliseconds: 240),
+                        curve: Curves.easeOutBack,
+                        left: _trackPad + (span * progress) + n,
+                        top: _trackPad,
+                        child: child!,
+                      );
+                    },
+                    child: Container(
+                      width: _thumbSize,
+                      height: _thumbSize,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white.withValues(alpha: 0.94),
+                        boxShadow: [
+                          BoxShadow(
+                            color: _Skin.amberDeep.withValues(alpha: 0.35),
+                            blurRadius: 18,
+                          ),
+                        ],
+                      ),
+                      child: Icon(
+                        _rating == 0
+                            ? Icons.touch_app_rounded
+                            : Icons.star_rounded,
+                        color: _rating == 0 ? _Skin.brand : _Skin.amberDeep,
+                        size: 24,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Star arc
+  // -------------------------------------------------------------------------
+
+  Widget _buildStarArc() {
+    return SizedBox(
+      height: 130,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final slot = constraints.maxWidth / _starCount;
+
+          return Stack(
+            clipBehavior: Clip.none,
+            children: [
+              // Sparkles centred on the arc.
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: _burst,
+                    builder: (context, _) => CustomPaint(
+                      painter: _SparklePainter(
+                        progress: _burst.value,
+                        seed: _burstSeed,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              ...List.generate(_starCount, (i) {
+                final index = i + 1;
+                final t = (i - 2) / 2.0; // -1 .. 1
+                final dip = 38.0 * (1 - (t * t)); // centre sits lowest
+                final filled = index <= _rating;
+                final active = index == _rating;
+
+                // Staggered entrance, outer stars first.
+                final start = (0.35 + (i * 0.07)).clamp(0.0, 0.85);
+                final curve = CurvedAnimation(
+                  parent: _entrance,
+                  curve: Interval(
+                    start,
+                    (start + 0.3).clamp(0.0, 1.0),
+                    curve: Curves.easeOutBack,
+                  ),
+                );
+
+                return AnimatedPositioned(
+                  duration: const Duration(milliseconds: 340),
+                  curve: Curves.easeOutBack,
+                  left: slot * i,
+                  width: slot,
+                  top: 18 + dip - (active ? 10 : 0),
+                  child: FadeTransition(
+                    opacity: curve,
+                    child: ScaleTransition(
+                      scale: curve,
+                      child: GestureDetector(
+                        behavior: HitTestBehavior.opaque,
+                        onTap: () => _setRating(index),
+                        child: Transform.rotate(
+                          angle: t * 0.32,
+                          child: TweenAnimationBuilder<double>(
+                            tween: Tween<double>(
+                              begin: 1,
+                              end: active ? 1.34 : (filled ? 1.08 : 0.92),
+                            ),
+                            duration: const Duration(milliseconds: 320),
+                            curve: Curves.elasticOut,
+                            builder: (context, scale, child) =>
+                                Transform.scale(scale: scale, child: child),
+                            child: Icon(
+                              Icons.star_rounded,
+                              size: 44,
+                              color: filled
+                                  ? _Skin.amber
+                                  : Colors.white.withValues(alpha: 0.30),
+                              shadows: filled
+                                  ? [
+                                BoxShadow(
+                                  color: _Skin.amberDeep
+                                      .withValues(alpha: 0.60),
+                                  blurRadius: 20,
+                                ),
+                              ]
+                                  : null,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              }),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Confirm
+  // -------------------------------------------------------------------------
+
+  Widget _buildConfirm(String lang) {
+    final positive = _rating >= RatingPopup.positiveThreshold;
+
+    if (_rating == 0) {
+      return SizedBox(
+        height: 52,
+        child: Center(
+          child: AnimatedBuilder(
+            animation: _nudge,
+            builder: (context, child) => Opacity(
+              opacity: 0.45 + (math.sin(_nudge.value * math.pi * 2) * 0.25),
+              child: child,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  MiscStrings.t(lang, 'rating_pick_stars'),
+                  style: TextStyle(color: _Skin.onDarkSub, fontSize: 13),
+                ),
+                const SizedBox(width: 8),
+                Icon(Icons.auto_awesome, size: 16, color: _Skin.onDarkSub),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(30),
+      child: Stack(
+        children: [
+          ElevatedButton.icon(
+            onPressed: () {
+              HapticFeedback.mediumImpact();
+              Navigator.pop(
+                context,
+                _RatingResult(rating: _rating, neverAskAgain: _neverAsk),
+              );
+            },
+            icon: Icon(
+              positive ? Icons.open_in_new_rounded : Icons.send_rounded,
+              size: 18,
+              color: _Skin.brand,
+            ),
+            label: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 220),
+              child: Text(
+                positive
+                    ? MiscStrings.t(lang, 'rating_cta_playstore')
+                    : MiscStrings.t(lang, 'rating_cta_feedback'),
+                key: ValueKey<bool>(positive),
+                style: TextStyle(
+                  color: _Skin.brand,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 14,
+                ),
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: _Skin.brand,
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(30),
+              ),
+              minimumSize: const Size.fromHeight(52),
+            ),
+          ),
+          Positioned.fill(
+            child: IgnorePointer(
+              child: AnimatedBuilder(
+                animation: _shimmer,
+                builder: (context, _) => FractionallySizedBox(
+                  widthFactor: 0.35,
+                  alignment: Alignment(-1.6 + (_shimmer.value * 3.2), 0),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          _Skin.brand.withValues(alpha: 0),
+                          _Skin.brand.withValues(alpha: 0.14),
+                          _Skin.brand.withValues(alpha: 0),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    final colors = _Skin.nightGradient;
+    final maxHeight = MediaQuery.of(context).size.height * 0.86;
+
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: ConstrainedBox(
+        constraints: BoxConstraints(maxHeight: maxHeight),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: colors,
+            ),
+            borderRadius: const BorderRadius.vertical(
+              top: Radius.circular(34),
+            ),
+          ),
+          child: Stack(
+            children: [
+              // Ambient halo.
+              Positioned.fill(
+                child: IgnorePointer(
+                  child: AnimatedBuilder(
+                    animation: Listenable.merge([_aura, _entrance]),
+                    builder: (context, _) => CustomPaint(
+                      painter: _AuraPainter(
+                        turn: _aura.value,
+                        intensity: _entrance.value,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              SafeArea(
+                top: false,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(24, 14, 24, 20),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Container(
+                        width: 44,
+                        height: 5,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.30),
+                          borderRadius: BorderRadius.circular(50),
+                        ),
+                      ),
+                      const SizedBox(height: 26),
+
+                      // Star mark.
+                      AnimatedBuilder(
+                        animation: _markDraw,
+                        builder: (context, _) => CustomPaint(
+                          size: const Size(96, 96),
+                          painter: _StarMarkPainter(progress: _markDraw.value),
+                        ),
+                      ),
+                      const SizedBox(height: 22),
+
+                      FadeTransition(
+                        opacity: _fade,
+                        child: Column(
+                          children: [
+
+                            Text(
+                              '${MiscStrings.t(lang, 'rating_popup_title')}?',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: _Skin.onDark,
+                                fontSize: 27,
+                                fontWeight: FontWeight.bold,
+                                height: 1.15,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+
+
+                            Padding(
+                              padding: const EdgeInsets.only(left: 50.0,right: 50),
+                              child: Text(
+                                MiscStrings.t(lang, 'rating_popup_subtitle'),
+                                style: TextStyle(
+                                  color: _Skin.onDark.withValues(alpha: 0.92),
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w300,
+                                  letterSpacing: 2.4,
+
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 30),
+
+                      _buildTrack(),
+                      const SizedBox(height: 12),
+
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 260),
+                        transitionBuilder: (child, anim) => FadeTransition(
+                          opacity: anim,
+                          child: SlideTransition(
+                            position: Tween<Offset>(
+                              begin: const Offset(0, 0.4),
+                              end: Offset.zero,
+                            ).animate(anim),
+                            child: child,
+                          ),
+                        ),
+                        child: Text(
+                          _hint(lang),
+                          key: ValueKey<String>(_hint(lang)),
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            color: _Skin.onDarkSub,
+                            fontSize: 13,
+                          ),
+                        ),
+                      ),
+
+                      _buildStarArc(),
+
+                      _buildConfirm(lang),
+                      const SizedBox(height: 4),
+
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: Text(
+                              MiscStrings.t(lang, 'rating_later'),
+                              style: TextStyle(
+                                color: _Skin.onDarkSub,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                          InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () => setState(() => _neverAsk = !_neverAsk),
+                            child: Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 6,
+                              ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    _neverAsk
+                                        ? Icons.check_box_rounded
+                                        : Icons.check_box_outline_blank_rounded,
+                                    size: 18,
+                                    color: _neverAsk
+                                        ? Colors.white
+                                        : _Skin.onDarkFaint,
+                                  ),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    MiscStrings.t(lang, 'rating_never_ask'),
+                                    style: TextStyle(
+                                      color: _Skin.onDarkSub,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Feedback sheet
+// ---------------------------------------------------------------------------
+
+/// Coloured sheet shell used by the feedback sheet.
 class _SheetShell extends StatefulWidget {
   const _SheetShell({required this.child});
 
@@ -219,7 +1060,7 @@ class _SheetShellState extends State<_SheetShell>
   @override
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).viewInsets.bottom;
-    final colors = _Skin.gradient;
+    final colors = _Skin.nightGradient;
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomInset),
@@ -249,7 +1090,6 @@ class _SheetShellState extends State<_SheetShell>
         },
         child: Stack(
           children: [
-            // Breathing highlight blob.
             Positioned(
               top: -60,
               right: -40,
@@ -295,545 +1135,7 @@ class _SheetShellState extends State<_SheetShell>
   }
 }
 
-/// Radiating sparkles, fired when the user lands on 5 stars.
-class _SparklePainter extends CustomPainter {
-  _SparklePainter({required this.progress, required this.seed})
-      : super(repaint: null);
-
-  final double progress; // 0 -> 1
-  final int seed;
-
-  static const int _count = 14;
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    if (progress <= 0 || progress >= 1) return;
-
-    final center = Offset(size.width / 2, size.height / 2);
-    final rnd = math.Random(seed);
-    final eased = Curves.easeOutCubic.transform(progress);
-    final fade = (1 - progress).clamp(0.0, 1.0);
-
-    for (int i = 0; i < _count; i++) {
-      final angle = (i / _count) * 2 * math.pi + rnd.nextDouble() * 0.4;
-      final distance = (size.width * 0.42) * eased * (0.7 + rnd.nextDouble() * 0.6);
-      final offset = center + Offset(math.cos(angle), math.sin(angle)) * distance;
-
-      final paint = Paint()
-        ..color = (i.isEven ? _Skin.amber : Colors.white)
-            .withValues(alpha: fade * 0.9);
-
-      final r = (2.0 + rnd.nextDouble() * 2.5) * (0.4 + fade);
-      canvas.drawCircle(offset, r, paint);
-    }
-  }
-
-  @override
-  bool shouldRepaint(_SparklePainter old) =>
-      old.progress != progress || old.seed != seed;
-}
-
-/// Rating prompt presented as a bottom sheet.
-class _RatingSheet extends StatefulWidget {
-  const _RatingSheet();
-
-  @override
-  State<_RatingSheet> createState() => _RatingSheetState();
-}
-
-class _RatingSheetState extends State<_RatingSheet>
-    with TickerProviderStateMixin {
-  static const int _starCount = 5;
-
-  int _rating = RatingPopup.defaultRating;
-  bool _neverAsk = false;
-  int _burstSeed = 0;
-
-  late final AnimationController _entrance;
-  late final AnimationController _pulse;   // badge halo, loops forever
-  late final AnimationController _burst;   // sparkles on 5 stars
-  late final AnimationController _shimmer; // CTA light sweep
-  late final AnimationController _wiggle;  // star shake on a low rating
-
-  late final Animation<double> _fade;
-  late final Animation<Offset> _slide;
-  late final Animation<double> _badgePop;
-
-  @override
-  void initState() {
-    super.initState();
-
-    _entrance = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 620),
-    );
-    _fade = CurvedAnimation(parent: _entrance, curve: Curves.easeOut);
-    _slide = Tween<Offset>(
-      begin: const Offset(0, 0.14),
-      end: Offset.zero,
-    ).animate(CurvedAnimation(parent: _entrance, curve: Curves.easeOutCubic));
-    _badgePop = CurvedAnimation(
-      parent: _entrance,
-      curve: const Interval(0.10, 1.0, curve: Curves.elasticOut),
-    );
-
-    _pulse = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1800),
-    )..repeat();
-
-    _burst = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 900),
-    );
-
-    _shimmer = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 2200),
-    )..repeat();
-
-    _wiggle = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 420),
-    );
-
-    _entrance.forward();
-    // Celebrate the pre-selected 5 stars right after the sheet settles.
-    Future.delayed(const Duration(milliseconds: 480), () {
-      if (mounted && _rating == _starCount) _fireBurst();
-    });
-  }
-
-  @override
-  void dispose() {
-    _entrance.dispose();
-    _pulse.dispose();
-    _burst.dispose();
-    _shimmer.dispose();
-    _wiggle.dispose();
-    super.dispose();
-  }
-
-  void _fireBurst() {
-    setState(() => _burstSeed = DateTime.now().microsecondsSinceEpoch);
-    _burst.forward(from: 0);
-  }
-
-  void _setRating(int value) {
-    if (value == _rating) return;
-    HapticFeedback.selectionClick();
-    setState(() => _rating = value);
-
-    if (value == _starCount) {
-      _fireBurst();
-    } else if (value <= 2) {
-      _wiggle.forward(from: 0);
-    }
-  }
-
-  String get _hint {
-    switch (_rating) {
-      case 0:
-        return 'Tap or slide across the stars';
-      case 1:
-      case 2:
-        return 'Ouch — tell us what went wrong';
-      case 3:
-        return 'Thanks! How can we do better?';
-      case 4:
-        return 'Great! Glad you like it';
-      default:
-        return 'Awesome! Tap a star to change it';
-    }
-  }
-
-  IconData get _faceIcon {
-    if (_rating <= 2) return Icons.sentiment_dissatisfied_rounded;
-    if (_rating == 3) return Icons.sentiment_neutral_rounded;
-    if (_rating == 4) return Icons.sentiment_satisfied_alt_rounded;
-    return Icons.star_rounded;
-  }
-
-  /// Badge: pulsing halo ring + a face that morphs with the rating, with a
-  /// sparkle burst layered on top.
-  Widget _buildBadge() {
-    return ScaleTransition(
-      scale: _badgePop,
-      child: SizedBox(
-        width: 150,
-        height: 92,
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // Expanding halo ring, restarts every loop.
-            AnimatedBuilder(
-              animation: _pulse,
-              builder: (context, _) {
-                final v = _pulse.value;
-                return Container(
-                  width: 68 + (v * 40),
-                  height: 68 + (v * 40),
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(
-                      color: Colors.white.withValues(alpha: (1 - v) * 0.35),
-                      width: 1.5,
-                    ),
-                  ),
-                );
-              },
-            ),
-            AnimatedBuilder(
-              animation: _burst,
-              builder: (context, _) => CustomPaint(
-                size: const Size(150, 92),
-                painter: _SparklePainter(
-                  progress: _burst.value,
-                  seed: _burstSeed,
-                ),
-              ),
-            ),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white.withValues(alpha: 0.16),
-                border: Border.all(
-                  color: Colors.white.withValues(alpha: 0.30),
-                ),
-              ),
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 280),
-                transitionBuilder: (child, anim) => ScaleTransition(
-                  scale: CurvedAnimation(parent: anim, curve: Curves.easeOutBack),
-                  child: RotationTransition(
-                    turns: Tween<double>(begin: -0.12, end: 0).animate(anim),
-                    child: FadeTransition(opacity: anim, child: child),
-                  ),
-                ),
-                child: Icon(
-                  _faceIcon,
-                  key: ValueKey<IconData>(_faceIcon),
-                  color: _Skin.amber,
-                  size: 36,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// Stars: tap + drag, staggered entrance, pop on fill, and a small shake
-  /// when the user picks 1–2.
-  Widget _buildStars() {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final slot = constraints.maxWidth / _starCount;
-
-        void updateFrom(double dx) {
-          final index = (dx / slot).floor().clamp(0, _starCount - 1) + 1;
-          _setRating(index);
-        }
-
-        return Semantics(
-          label: 'Rating',
-          value: '$_rating out of $_starCount stars',
-          slider: true,
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTapDown: (d) => updateFrom(d.localPosition.dx),
-            onHorizontalDragUpdate: (d) => updateFrom(d.localPosition.dx),
-            child: AnimatedBuilder(
-              animation: _wiggle,
-              builder: (context, child) {
-                final shake =
-                    math.sin(_wiggle.value * math.pi * 4) * (1 - _wiggle.value) * 7;
-                return Transform.translate(
-                  offset: Offset(shake, 0),
-                  child: child,
-                );
-              },
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(_starCount, (i) {
-                  final index = i + 1;
-                  final filled = index <= _rating;
-                  final start = 0.20 + (i * 0.09);
-
-                  return Expanded(
-                    child: FadeTransition(
-                      opacity: CurvedAnimation(
-                        parent: _entrance,
-                        curve: Interval(start, (start + 0.4).clamp(0.0, 1.0)),
-                      ),
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, 0.5),
-                          end: Offset.zero,
-                        ).animate(CurvedAnimation(
-                          parent: _entrance,
-                          curve: Interval(
-                            start,
-                            (start + 0.4).clamp(0.0, 1.0),
-                            curve: Curves.easeOutBack,
-                          ),
-                        )),
-                        // Scale + tilt gives the fill a satisfying "snap".
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween<double>(begin: 1, end: filled ? 1.18 : 1),
-                          duration: const Duration(milliseconds: 260),
-                          curve: Curves.elasticOut,
-                          builder: (context, scale, child) => Transform.rotate(
-                            angle: filled ? (scale - 1) * 0.35 : 0,
-                            child: Transform.scale(scale: scale, child: child),
-                          ),
-                          child: Icon(
-                            filled
-                                ? Icons.star_rounded
-                                : Icons.star_border_rounded,
-                            size: 42,
-                            color: filled ? _Skin.amber : _Skin.onDarkFaint,
-                            shadows: filled
-                                ? [
-                              BoxShadow(
-                                color: _Skin.amberDeep
-                                    .withValues(alpha: 0.55),
-                                blurRadius: 14,
-                              ),
-                            ]
-                                : null,
-                          ),
-                        ),
-                      ),
-                    ),
-                  );
-                }),
-              ),
-            ),
-          ),
-        );
-      },
-    );
-  }
-
-  /// White CTA with a light sweep travelling across it.
-  Widget _buildCta(bool positive) {
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(14),
-      child: Stack(
-        children: [
-          ElevatedButton.icon(
-            onPressed: () {
-              HapticFeedback.mediumImpact();
-              Navigator.pop(
-                context,
-                _RatingResult(rating: _rating, neverAskAgain: _neverAsk),
-              );
-            },
-            icon: Icon(
-              positive ? Icons.open_in_new_rounded : Icons.send_rounded,
-              size: 18,
-              color: _Skin.brand,
-            ),
-            label: AnimatedSwitcher(
-              duration: const Duration(milliseconds: 220),
-              transitionBuilder: (child, anim) => FadeTransition(
-                opacity: anim,
-                child: SizeTransition(
-                  axis: Axis.horizontal,
-                  sizeFactor: anim,
-                  child: child,
-                ),
-              ),
-              child: Text(
-                positive ? 'Rate on Play Store' : 'Submit',
-                key: ValueKey<bool>(positive),
-                style: TextStyle(
-                  color: _Skin.brand,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 13.5,
-                ),
-              ),
-            ),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: Colors.white,
-              foregroundColor: _Skin.brand,
-              elevation: 0,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(14),
-              ),
-              padding: const EdgeInsets.symmetric(vertical: 14),
-              minimumSize: const Size.fromHeight(48),
-            ),
-          ),
-          Positioned.fill(
-            child: IgnorePointer(
-              child: AnimatedBuilder(
-                animation: _shimmer,
-                builder: (context, _) {
-                  return FractionallySizedBox(
-                    widthFactor: 0.35,
-                    alignment: Alignment(-1.6 + (_shimmer.value * 3.2), 0),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            _Skin.brand.withValues(alpha: 0),
-                            _Skin.brand.withValues(alpha: 0.14),
-                            _Skin.brand.withValues(alpha: 0),
-                          ],
-                        ),
-                      ),
-                    ),
-                  );
-                },
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final positive = _rating >= RatingPopup.positiveThreshold;
-
-    return _SheetShell(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _buildBadge(),
-          const SizedBox(height: 10),
-          FadeTransition(
-            opacity: _fade,
-            child: SlideTransition(
-              position: _slide,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'Rate ${RatingPopup.appName}',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(
-                      color: _Skin.onDark,
-                      fontSize: 21,
-                      fontWeight: FontWeight.w800,
-                      letterSpacing: 0.2,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Enjoying the app? A rating really helps us ❤️',
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: _Skin.onDarkSub, fontSize: 13),
-                  ),
-                  const SizedBox(height: 18),
-                  _buildStars(),
-                  const SizedBox(height: 6),
-
-                  // Hint slides up as it swaps, so the change is noticeable.
-                  AnimatedSwitcher(
-                    duration: const Duration(milliseconds: 260),
-                    transitionBuilder: (child, anim) => FadeTransition(
-                      opacity: anim,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0, 0.5),
-                          end: Offset.zero,
-                        ).animate(anim),
-                        child: child,
-                      ),
-                    ),
-                    child: Text(
-                      _hint,
-                      key: ValueKey<String>(_hint),
-                      style: TextStyle(color: _Skin.onDarkSub, fontSize: 12),
-                    ),
-                  ),
-                  const SizedBox(height: 10),
-
-                  InkWell(
-                    borderRadius: BorderRadius.circular(10),
-                    onTap: () => setState(() => _neverAsk = !_neverAsk),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 2),
-                      child: Row(
-                        children: [
-                          Checkbox(
-                            value: _neverAsk,
-                            onChanged: (v) =>
-                                setState(() => _neverAsk = v ?? false),
-                            side: BorderSide(
-                              color: Colors.white.withValues(alpha: 0.55),
-                              width: 1.4,
-                            ),
-                            activeColor: Colors.white,
-                            checkColor: _Skin.brand,
-                            materialTapTargetSize:
-                            MaterialTapTargetSize.shrinkWrap,
-                            visualDensity: VisualDensity.compact,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              "Don't ask again",
-                              style: TextStyle(
-                                color: _Skin.onDarkSub,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-
-                  Row(
-                    children: [
-                      Expanded(
-                        child: TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          style: TextButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 14),
-                            backgroundColor:
-                            Colors.white.withValues(alpha: 0.14),
-                            minimumSize: const Size.fromHeight(48),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(14),
-                              side: BorderSide(
-                                color: Colors.white.withValues(alpha: 0.24),
-                              ),
-                            ),
-                          ),
-                          child: Text(
-                            'Later',
-                            style: TextStyle(
-                              color: _Skin.onDarkSub,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(flex: 3, child: _buildCta(positive)),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Feedback sheet for low ratings — same coloured skin, staggered entrance,
-/// and it disposes its controller properly.
+/// Feedback sheet for low ratings.
 class _FeedbackSheet extends StatefulWidget {
   const _FeedbackSheet({required this.rating});
 
@@ -874,9 +1176,10 @@ class _FeedbackSheetState extends State<_FeedbackSheet>
       // Never block the user on a failed report.
     }
     if (!mounted) return;
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Thanks for the feedback!')),
+      SnackBar(content: Text(MiscStrings.t(lang, 'feedback_sent_snackbar'))),
     );
   }
 
@@ -910,6 +1213,7 @@ class _FeedbackSheetState extends State<_FeedbackSheet>
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return _SheetShell(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -921,9 +1225,9 @@ class _FeedbackSheetState extends State<_FeedbackSheet>
               children: [
                 const Icon(Icons.favorite_rounded, color: _Skin.amber, size: 20),
                 const SizedBox(width: 8),
-                const Text(
-                  'What can we fix?',
-                  style: TextStyle(
+                Text(
+                  MiscStrings.t(lang, 'feedback_title'),
+                  style: const TextStyle(
                     color: _Skin.onDark,
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
@@ -936,7 +1240,7 @@ class _FeedbackSheetState extends State<_FeedbackSheet>
           _stagger(
             1,
             Text(
-              'This goes straight to the team — it is not posted publicly.',
+              MiscStrings.t(lang, 'feedback_subtitle'),
               style: TextStyle(color: _Skin.onDarkSub, fontSize: 12),
             ),
           ),
@@ -952,7 +1256,7 @@ class _FeedbackSheetState extends State<_FeedbackSheet>
               style: const TextStyle(color: _Skin.onDark, fontSize: 14),
               textInputAction: TextInputAction.newline,
               decoration: InputDecoration(
-                hintText: 'Playback issues, missing formats, crashes…',
+                hintText: MiscStrings.t(lang, 'feedback_hint'),
                 hintStyle: TextStyle(
                   color: Colors.white.withValues(alpha: 0.45),
                   fontSize: 13,
@@ -985,7 +1289,7 @@ class _FeedbackSheetState extends State<_FeedbackSheet>
                       ),
                     ),
                     child: Text(
-                      'Not now',
+                      MiscStrings.t(lang, 'feedback_not_now'),
                       style: TextStyle(
                         color: _Skin.onDarkSub,
                         fontWeight: FontWeight.w600,
@@ -1021,7 +1325,7 @@ class _FeedbackSheetState extends State<_FeedbackSheet>
                         ),
                       )
                           : Text(
-                        'Send feedback',
+                        MiscStrings.t(lang, 'rating_cta_feedback'),
                         style: TextStyle(
                           color: _Skin.brand,
                           fontWeight: FontWeight.w800,

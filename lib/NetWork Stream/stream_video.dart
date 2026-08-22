@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
 
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../NotifyListeners/LanguageProvider/video_strings.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
 import '../ads/app_open_ad_manager.dart';
 
@@ -35,13 +38,14 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
 
   Future<void> _loadVideo() async {
     final url = _urlController.text.trim();
+    final lang = context.read<LocaleProvider>().locale.languageCode;
 
     if (url.isEmpty) {
-      _showSnackBar('Please enter a video URL');
+      _showSnackBar(VideoStrings.t(lang, 'stream_please_enter_url'));
       return;
     }
     if (!_isPlayableUrl(url)) {
-      _showSnackBar('Enter a full URL, e.g. https://example.com/video.mp4');
+      _showSnackBar(VideoStrings.t(lang, 'stream_enter_full_url'));
       return;
     }
 
@@ -78,6 +82,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -86,7 +91,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
           onPressed: () => Navigator.pop(context),
         ),
         title: Text(
-          'Stream Video',
+          VideoStrings.t(lang, 'stream_appbar_title'),
           style: GoogleFonts.poppins(
             color: Colors.white,
             fontSize: 20,
@@ -115,7 +120,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Text(
-                    'Stream Your Video',
+                    VideoStrings.t(lang, 'stream_card_title'),
                     style: GoogleFonts.poppins(
                       fontSize: 24,
                       fontWeight: FontWeight.w700,
@@ -126,7 +131,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
                   TextField(
                     controller: _urlController,
                     decoration: InputDecoration(
-                      labelText: 'Enter Video URL',
+                      labelText: VideoStrings.t(lang, 'stream_url_label'),
                       labelStyle: GoogleFonts.poppins(color: Colors.grey[600]),
                       prefixIcon: const Icon(Icons.link, color: Colors.blueAccent),
                       filled: true,
@@ -164,7 +169,9 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
                       )
                           : const Icon(Icons.play_arrow, size: 28),
                       label: Text(
-                        _isLoading ? 'Loading...' : 'Play Now',
+                        _isLoading
+                            ? VideoStrings.t(lang, 'common_loading')
+                            : VideoStrings.t(lang, 'stream_play_now'),
                         style: GoogleFonts.poppins(
                           fontSize: 18,
                           fontWeight: FontWeight.w600,

@@ -5,12 +5,16 @@ import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatf
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:videoplayer/Utils/string.dart';
 import '../HexColorCode/HexColor.dart';
 import '../Home/HomeBottomnavigation/home_bottomNavigation.dart';
+import '../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../NotifyListeners/LanguageProvider/profile_strings.dart';
 import '../OnboardScreen/onboarding_screen.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
 import '../ads/app_open_ad_manager.dart';
@@ -82,23 +86,33 @@ class _SplashScreenState extends State<SplashScreen> {
     // see VideoIntentService._bootComplete for why that matters.
     VideoIntentService.markBootComplete();
 
-    // If the app was launched via "Open with", open the video on top of Home so
+    // If the app was launched via "Open with", open the media on top of Home so
     // pressing back returns to the app instead of an empty splash route.
     final pending = VideoIntentService.consumePendingVideo();
     if (pending == null) return;
     // The native side also proactively pushes "newVideoIntent" now — in a
     // narrow boot-timing race both this poll-based path and that push could
     // otherwise deliver the same uri and open the player twice.
-    if (!VideoIntentService.claimForOpening(pending)) return;
+    if (!VideoIntentService.claimForOpening(pending.uri)) return;
 
-    debugPrint('OPEN WITH URI => $pending');
+    debugPrint('OPEN WITH URI => ${pending.uri} (${pending.mimeType})');
+
+    if (pending.isAudio) {
+      // Home was just pushed above — play in the mini player there instead
+      // of opening the full-screen video player.
+      unawaited(
+        GlobalAudioController().playExternalUri(pending.uri, title: pending.name),
+      );
+      return;
+    }
+
     navigator.push(
       MaterialPageRoute(
         builder: (_) => FullScreenVideoPlayerFixed(
           videos: const [],
           initialIndex: 0,
           // media_kit opens content:// and file:// uris directly.
-          initialUrl: pending,
+          initialUrl: pending.uri,
         ),
       ),
     );
@@ -188,14 +202,17 @@ class CustomUpgradeDialog extends StatelessWidget {
     }
 
     if (!opened && context.mounted) {
+      final lang = context.read<LocaleProvider>().locale.languageCode;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Could not open the store')),
+        SnackBar(content: Text(ProfileStrings.t(lang, 'splash_could_not_open_store'))),
       );
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => ProfileStrings.t(lang, key);
     return Dialog(
       insetPadding: EdgeInsets.symmetric(horizontal: 10.sp, vertical: 20.sp),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.sp)),
@@ -243,7 +260,7 @@ class CustomUpgradeDialog extends StatelessWidget {
               ),
               SizedBox(height: 10.sp),
               Text(
-                "🚀 New Update Available!",
+                t('splash_new_update_available'),
                 style: GoogleFonts.poppins(
                   color: Colors.white,
                   fontSize: 16.sp,
@@ -262,7 +279,9 @@ class CustomUpgradeDialog extends StatelessWidget {
               SizedBox(height: 10.sp),
               Center(
                 child: Text(
-                  "A new version of Upgrader is available! Version $newVersion is now available - you have $currentVersion",
+                  t('splash_update_body')
+                      .replaceAll('{new}', newVersion)
+                      .replaceAll('{current}', currentVersion),
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontSize: 10.sp,
@@ -275,7 +294,7 @@ class CustomUpgradeDialog extends StatelessWidget {
 
               Center(
                 child: Text(
-                  " Would you like to update it now?",
+                  t('splash_update_prompt'),
                   style: GoogleFonts.poppins(
                     color: Colors.white,
                     fontSize: 11.sp,
@@ -296,7 +315,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "What's New in Version $newVersion",
+                      t('splash_whats_new').replaceAll('{version}', newVersion),
                       style: GoogleFonts.poppins(
                         color: Colors.white,
                         fontSize: 13.sp,
@@ -346,7 +365,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                 ),
                 icon: Icon(Icons.rocket_launch, size: 20.sp,color: Colors.white,),
                 label: Text(
-                  "Update Now".toUpperCase(),
+                  t('splash_update_now').toUpperCase(),
                   style: GoogleFonts.poppins(
                     fontSize: 14.sp,
                     fontWeight: FontWeight.w700,

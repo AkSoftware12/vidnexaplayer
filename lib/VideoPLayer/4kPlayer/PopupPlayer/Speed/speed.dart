@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
+
+import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../../../NotifyListeners/LanguageProvider/video_strings.dart';
 
 class PlaybackSpeedDialog {
   static Future<void> show(
@@ -9,6 +13,10 @@ class PlaybackSpeedDialog {
   }) {
     double newSpeed = currentSpeed;
     double originalSpeed = currentSpeed;
+
+    final lang =
+        Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+    String t(String key) => VideoStrings.t(lang, key);
 
     final List<double> options = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0];
 
@@ -45,9 +53,9 @@ class PlaybackSpeedDialog {
                         children: [
                           Padding(
                             padding:  EdgeInsets.only(left: 8.0),
-                            child: const Text(
-                              "Adjust Speed",
-                              style: TextStyle(color: Colors.white, fontSize: 18),
+                            child: Text(
+                              t('speed_adjust_title'),
+                              style: const TextStyle(color: Colors.white, fontSize: 18),
                             ),
                           ),
                           Row(
@@ -194,6 +202,42 @@ class PlaybackSpeedDialog {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.end,
                         children: [
+
+                          // OK BUTTON
+                          GestureDetector(
+                            onTap: () {
+                              onSpeedChange(newSpeed);   // final speed apply
+                              Navigator.pop(context);    // dialog close
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(12),
+                                color: ColorSelect.maineColor2,
+                                border: Border.all(
+                                  color: Colors.white.withValues(alpha: 0.4),
+                                  width: 1.5,
+                                ),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withValues(alpha: 0.4),
+                                    blurRadius: 8,
+                                    offset: const Offset(0, 3),
+                                  )
+                                ],
+                              ),
+                              child: Text(
+                                t('common_ok'),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          const SizedBox(width: 12),
                           // RESET BUTTON
                           GestureDetector(
                             onTap: () {
@@ -225,9 +269,9 @@ class PlaybackSpeedDialog {
                                   )
                                 ],
                               ),
-                              child: const Text(
-                                "Reset",
-                                style: TextStyle(
+                              child: Text(
+                                t('common_reset'),
+                                style: const TextStyle(
                                   color: Colors.white,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,
@@ -253,9 +297,9 @@ class PlaybackSpeedDialog {
                                   width: 1.5,
                                 ),
                               ),
-                              child: const Text(
-                                "Cancel",
-                                style: TextStyle(
+                              child: Text(
+                                t('common_cancel'),
+                                style: const TextStyle(
                                   color: Colors.redAccent,
                                   fontSize: 15,
                                   fontWeight: FontWeight.w600,

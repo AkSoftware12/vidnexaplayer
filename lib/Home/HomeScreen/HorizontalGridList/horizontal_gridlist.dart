@@ -2,7 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:provider/provider.dart';
 import '../../../NetWork Stream/stream_video.dart';
+import '../../../NotifyListeners/LanguageProvider/home_strings.dart';
+import '../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../Photo/image_album.dart';
 import '../../../StatusSaverScreen/whatsapp_download.dart';
 import '../../../VideoPLayer/VideoList/video_list.dart';
@@ -54,9 +57,12 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
     // For example, for videos: (await PhotoManager.getAssetPathList(type: RequestType.video))[0].assetCountAsync
     setState(() {
       items = [
+        // NOTE: `text` holds a HomeStrings key, not literal display copy —
+        // it is translated at render time (see itemBuilder below) so this
+        // list doesn't need to know the current language.
         PropertyTypeModel(
           imageUrl: 'assets/videos.png',
-          text: 'All Videos',
+          text: 'home_cat_all_videos',
           color: Colors.deepOrange,
           color2: Colors.orangeAccent,
           mb: '12.4 GB',
@@ -64,7 +70,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
         ),
         PropertyTypeModel(
           imageUrl: 'assets/image.png',
-          text: 'Images',
+          text: 'home_cat_images',
           color: Colors.pinkAccent,
           color2: Colors.redAccent,
           mb: '5.6 GB',
@@ -72,7 +78,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
         ),
         PropertyTypeModel(
           imageUrl: 'assets/musics.png',
-          text: 'Music',
+          text: 'home_cat_music',
           color: Colors.deepPurple,
           color2: Colors.purpleAccent,
           mb: '2.2 GB',
@@ -80,7 +86,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
         ),
         PropertyTypeModel(
           imageUrl: 'assets/downloadlist.png',
-          text: 'Status Saver',
+          text: 'home_cat_status_saver',
           color:Color(0xFF25D366),
           color2:Color(0xFF7ED89F),
           mb: '3.2 GB',
@@ -89,7 +95,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
         ),
         PropertyTypeModel(
           imageUrl: 'assets/link.img.png',
-          text: 'Network',
+          text: 'home_cat_network',
           color: Colors.blueAccent,
           color2: Colors.lightBlueAccent,
           mb: '3.2 GB',
@@ -101,6 +107,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Column(
       children: [
         Padding(
@@ -129,7 +136,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        "Media Categories",
+                        HomeStrings.t(lang, 'home_media_categories_title'),
                         style: GoogleFonts.poppins(
                           fontSize: 14.sp,
                           fontWeight: FontWeight.w600,
@@ -137,7 +144,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                         ),
                       ),
                       Text(
-                        "Videos, Music & Albums", // 👈 subtitle
+                        HomeStrings.t(lang, 'home_media_categories_subtitle'), // 👈 subtitle
                         style: GoogleFonts.poppins(
                           fontSize: 7.sp,
                           fontWeight: FontWeight.w400,
@@ -275,7 +282,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                             ),
                             Spacer(),
                             Text(
-                              item.text,
+                              HomeStrings.t(lang, item.text),
                               style: GoogleFonts.poppins(
                                 fontSize: 10.sp,
                                 fontWeight: FontWeight.w700,

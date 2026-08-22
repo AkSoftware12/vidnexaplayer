@@ -2,11 +2,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:videoplayer/ads/app_open_ad_manager.dart';
 import 'package:videoplayer/OnboardScreen/size_config.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:animate_do/animate_do.dart';
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../NotifyListeners/LanguageProvider/profile_strings.dart';
 import '../Permission/permission_page.dart';
 import 'onboarding_contents.dart';
 
@@ -66,6 +69,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     SizeConfig().init(context);
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => ProfileStrings.t(lang, key);
 
     return Scaffold(
       // Clamped: `colors` and the onboarding page count are two separate
@@ -83,7 +88,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   Text(
-                    'All Features',
+                    t('onboard_all_features'),
                     style: GoogleFonts.poppins(
                       fontSize: 15.sp,
                       fontWeight: FontWeight.w700,
@@ -111,7 +116,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           ),
                         ),
                         child: Text(
-                          'Skip',
+                          t('onboard_skip'),
                           style: GoogleFonts.openSans(
                             fontSize: 12.sp,
                             fontWeight: FontWeight.w600,
@@ -191,7 +196,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                 ),
                                 SizedBox(width: 2.sp),
                                 Text(
-                                  'Your data is safe with us.',
+                                  t('onboard_data_safe'),
                                   style: TextStyle(
                                     fontSize: 10.sp,
                                     fontWeight: FontWeight.w600,
@@ -318,7 +323,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                             ),
                           ),
                           child: Text(
-                            "Get Started",
+                            t('onboard_get_started'),
                             style: GoogleFonts.openSans(
                               fontSize: 15.sp,
                               fontWeight: FontWeight.w700,
@@ -369,7 +374,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               ),
                               SizedBox(width: 5.sp),
                               Text(
-                                "Next",
+                                t('onboard_next'),
                                 style: GoogleFonts.openSans(
                                   fontSize: 15.sp,
                                   fontWeight: FontWeight.w700,

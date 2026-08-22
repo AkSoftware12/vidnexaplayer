@@ -6,10 +6,13 @@ import 'package:docman/docman.dart';
 import 'package:flutter/material.dart';
 import 'package:gal/gal.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:videoplayer/StatusSaverScreen/status_saver.dart';
 import 'package:videoplayer/Utils/color.dart';
 
+import '../NotifyListeners/LanguageProvider/device_strings.dart';
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../Photo/image_album.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
 
@@ -55,9 +58,9 @@ class StatusItem {
     return document?.cache();
   }
 
-  Future<void> share() async {
+  Future<void> share({String shareTitle = 'Share status'}) async {
     if (document != null) {
-      await document!.share(title: 'Share status');
+      await document!.share(title: shareTitle);
       return;
     }
 
@@ -69,7 +72,7 @@ class StatusItem {
       exists: true,
       type: isVideo ? 'video/mp4' : 'image/jpeg',
     );
-    await tempDoc.share(title: 'Share status');
+    await tempDoc.share(title: shareTitle);
   }
 }
 
@@ -221,8 +224,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
         _setWaitingState(
           accessMode: AccessMode.directPermission,
           statuses: const [],
-          folderHint:
-          'Access is allowed. Open WhatsApp, watch at least one status, then return here and tap Refresh.',
+          folderHint: DeviceStrings.t(_langCode, 'wa_hint_access_allowed_watch'),
           clearDirectories: true,
         );
         return;
@@ -233,8 +235,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
         _loading = false;
         _accessMode = null;
         _allStatuses = const [];
-        _folderHint =
-        'Allow access first. If hidden statuses are blocked on your device, use folder selection.';
+        _folderHint = DeviceStrings.t(_langCode, 'wa_hint_allow_access_first');
       });
     } catch (e) {
       if (!mounted) return;
@@ -318,9 +319,8 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     if (!granted) {
       if (showErrors && mounted) {
         setState(() {
-          _error = 'Media permission was not granted.';
-          _folderHint =
-          'Allow access or select the WhatsApp media folder manually.';
+          _error = DeviceStrings.t(_langCode, 'wa_error_permission_not_granted');
+          _folderHint = DeviceStrings.t(_langCode, 'wa_hint_allow_or_select_folder');
           _accessMode = null;
         });
       }
@@ -335,8 +335,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     if (statuses.isEmpty && showErrors && mounted) {
       setState(() {
         _error = null;
-        _folderHint =
-        'Access is available, but no visible statuses were found yet. Open WhatsApp and watch a status first.';
+        _folderHint = DeviceStrings.t(_langCode, 'wa_hint_access_available_no_statuses');
       });
     }
 
@@ -413,8 +412,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       _accessMode = AccessMode.directPermission;
       _allStatuses = statuses;
       _error = null;
-      _folderHint =
-      'Statuses loaded. Refresh after viewing new statuses in WhatsApp.';
+      _folderHint = DeviceStrings.t(_langCode, 'wa_hint_statuses_loaded');
       _selectedDirectory = null;
       _statusesDirectory = null;
     });
@@ -469,7 +467,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       setState(() {
         _selectingFolder = false;
         _loading = false;
-        _error = 'Folder selection failed: $e';
+        _error = '${DeviceStrings.t(_langCode, 'wa_error_folder_selection_failed_prefix')}$e';
       });
     }
   }
@@ -495,8 +493,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
           _statusesDirectory = null;
           _allStatuses = const [];
           _accessMode = AccessMode.saf;
-          _error =
-          'The .Statuses folder was not found. Select WhatsApp/Media or Android/media/.../Media.';
+          _error = DeviceStrings.t(_langCode, 'wa_error_statuses_folder_not_found');
         });
         return;
       }
@@ -538,15 +535,15 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
         _statusesDirectory = statusesDir;
         _allStatuses = statuses;
         _folderHint = statuses.isEmpty
-            ? 'Folder connected. Open WhatsApp, view a status, then come back and refresh.'
-            : 'Folder connected. This mode is reliable on Android 11 and above.';
+            ? DeviceStrings.t(_langCode, 'wa_hint_folder_connected_watch')
+            : DeviceStrings.t(_langCode, 'wa_hint_folder_connected_reliable');
         _error = null;
       });
     } catch (e) {
       if (!mounted) return;
       setState(() {
         _loading = false;
-        _error = 'Unable to load statuses: $e';
+        _error = '${DeviceStrings.t(_langCode, 'wa_error_unable_load_statuses_prefix')}$e';
       });
     }
   }
@@ -632,8 +629,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
           _setWaitingState(
             accessMode: AccessMode.directPermission,
             statuses: const [],
-            folderHint:
-            'Still no statuses found. Open WhatsApp, view a status, then return and refresh again.',
+            folderHint: DeviceStrings.t(_langCode, 'wa_hint_still_no_statuses'),
             clearDirectories: true,
           );
         }
@@ -665,8 +661,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       _setWaitingState(
         accessMode: AccessMode.directPermission,
         statuses: const [],
-        folderHint:
-        'Access granted. Open WhatsApp, watch any status, then come back and tap Refresh.',
+        folderHint: DeviceStrings.t(_langCode, 'wa_hint_access_granted_watch'),
         clearDirectories: true,
       );
       return;
@@ -687,7 +682,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       _accessMode = null;
       _allStatuses = const [];
       _error = null;
-      _folderHint = 'Folder reset. Pick the folder again if needed.';
+      _folderHint = DeviceStrings.t(_langCode, 'wa_hint_folder_reset');
       _loading = false;
       _previewFutures.clear();
       _statusById.clear();
@@ -700,10 +695,17 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
 
   bool _isDownloaded(StatusItem item) => _downloadedIds.contains(item.id);
 
+  /// Current language code, read (not watched) — used from event handlers
+  /// and async callbacks outside `build()`.
+  String get _langCode => context.read<LocaleProvider>().locale.languageCode;
+
+  String _typeLabel(bool isVideo, String lang) =>
+      DeviceStrings.t(lang, isVideo ? 'wa_type_video' : 'wa_type_image');
+
   Future<void> _saveStatus(StatusItem item) async {
     try {
       final file = await item.cacheFile();
-      if (file == null) throw 'File unavailable';
+      if (file == null) throw DeviceStrings.t(_langCode, 'wa_file_unavailable');
 
       if (item.isVideo) {
         await Gal.putVideo(file.path, album: _galleryAlbumName);
@@ -733,24 +735,30 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       await _persistDownloads();
 
       if (!mounted) return;
+      final lang = _langCode;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('${item.typeLabel} saved to gallery.')),
+        SnackBar(
+          content: Text(
+            DeviceStrings.t(lang, 'wa_saved_to_gallery')
+                .replaceAll('{type}', _typeLabel(item.isVideo, lang)),
+          ),
+        ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Save failed: $e')),
+        SnackBar(content: Text('${DeviceStrings.t(_langCode, 'wa_save_failed_prefix')}$e')),
       );
     }
   }
 
   Future<void> _shareStatus(StatusItem item) async {
     try {
-      await item.share();
+      await item.share(shareTitle: DeviceStrings.t(_langCode, 'wa_share_status_title'));
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Share failed: $e')),
+        SnackBar(content: Text('${DeviceStrings.t(_langCode, 'wa_share_failed_prefix')}$e')),
       );
     }
   }
@@ -772,7 +780,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
         if (file == null || !await file.exists()) {
           if (!mounted) return;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Video file not found')),
+            SnackBar(content: Text(DeviceStrings.t(_langCode, 'wa_video_not_found'))),
           );
           return;
         }
@@ -791,7 +799,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       } catch (e) {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Unable to open video: $e')),
+          SnackBar(content: Text('${DeviceStrings.t(_langCode, 'wa_unable_open_video_prefix')}$e')),
         );
         return;
       }
@@ -805,6 +813,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
   }
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     final imageCount = _imageStatuses.length;
     final videoCount = _videoStatuses.length;
 
@@ -826,14 +835,14 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Text(
-                    'Status Saver',
+                    DeviceStrings.t(lang, 'wa_title'),
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
                   Text(
-                    'Allow access to view and save statuses.',
+                    DeviceStrings.t(lang, 'wa_subtitle'),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -884,10 +893,10 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
               indicatorSize: TabBarIndicatorSize.label,
               labelPadding: const EdgeInsets.symmetric(horizontal: 12),
               tabs: [
-                _tab('All', _allStatuses.length),
-                _tab('Images', imageCount),
-                _tab('Videos', videoCount),
-                _tab('Downloads', _downloads.length),
+                _tab(DeviceStrings.t(lang, 'wa_tab_all'), _allStatuses.length),
+                _tab(DeviceStrings.t(lang, 'wa_tab_images'), imageCount),
+                _tab(DeviceStrings.t(lang, 'wa_tab_videos'), videoCount),
+                _tab(DeviceStrings.t(lang, 'wa_tab_downloads'), _downloads.length),
               ],
             ),
           ),
@@ -918,15 +927,16 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       return Center(child: AnimatedProgressIndicator());
     }
 
+    final lang = _langCode;
+
     if (_stage == HomeStage.permission) {
       return _InfoState(
         icon: Icons.lock_open_rounded,
-        title: 'Allow access to load statuses',
-        message:
-        'On first launch, allow media access. If your device still hides the status folder, use Pick Folder.',
-        primaryLabel: 'Allow Access',
+        title: DeviceStrings.t(lang, 'wa_permission_title'),
+        message: DeviceStrings.t(lang, 'wa_permission_message'),
+        primaryLabel: DeviceStrings.t(lang, 'wa_allow_access'),
         onPrimary: _enableDirectPermissionMode,
-        secondaryLabel: 'Pick Folder',
+        secondaryLabel: DeviceStrings.t(lang, 'wa_pick_folder'),
         onSecondary: _pickFolder,
       );
     }
@@ -934,12 +944,13 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     if (_stage == HomeStage.waiting) {
       return _InfoState(
         icon: Icons.visibility_rounded,
-        title: 'No statuses found yet',
-        message:
-        'Open WhatsApp, watch any status, then return here and tap Refresh. New statuses will appear automatically after refresh.',
-        primaryLabel: 'Refresh',
+        title: DeviceStrings.t(lang, 'wa_waiting_title'),
+        message: DeviceStrings.t(lang, 'wa_waiting_message'),
+        primaryLabel: DeviceStrings.t(lang, 'wa_refresh'),
         onPrimary: _refresh,
-        secondaryLabel: _isSafMode ? 'Change Folder' : 'Pick Folder',
+        secondaryLabel: _isSafMode
+            ? DeviceStrings.t(lang, 'wa_change_folder')
+            : DeviceStrings.t(lang, 'wa_pick_folder'),
         onSecondary: _pickFolder,
       );
     }
@@ -947,10 +958,9 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     if (statuses.isEmpty) {
       return _InfoState(
         icon: Icons.filter_alt_off_rounded,
-        title: 'Nothing in this filter',
-        message:
-        'Try another tab or refresh after viewing more statuses in WhatsApp.',
-        primaryLabel: 'Refresh',
+        title: DeviceStrings.t(lang, 'wa_empty_filter_title'),
+        message: DeviceStrings.t(lang, 'wa_empty_filter_message'),
+        primaryLabel: DeviceStrings.t(lang, 'wa_refresh'),
         onPrimary: _refresh,
       );
     }
@@ -989,9 +999,9 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     if (_downloads.isEmpty) {
       return _InfoState(
         icon: Icons.download_done_rounded,
-        title: 'No downloads yet',
-        message: 'Saved statuses will appear here with a green check mark.',
-        primaryLabel: 'View statuses',
+        title: DeviceStrings.t(_langCode, 'wa_no_downloads_title'),
+        message: DeviceStrings.t(_langCode, 'wa_no_downloads_message'),
+        primaryLabel: DeviceStrings.t(_langCode, 'wa_view_statuses'),
         onPrimary: () => _tabController.animateTo(0),
       );
     }
@@ -1034,17 +1044,19 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
   }
 
   Widget _buildAccessPanel(BuildContext context) {
+    final lang = _langCode;
+
     final statusText = switch (_stage) {
-      HomeStage.permission => 'Access required',
-      HomeStage.waiting => 'Waiting for statuses',
-      HomeStage.ready => 'Statuses available',
+      HomeStage.permission => DeviceStrings.t(lang, 'wa_status_access_required'),
+      HomeStage.waiting => DeviceStrings.t(lang, 'wa_status_waiting_for_statuses'),
+      HomeStage.ready => DeviceStrings.t(lang, 'wa_status_available'),
     };
 
     final modeText = _isDirectMode
-        ? 'Direct permission mode'
+        ? DeviceStrings.t(lang, 'wa_mode_direct')
         : _isSafMode
-        ? 'Folder access mode'
-        : 'No access selected';
+        ? DeviceStrings.t(lang, 'wa_mode_folder')
+        : DeviceStrings.t(lang, 'wa_mode_none');
 
     return Container(
       width: double.infinity,
@@ -1088,7 +1100,8 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
               ),
               _StatChip(
                 icon: Icons.check_circle_rounded,
-                label: '${_downloads.length} saved',
+                label: DeviceStrings.t(lang, 'wa_saved_count')
+                    .replaceAll('{count}', '${_downloads.length}'),
                 color: const Color(0xFF16A34A),
               ),
             ],
@@ -1096,7 +1109,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
           if (_statusesDirectory != null) ...[
             const SizedBox(height: 10),
             Text(
-              'Connected folder: ${_statusesDirectory!.name}',
+              '${DeviceStrings.t(lang, 'wa_connected_folder_prefix')}${_statusesDirectory!.name}',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: const Color(0xFF334155),
                 fontWeight: FontWeight.w600,
@@ -1135,7 +1148,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: const Text('Allow Access'),
+                    child: Text(DeviceStrings.t(lang, 'wa_allow_access')),
                   ),
                 ),
                 const SizedBox(width: 10),
@@ -1148,10 +1161,10 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
                   ),
                   child: Text(
                     _selectingFolder
-                        ? 'Opening...'
+                        ? DeviceStrings.t(lang, 'wa_opening')
                         : _isSafMode
-                        ? 'Change Folder'
-                        : 'Pick Folder',
+                        ? DeviceStrings.t(lang, 'wa_change_folder')
+                        : DeviceStrings.t(lang, 'wa_pick_folder'),
                   ),
                 ),
               ),
@@ -1163,7 +1176,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
               alignment: Alignment.centerRight,
               child: TextButton(
                 onPressed: _clearSavedFolder,
-                child: const Text('Reset folder'),
+                child: Text(DeviceStrings.t(lang, 'wa_reset_folder')),
               ),
             ),
           ],
@@ -1192,6 +1205,8 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Material(
       color: Colors.white,
       borderRadius: BorderRadius.circular(10),
@@ -1268,7 +1283,7 @@ class _StatusCard extends StatelessWidget {
                               ),
                               const SizedBox(width: 4),
                               Text(
-                                'Saved',
+                                DeviceStrings.t(lang, 'wa_saved'),
                                 style: Theme.of(context)
                                     .textTheme
                                     .labelSmall
@@ -1295,7 +1310,9 @@ class _StatusCard extends StatelessWidget {
                           borderRadius: BorderRadius.circular(999),
                         ),
                         child: Text(
-                          item.typeLabel,
+                          item.isVideo
+                              ? DeviceStrings.t(lang, 'wa_type_video')
+                              : DeviceStrings.t(lang, 'wa_type_image'),
                           style: Theme.of(context)
                               .textTheme
                               .labelSmall
@@ -1322,7 +1339,7 @@ class _StatusCard extends StatelessWidget {
               const SizedBox(height: 1),
               Text(
                 item.modifiedAt == null
-                    ? 'Unknown date'
+                    ? DeviceStrings.t(lang, 'wa_unknown_date')
                     : _formatDate(item.modifiedAt!),
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                   color: const Color(0xFF64748B),
@@ -1337,8 +1354,8 @@ class _StatusCard extends StatelessWidget {
                       child: OutlinedButton.icon(
                         onPressed: onShare,
                         icon: const Icon(Icons.share_rounded, size: 16,color: Colors.black,), // 🔥 icon small
-                        label: const Text(
-                          'Share',
+                        label: Text(
+                          DeviceStrings.t(lang, 'wa_share'),
                           style: TextStyle(fontSize: 12, color: Colors.black), // 🔥 font small
                         ),
                         style: OutlinedButton.styleFrom(
@@ -1363,7 +1380,9 @@ class _StatusCard extends StatelessWidget {
                           color: ColorSelect.maineColor2,
                         ),
                         label: Text(
-                          isDownloaded ? 'Saved' : 'Save',
+                          isDownloaded
+                              ? DeviceStrings.t(lang, 'wa_saved')
+                              : DeviceStrings.t(lang, 'wa_save'),
                           style:  TextStyle(fontSize: 12,color: ColorSelect.maineColor2),
                         ),
                         style: FilledButton.styleFrom(
@@ -1396,6 +1415,8 @@ class _DownloadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
@@ -1440,7 +1461,8 @@ class _DownloadTile extends StatelessWidget {
         subtitle: Padding(
           padding: const EdgeInsets.only(top: 4),
           child: Text(
-            'Saved on ${_formatDate(item.savedAt)}',
+            DeviceStrings.t(lang, 'wa_saved_on')
+                .replaceAll('{date}', _formatDate(item.savedAt)),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
               color: const Color(0xFF64748B),
             ),
@@ -1452,16 +1474,16 @@ class _DownloadTile extends StatelessWidget {
             color: const Color(0xFFDCFCE7),
             borderRadius: BorderRadius.circular(999),
           ),
-          child: const Row(
+          child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Icon(
+              const Icon(
                 Icons.check_circle_rounded,
                 size: 16,
                 color: Color(0xFF16A34A),
               ),
-              SizedBox(width: 6),
-              Text('Downloaded'),
+              const SizedBox(width: 6),
+              Text(DeviceStrings.t(lang, 'wa_downloaded')),
             ],
           ),
         ),
@@ -1632,9 +1654,15 @@ class _StatusPreviewPageState extends State<StatusPreviewPage> {
   Future<void> _prepare() async {
     try {
       final file = await widget.item.cacheFile();
-      if (file == null) throw 'Preview file unavailable';
-
       if (!mounted) return;
+
+      if (file == null) {
+        throw DeviceStrings.t(
+          context.read<LocaleProvider>().locale.languageCode,
+          'wa_preview_file_unavailable',
+        );
+      }
+
       setState(() {
         _file = file;
         _loading = false;
@@ -1650,18 +1678,24 @@ class _StatusPreviewPageState extends State<StatusPreviewPage> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return Scaffold(
       backgroundColor: const Color(0xFF020617),
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         foregroundColor: Colors.white,
-        title: Text(widget.item.typeLabel),
+        title: Text(
+          widget.item.isVideo
+              ? DeviceStrings.t(lang, 'wa_type_video')
+              : DeviceStrings.t(lang, 'wa_type_image'),
+        ),
       ),
-      body: Center(child: _buildPreview()),
+      body: Center(child: _buildPreview(lang)),
     );
   }
 
-  Widget _buildPreview() {
+  Widget _buildPreview(String lang) {
     if (_loading) {
       return const CircularProgressIndicator(color: Colors.white);
     }
@@ -1673,9 +1707,9 @@ class _StatusPreviewPageState extends State<StatusPreviewPage> {
 
     final file = _file;
     if (file == null) {
-      return const Text(
-        'Preview unavailable',
-        style: TextStyle(color: Colors.white),
+      return Text(
+        DeviceStrings.t(lang, 'wa_preview_unavailable'),
+        style: const TextStyle(color: Colors.white),
       );
     }
 

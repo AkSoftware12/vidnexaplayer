@@ -5,6 +5,8 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
+import '../../NotifyListeners/LanguageProvider/home_strings.dart';
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../Photo/image_album.dart';
 import '../../RecentlyVideos/RecentlyPlayedScreen/recently_played_screen.dart';
 import '../../VideoPLayer/4kPlayer/4k_player.dart';
@@ -195,7 +197,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
     }
   }
 
-  Widget _buildPermissionCard() {
+  Widget _buildPermissionCard(String lang) {
     return Center(
       child: Padding(
         padding: EdgeInsets.all(16.sp),
@@ -212,7 +214,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                 Icon(Icons.lock_outline, color: Colors.red, size: 48.sp),
                 SizedBox(height: 16.sp),
                 Text(
-                  'Permissions Required',
+                  HomeStrings.t(lang, 'home_permission_required_title'),
                   style: GoogleFonts.poppins(
                     textStyle: TextStyle(
                       fontSize: 18.sp,
@@ -223,7 +225,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                 ),
                 SizedBox(height: 8.sp),
                 Text(
-                  'Please grant access to photos and videos to view your media content.',
+                  HomeStrings.t(lang, 'home_permission_required_desc'),
                   style: GoogleFonts.poppins(
                     textStyle: TextStyle(
                       fontSize: 14.sp,
@@ -247,7 +249,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                     ),
                   ),
                   child: Text(
-                    'Allow Permissions',
+                    HomeStrings.t(lang, 'home_allow_permissions'),
                     style: GoogleFonts.poppins(
                       textStyle: TextStyle(
                         fontSize: 16.sp,
@@ -266,6 +268,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       backgroundColor: Colors.white,
       body: RefreshIndicator(
@@ -288,7 +291,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
               _isLoading
                   ? const SizedBox()
                   : !_hasPermission
-                  ? _buildPermissionCard()
+                  ? _buildPermissionCard(lang)
                   : FadeTransition(
                     opacity: _fadeAnimation,
                     // Removed a nested SingleChildScrollView — this Column is
@@ -344,7 +347,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                         ),
                                         SizedBox(width: 8.sp),
                                         Text(
-                                          'Folders',
+                                          HomeStrings.t(lang, 'home_folders'),
                                           style: GoogleFonts.poppins(
                                             textStyle: TextStyle(
                                               color: Colors.black87,
@@ -424,7 +427,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                 child: Padding(
                                   padding: EdgeInsets.only(top: 50.sp),
                                   child: Text(
-                                    'No albums found',
+                                    HomeStrings.t(lang, 'home_no_albums_found'),
                                     style: GoogleFonts.poppins(
                                       textStyle: TextStyle(
                                         color: Colors.black54,
@@ -578,6 +581,7 @@ class AlbumTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return FutureBuilder<int>(
       future: album.assetCountAsync,
       builder: (context, snapshot) {
@@ -671,7 +675,7 @@ class AlbumTile extends StatelessWidget {
                                 ),
                               )
                               : Text(
-                                'SD Card',
+                                HomeStrings.t(lang, 'home_sd_card'),
                                 style: GoogleFonts.poppins(
                                   textStyle: TextStyle(
                                     color:
@@ -683,7 +687,7 @@ class AlbumTile extends StatelessWidget {
                               ),
                           SizedBox(height: 4.h),
                           Text(
-                            '${snapshot.data ?? 0} Videos',
+                            '${snapshot.data ?? 0} ${HomeStrings.t(lang, 'home_videos_suffix')}',
                             style: GoogleFonts.poppins(
                               textStyle: TextStyle(
                                 color: Theme.of(context).colorScheme.secondary,
@@ -758,6 +762,7 @@ class AlbumGridTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return FutureBuilder<int>(
       future: album.assetCountAsync,
       builder: (context, snapshot) {
@@ -863,7 +868,7 @@ class AlbumGridTile extends StatelessWidget {
                                   maxLines: 1,
                                 )
                                 : Text(
-                                  'SD Card',
+                                  HomeStrings.t(lang, 'home_sd_card'),
                                   style: GoogleFonts.poppins(
                                     textStyle: TextStyle(
                                       color:
@@ -877,7 +882,7 @@ class AlbumGridTile extends StatelessWidget {
                                 ),
                             SizedBox(height: 4.h),
                             Text(
-                              '${snapshot.data ?? 0} Videos',
+                              '${snapshot.data ?? 0} ${HomeStrings.t(lang, 'home_videos_suffix')}',
                               style: GoogleFonts.poppins(
                                 textStyle: TextStyle(
                                   color:
@@ -951,6 +956,7 @@ class AlbumGridTile3 extends StatelessWidget {
       [Colors.pinkAccent, Colors.orangeAccent],
     ];
 
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return FutureBuilder<int>(
       future: album.assetCountAsync,
       builder: (context, snapshot) {
@@ -1063,7 +1069,7 @@ class AlbumGridTile3 extends StatelessWidget {
                               Text(
                                 album.name.isNotEmpty
                                     ? album.name
-                                    : "Untitled Album",
+                                    : HomeStrings.t(lang, 'home_untitled_album'),
                                 style: GoogleFonts.poppins(
                                   textStyle: TextStyle(
                                     color: Colors.black,
@@ -1075,7 +1081,7 @@ class AlbumGridTile3 extends StatelessWidget {
                               ),
                               SizedBox(height: 0.h),
                               Text(
-                                "$count videos",
+                                '$count ${HomeStrings.t(lang, 'home_videos_suffix_lower')}',
                                 style: GoogleFonts.poppins(
                                   textStyle: TextStyle(
                                     color: Colors.black54,

@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../app_open_ad_manager.dart';
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../NotifyListeners/LanguageProvider/misc_strings.dart';
 
 /// ✅ Common list widget: inserts a banner after every [itemsPerAd] items.
 ///
@@ -52,18 +55,18 @@ class InlineBannerList<T> extends StatelessWidget {
     return items.length + ads;
   }
 
-  Widget _adTile(int slot) {
+  Widget _adTile(int slot, String lang) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (showSponsoredLabel)
-            const Padding(
-              padding: EdgeInsets.only(left: 2, bottom: 6),
+            Padding(
+              padding: const EdgeInsets.only(left: 2, bottom: 6),
               child: Text(
-                'Sponsored',
-                style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+                MiscStrings.t(lang, 'ads_sponsored'),
+                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
               ),
             ),
           Container(
@@ -89,6 +92,7 @@ class InlineBannerList<T> extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return ListView.builder(
       shrinkWrap: shrinkWrap,
       physics: physics,
@@ -96,7 +100,7 @@ class InlineBannerList<T> extends StatelessWidget {
       itemCount: _itemCount,
       itemBuilder: (context, listIndex) {
         if (_isAdIndex(listIndex)) {
-          return _adTile(_adSlotFromIndex(listIndex));
+          return _adTile(_adSlotFromIndex(listIndex), lang);
         }
 
         final dataIndex = _dataIndexFromListIndex(listIndex);

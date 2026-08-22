@@ -3,7 +3,10 @@ import 'dart:ui';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../NotifyListeners/LanguageProvider/profile_strings.dart';
 import '../service/vault_service.dart';
 
 class VaultScreen extends StatefulWidget {
@@ -66,12 +69,14 @@ class _VaultScreenState extends State<VaultScreen> {
     TextEditingController ctrl,
     GlobalKey<FormState> formKey,
   ) async {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
+    String tr(String key) => ProfileStrings.t(lang, key);
     await showDialog(
       context: context,
       barrierDismissible: false,
       builder: (_) => _GlassDialog(
-        title: "Set Vault PIN",
-        subtitle: "Create a 4–6 digit PIN to protect your files.",
+        title: tr('lock_set_pin_title'),
+        subtitle: tr('lock_set_pin_sub'),
         icon: Icons.shield_rounded,
         child: Form(
           key: formKey,
@@ -80,23 +85,23 @@ class _VaultScreenState extends State<VaultScreen> {
             keyboardType: TextInputType.number,
             obscureText: true,
             maxLength: 6,
-            decoration: _inputDeco("Enter 4–6 digit PIN", Icons.password_rounded),
+            decoration: _inputDeco(tr('lock_enter_pin_hint'), Icons.password_rounded),
             validator: (v) {
               final t = (v ?? "").trim();
-              if (t.length < 4) return "Minimum 4 digits required";
-              if (t.length > 6) return "Maximum 6 digits allowed";
+              if (t.length < 4) return tr('lock_min_digits');
+              if (t.length > 6) return tr('lock_max_digits');
               return null;
             },
           ),
         ),
-        primaryText: "Save PIN",
+        primaryText: tr('lock_save_pin'),
         onPrimary: () async {
           if (!(formKey.currentState?.validate() ?? false)) return;
           await vault.setPin(ctrl.text.trim());
           if (mounted) Navigator.pop(context);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text("PIN set successfully")),
+              SnackBar(content: Text(tr('lock_pin_set_success'))),
             );
           }
         },
@@ -114,11 +119,17 @@ class _VaultScreenState extends State<VaultScreen> {
   static const Duration _lockoutDuration = Duration(minutes: 1);
 
   Future<void> _unlockFlow() async {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     final lockedUntil = _lockedOutUntil;
     if (lockedUntil != null && DateTime.now().isBefore(lockedUntil)) {
       final secs = lockedUntil.difference(DateTime.now()).inSeconds;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Too many attempts. Try again in ${secs}s.')),
+        SnackBar(
+          content: Text(
+            ProfileStrings.t(lang, 'lock_too_many_attempts')
+                .replaceAll('{secs}', '$secs'),
+          ),
+        ),
       );
       return;
     }
@@ -149,13 +160,13 @@ class _VaultScreenState extends State<VaultScreen> {
           _lockedOutUntil = DateTime.now().add(_lockoutDuration);
           _failedAttempts = 0;
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Too many wrong attempts. Locked for 1 minute.'),
+            SnackBar(
+              content: Text(ProfileStrings.t(lang, 'lock_too_many_wrong')),
             ),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Wrong PIN')),
+            SnackBar(content: Text(ProfileStrings.t(lang, 'lock_wrong_pin'))),
           );
         }
 
@@ -170,12 +181,14 @@ class _VaultScreenState extends State<VaultScreen> {
     TextEditingController ctrl,
     GlobalKey<FormState> formKey,
   ) async {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
+    String tr(String key) => ProfileStrings.t(lang, key);
     final result = await showDialog<_UnlockOutcome>(
       context: context,
       barrierDismissible: true,
       builder: (dialogContext) => _GlassDialog(
-        title: "Unlock Vault",
-        subtitle: "Enter your PIN to access secured files.",
+        title: tr('lock_unlock_vault_title'),
+        subtitle: tr('lock_unlock_vault_sub'),
         icon: Icons.lock_open_rounded,
         child: Form(
           key: formKey,
@@ -184,16 +197,16 @@ class _VaultScreenState extends State<VaultScreen> {
             keyboardType: TextInputType.number,
             obscureText: true,
             maxLength: 6,
-            decoration: _inputDeco("Enter PIN", Icons.lock_rounded),
+            decoration: _inputDeco(tr('lock_enter_pin_short'), Icons.lock_rounded),
             validator: (v) {
               final t = (v ?? "").trim();
-              if (t.isEmpty) return "PIN required";
-              if (t.length < 4) return "Wrong PIN length";
+              if (t.isEmpty) return tr('lock_pin_required');
+              if (t.length < 4) return tr('lock_wrong_pin_length');
               return null;
             },
           ),
         ),
-        primaryText: "Unlock",
+        primaryText: tr('lock_unlock'),
         onPrimary: () async {
           if (!(formKey.currentState?.validate() ?? false)) return;
           final ok = await vault.verifyPin(ctrl.text.trim());
@@ -203,7 +216,7 @@ class _VaultScreenState extends State<VaultScreen> {
             ok ? _UnlockOutcome.success : _UnlockOutcome.wrongPin,
           );
         },
-        secondaryText: "Cancel",
+        secondaryText: tr('lock_cancel'),
         onSecondary: () =>
             Navigator.pop(dialogContext, _UnlockOutcome.cancelled),
       ),
@@ -239,16 +252,18 @@ class _VaultScreenState extends State<VaultScreen> {
 
     setState(() => busy = true);
 
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     String message;
     try {
       final result = await vault.addToVault(File(path));
       message = result.originalRemoved
-          ? 'Moved to vault'
+          ? ProfileStrings.t(lang, 'lock_moved_to_vault')
           // The file is hidden in the vault but the original could not be
           // deleted, so be honest that it is still in the gallery.
-          : 'Copied to vault — the original could not be removed';
+          : ProfileStrings.t(lang, 'lock_copied_to_vault');
     } catch (e) {
-      message = 'Could not add to vault: $e';
+      message = ProfileStrings.t(lang, 'lock_could_not_add')
+          .replaceAll('{error}', '$e');
     }
 
     await _refresh();
@@ -280,13 +295,19 @@ class _VaultScreenState extends State<VaultScreen> {
     if (!mounted) return;
     setState(() => busy = false);
 
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     if (restored != null) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("Restored to: $restored")),
+        SnackBar(
+          content: Text(
+            ProfileStrings.t(lang, 'lock_restored_to')
+                .replaceAll('{path}', restored),
+          ),
+        ),
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Restore cancelled / failed")),
+        SnackBar(content: Text(ProfileStrings.t(lang, 'lock_restore_cancelled'))),
       );
     }
   }
@@ -294,14 +315,15 @@ class _VaultScreenState extends State<VaultScreen> {
   Future<void> _deleteVaultFile(File vaultFile) async {
     if (busy) return;
 
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     final ok = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text("Delete file?"),
-        content: const Text("This will remove the file from vault."),
+        title: Text(ProfileStrings.t(lang, 'lock_delete_file_title')),
+        content: Text(ProfileStrings.t(lang, 'lock_delete_file_body')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text("Cancel")),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text("Delete")),
+          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(ProfileStrings.t(lang, 'lock_cancel'))),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(ProfileStrings.t(lang, 'lock_delete'))),
         ],
       ),
     );
@@ -315,7 +337,7 @@ class _VaultScreenState extends State<VaultScreen> {
     setState(() => busy = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text("Deleted from vault")),
+      SnackBar(content: Text(ProfileStrings.t(lang, 'lock_deleted_from_vault'))),
     );
   }
 
@@ -341,6 +363,8 @@ class _VaultScreenState extends State<VaultScreen> {
   @override
   Widget build(BuildContext context) {
     final safeTop = MediaQuery.of(context).padding.top;
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => ProfileStrings.t(lang, key);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FF),
@@ -363,7 +387,7 @@ class _VaultScreenState extends State<VaultScreen> {
             child: Column(
               children: [
                 _VaultAppBar(
-                  title: "Vault",
+                  title: t('lock_vault_title'),
                   unlocked: unlocked,
                   busy: busy,
                   onAdd: unlocked ? _addFile : null,
@@ -395,9 +419,9 @@ class _VaultScreenState extends State<VaultScreen> {
             Positioned(
               right: 16,
               top: safeTop + 70,
-              child: const _PillBadge(
+              child: _PillBadge(
                 icon: Icons.sync_rounded,
-                text: "Syncing…",
+                text: t('lock_syncing'),
               ),
             ),
         ],
@@ -414,7 +438,7 @@ class _VaultScreenState extends State<VaultScreen> {
               Expanded(
                 child: _PrimaryButton(
                   icon: Icons.add_rounded,
-                  label: "Add File",
+                  label: t('lock_add_file'),
                   onTap: busy ? null : _addFile,
                 ),
               ),
@@ -422,7 +446,7 @@ class _VaultScreenState extends State<VaultScreen> {
               _IconButtonGlass(
                 icon: Icons.refresh_rounded,
                 onTap: busy ? null : _refresh,
-                tooltip: "Refresh",
+                tooltip: t('lock_refresh'),
               ),
             ],
           ),
@@ -468,6 +492,8 @@ class _VaultAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => ProfileStrings.t(lang, key);
     return Padding(
       padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
       child: Row(
@@ -487,7 +513,7 @@ class _VaultAppBar extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  unlocked ? "Secured files unlocked" : "Locked • Enter PIN to access",
+                  unlocked ? t('lock_secured_unlocked') : t('lock_locked_enter_pin'),
                   style: TextStyle(
                     color: Colors.white.withValues(alpha:0.85),
                     fontSize: 12.5,
@@ -500,17 +526,17 @@ class _VaultAppBar extends StatelessWidget {
           if (unlocked) ...[
             _TopIcon(
               icon: Icons.add_rounded,
-              tooltip: "Add",
+              tooltip: t('lock_add'),
               onTap: busy ? null : onAdd,
             ),
             const SizedBox(width: 8),
             _TopIcon(
               icon: Icons.refresh_rounded,
-              tooltip: "Refresh",
+              tooltip: t('lock_refresh'),
               onTap: busy ? null : onRefresh,
             ),
           ] else ...[
-            const _PillBadge(icon: Icons.lock_rounded, text: "Locked"),
+            _PillBadge(icon: Icons.lock_rounded, text: t('lock_locked_badge')),
           ],
         ],
       ),
@@ -524,6 +550,8 @@ class _LockedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => ProfileStrings.t(lang, key);
     return Center(
       child: ConstrainedBox(
         constraints: const BoxConstraints(maxWidth: 520),
@@ -558,13 +586,13 @@ class _LockedView extends StatelessWidget {
                     child: const Icon(Icons.lock_rounded, color: Color(0xFF0A1AFF), size: 28),
                   ),
                   const SizedBox(height: 12),
-                  const Text(
-                    "Vault Locked",
-                    style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                  Text(
+                    t('lock_vault_locked_title'),
+                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 6),
                   Text(
-                    "Your files are protected with a PIN.\nUnlock to view and manage them.",
+                    t('lock_vault_locked_body'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
                       fontSize: 13,
@@ -583,9 +611,9 @@ class _LockedView extends StatelessWidget {
                       ),
                       onPressed: onUnlock,
                       icon: const Icon(Icons.lock_open_rounded),
-                      label: const Text(
-                        "Unlock Vault",
-                        style: TextStyle(fontWeight: FontWeight.w700),
+                      label: Text(
+                        t('lock_unlock_vault_button'),
+                        style: const TextStyle(fontWeight: FontWeight.w700),
                       ),
                     ),
                   ),
@@ -617,6 +645,8 @@ class _UnlockedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => ProfileStrings.t(lang, key);
     if (files.isEmpty) {
       return Center(
         child: ConstrainedBox(
@@ -648,13 +678,13 @@ class _UnlockedView extends StatelessWidget {
                   child: const Icon(Icons.folder_off_rounded, size: 28),
                 ),
                 const SizedBox(height: 10),
-                const Text(
-                  "No files in vault",
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                Text(
+                  t('lock_no_files_title'),
+                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  "Tap “Add File” to secure your photos, videos, PDFs, and more.",
+                  t('lock_no_files_body'),
                   textAlign: TextAlign.center,
                   style: TextStyle(color: Colors.black.withValues(alpha:0.65), fontWeight: FontWeight.w500),
                 ),
@@ -719,14 +749,14 @@ class _UnlockedView extends StatelessWidget {
                   if (v == "restore") await onRestore(f);
                   if (v == "delete") await onDelete(f);
                 },
-                itemBuilder: (_) => const [
+                itemBuilder: (_) => [
                   PopupMenuItem(
                     value: "restore",
                     child: Row(
                       children: [
-                        Icon(Icons.restore_rounded),
-                        SizedBox(width: 10),
-                        Text("Restore"),
+                        const Icon(Icons.restore_rounded),
+                        const SizedBox(width: 10),
+                        Text(t('lock_restore')),
                       ],
                     ),
                   ),
@@ -734,9 +764,9 @@ class _UnlockedView extends StatelessWidget {
                     value: "delete",
                     child: Row(
                       children: [
-                        Icon(Icons.delete_outline_rounded),
-                        SizedBox(width: 10),
-                        Text("Delete from Vault"),
+                        const Icon(Icons.delete_outline_rounded),
+                        const SizedBox(width: 10),
+                        Text(t('lock_delete_from_vault')),
                       ],
                     ),
                   ),

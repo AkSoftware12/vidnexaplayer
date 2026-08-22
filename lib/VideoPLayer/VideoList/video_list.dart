@@ -6,6 +6,9 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path/path.dart' as path;
+import 'package:provider/provider.dart';
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../NotifyListeners/LanguageProvider/video_strings.dart';
 import '../../Utils/color.dart';
 import '../../Utils/video_thumb.dart';
 import '../../ads/app_open_ad_manager.dart';
@@ -36,6 +39,12 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
   final appOpenManager = AppOpenAdManager();
 
   bool _isGridView = false;
+
+  // Cached at the top of build() (context.watch) so language changes trigger
+  // a rebuild; also reused from callbacks (via _t) outside build() where
+  // `context.watch` cannot be called.
+  String _lang = 'en';
+  String _t(String key) => VideoStrings.t(_lang, key);
 
   List<AssetEntity> _photos = [];
   bool _isLoading = true;
@@ -104,13 +113,13 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
 
       if (!mounted) return true;
       messenger.showSnackBar(
-        const SnackBar(content: Text('🗑️ Video deleted successfully')),
+        SnackBar(content: Text(_t('video_delete_success'))),
       );
       return true;
     } catch (e) {
       if (!mounted) return false;
       messenger.showSnackBar(
-        SnackBar(content: Text('❌ Failed to delete video: $e')),
+        SnackBar(content: Text('${_t('video_delete_failed_prefix')} $e')),
       );
       return false;
     }
@@ -118,6 +127,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
 
   @override
   Widget build(BuildContext context) {
+    _lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -189,7 +199,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _photos.isEmpty
-              ? const Center(child: Text('No videos in this folder'))
+              ? Center(child: Text(_t('video_no_videos_in_folder')))
               : FadeTransition(
                   opacity: _fadeAnimation,
                   child: _isGridView ? _buildGridView() : _buildListView(),
@@ -215,7 +225,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             if (!mounted) return;
             if (file == null) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('❌ Unable to access video file')),
+                SnackBar(content: Text(_t('video_unable_access_file'))),
               );
               return;
             }
@@ -229,7 +239,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
               _shareVideo(context, file.path);
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('❌ Unable to access video file')),
+                SnackBar(content: Text(_t('video_unable_access_file'))),
               );
             }
           },
@@ -258,7 +268,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             if (!mounted) return;
             if (file == null) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('❌ Unable to access video file')),
+                SnackBar(content: Text(_t('video_unable_access_file'))),
               );
               return;
             }
@@ -277,7 +287,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
               _shareVideo(context, file.path);
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('❌ Unable to access video file')),
+                SnackBar(content: Text(_t('video_unable_access_file'))),
               );
             }
           },
@@ -295,8 +305,8 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
     if (!context.mounted) return;
     if (!permission.isAuth) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text("Permission denied"),
+        SnackBar(
+          content: Text(_t('video_permission_denied')),
           backgroundColor: Colors.red,
         ),
       );
@@ -311,21 +321,21 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             shape: RoundedRectangleBorder(
               borderRadius: BorderRadius.circular(12),
             ),
-            title: const Text("Delete Video"),
-            content: const Text("Are you sure you want to delete this video?"),
+            title: Text(_t('video_delete_dialog_title')),
+            content: Text(_t('video_delete_dialog_content')),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text(
-                  "Cancel",
-                  style: TextStyle(color: Colors.teal),
+                child: Text(
+                  _t('common_cancel'),
+                  style: const TextStyle(color: Colors.teal),
                 ),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text(
-                  "Delete",
-                  style: TextStyle(color: Colors.red),
+                child: Text(
+                  _t('common_delete'),
+                  style: const TextStyle(color: Colors.red),
                 ),
               ),
             ],
@@ -352,16 +362,16 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             if (!context.mounted) return;
             if (result.isNotEmpty) {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Video deleted from device"),
+                SnackBar(
+                  content: Text(_t('video_deleted_from_device')),
                   backgroundColor: Colors.green,
-                  duration: Duration(seconds: 2),
+                  duration: const Duration(seconds: 2),
                 ),
               );
             } else {
               ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text("Failed to delete video"),
+                SnackBar(
+                  content: Text(_t('video_delete_failed_generic')),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -370,7 +380,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             if (context.mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(
-                  content: Text("Error deleting video: $e"),
+                  content: Text('${_t('video_delete_error_prefix')} $e'),
                   backgroundColor: Colors.red,
                 ),
               );
@@ -392,7 +402,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
         // VideoFolderScreen itself instead of just showing the snackbar.
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ File not found')),
+          SnackBar(content: Text(_t('video_file_not_found'))),
         );
         return;
       }
@@ -417,7 +427,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
       debugPrint('Error sharing: $e\n$st');
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('❌ Failed to share video')),
+          SnackBar(content: Text(_t('video_share_failed'))),
         );
       }
     } finally {
@@ -444,7 +454,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
               Icon(Icons.video_file, color: ColorSelect.maineColor, size: 30),
               SizedBox(width: 8),
               Text(
-                'Video Info',
+                _t('video_info_title'),
                 style: TextStyle(
                   fontWeight: FontWeight.bold,
                   color: ColorSelect.maineColor,
@@ -460,9 +470,9 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
               }
 
               if (!snapshot.hasData || snapshot.data == null) {
-                return const Text(
-                  'File not found',
-                  style: TextStyle(color: Colors.red, fontSize: 12),
+                return Text(
+                  _t('video_info_file_not_found'),
+                  style: const TextStyle(color: Colors.red, fontSize: 12),
                 );
               }
 
@@ -475,17 +485,17 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildInfoRow('Name', photo.title ?? 'Unknown'),
+                  _buildInfoRow(_t('video_info_name'), photo.title ?? _t('video_info_unknown')),
                   SizedBox(height: 12),
-                  _buildInfoRow('Path', file.path),
+                  _buildInfoRow(_t('video_info_path'), file.path),
                   SizedBox(height: 12),
-                  _buildInfoRow('Size', '${size.toStringAsFixed(2)} MB'),
+                  _buildInfoRow(_t('video_info_size'), '${size.toStringAsFixed(2)} MB'),
                   SizedBox(height: 12),
-                  _buildInfoRow('Duration', durationText),
+                  _buildInfoRow(_t('video_info_duration'), durationText),
                   SizedBox(height: 12),
                   _buildInfoRow(
                     // `createDateTime` is non-nullable — the `?.`/`??` never fired.
-                    'Last Modified',
+                    _t('video_info_last_modified'),
                     photo.createDateTime.toString().split('.').first,
                   ),
                 ],
@@ -505,7 +515,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
-                  'OK',
+                  _t('common_ok'),
                   style: TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
@@ -567,6 +577,8 @@ class PhotoTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => VideoStrings.t(lang, key);
     return GestureDetector(
       onTap: () {
         appOpenManager.showInterstitialIfAllowed(
@@ -647,7 +659,7 @@ class PhotoTile extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      photo.title ?? 'Untitled',
+                      photo.title ?? t('video_untitled'),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
                       style: GoogleFonts.poppins(
@@ -672,13 +684,13 @@ class PhotoTile extends StatelessWidget {
                       MediaQuery.of(context).size.height,
                     ),
                     items: [
-                      _buildMenuItem(Icons.play_circle, "Play", Colors.blue),
-                      _buildMenuItem(Icons.delete, "Delete", Colors.red),
-                      _buildMenuItem(Icons.info, "Info", Colors.teal),
-                      _buildMenuItem(Icons.share, "Share", Colors.black54),
+                      _buildMenuItem(Icons.play_circle, "play", t('common_play'), Colors.blue),
+                      _buildMenuItem(Icons.delete, "delete", t('common_delete'), Colors.red),
+                      _buildMenuItem(Icons.info, "info", t('common_info'), Colors.teal),
+                      _buildMenuItem(Icons.share, "share", t('common_share'), Colors.black54),
                     ],
                   ).then((value) async {
-                    if (value == "Play") {
+                    if (value == "play") {
                       appOpenManager.showInterstitialIfAllowed(
                         onContinue: () {
                           FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
@@ -695,11 +707,11 @@ class PhotoTile extends StatelessWidget {
                         },
                       );
 
-                    } else if (value == "Delete") {
+                    } else if (value == "delete") {
                       onDelete();
-                    } else if (value == "Info") {
+                    } else if (value == "info") {
                       onInfo();
-                    } else if (value == "Share") {
+                    } else if (value == "share") {
                       onShare();
 
                     }
@@ -723,16 +735,17 @@ class PhotoTile extends StatelessWidget {
 
   PopupMenuItem<String> _buildMenuItem(
     IconData icon,
-    String text,
+    String value,
+    String label,
     Color color,
   ) {
     return PopupMenuItem(
-      value: text,
+      value: value,
       child: Row(
         children: [
           Icon(icon, color: color, size: 20.sp),
           SizedBox(width: 8),
-          Text(text, style: GoogleFonts.poppins(fontSize: 12.sp)),
+          Text(label, style: GoogleFonts.poppins(fontSize: 12.sp)),
         ],
       ),
     );
@@ -827,6 +840,7 @@ class _PhotoTileFileInfoState extends State<_PhotoTileFileInfo> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     final sizeMB = _sizeMB ?? 0;
     final duration = widget.photo.videoDuration;
 
@@ -836,7 +850,7 @@ class _PhotoTileFileInfoState extends State<_PhotoTileFileInfo> {
         Text(
           !_resolved
               ? ''
-              : (sizeMB > 0 ? '${sizeMB.toStringAsFixed(2)} MB' : 'File missing'),
+              : (sizeMB > 0 ? '${sizeMB.toStringAsFixed(2)} MB' : VideoStrings.t(lang, 'video_file_missing')),
           style: GoogleFonts.poppins(
             fontSize: 10.sp,
             color: sizeMB > 0 ? Colors.grey[600] : Colors.redAccent,
@@ -876,6 +890,8 @@ class GridviewList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => VideoStrings.t(lang, key);
     return GestureDetector(
       onTap: () {
         appOpenManager.showInterstitialIfAllowed(
@@ -964,7 +980,7 @@ class GridviewList extends StatelessWidget {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            photo.title ?? 'Untitled',
+                            photo.title ?? t('video_untitled'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
@@ -988,13 +1004,13 @@ class GridviewList extends StatelessWidget {
                           MediaQuery.of(context).size.height,
                         ),
                         items: [
-                          _buildMenuItem(Icons.play_circle, "Play", Colors.blue),
-                          _buildMenuItem(Icons.delete, "Delete", Colors.red),
-                          _buildMenuItem(Icons.info, "Info", Colors.teal),
-                          _buildMenuItem(Icons.share, "Share", Colors.black54),
+                          _buildMenuItem(Icons.play_circle, "play", t('common_play'), Colors.blue),
+                          _buildMenuItem(Icons.delete, "delete", t('common_delete'), Colors.red),
+                          _buildMenuItem(Icons.info, "info", t('common_info'), Colors.teal),
+                          _buildMenuItem(Icons.share, "share", t('common_share'), Colors.black54),
                         ],
                       ).then((value) async {
-                        if (value == "Play") {
+                        if (value == "play") {
                           appOpenManager.showInterstitialIfAllowed(
                             onContinue: () {
                               FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
@@ -1010,11 +1026,11 @@ class GridviewList extends StatelessWidget {
                               );
                             },
                           );
-                        } else if (value == "Delete") {
+                        } else if (value == "delete") {
                           onDelete();
-                        } else if (value == "Info") {
+                        } else if (value == "info") {
                           onInfo();
-                        } else if (value == "Share") {
+                        } else if (value == "share") {
                           onShare();
                         }
                       });
@@ -1039,14 +1055,14 @@ class GridviewList extends StatelessWidget {
   }
 
   PopupMenuItem<String> _buildMenuItem(
-      IconData icon, String text, Color color) {
+      IconData icon, String value, String label, Color color) {
     return PopupMenuItem(
-      value: text,
+      value: value,
       child: Row(
         children: [
           Icon(icon, color: color, size: 20.sp),
           SizedBox(width: 8),
-          Text(text, style: GoogleFonts.poppins(fontSize: 12.sp)),
+          Text(label, style: GoogleFonts.poppins(fontSize: 12.sp)),
         ],
       ),
     );

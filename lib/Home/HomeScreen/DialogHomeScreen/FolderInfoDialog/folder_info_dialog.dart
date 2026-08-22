@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:provider/provider.dart';
+import '../../../../NotifyListeners/LanguageProvider/home_strings.dart';
+import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 
 class FolderInfoDialog {
   static void show(
@@ -11,6 +14,7 @@ class FolderInfoDialog {
         required String modifiedDate,
         required final AssetPathEntity videos,
       }) {
+    final lang = context.read<LocaleProvider>().locale.languageCode;
     showDialog(
       context: context,
       builder: (BuildContext context) {
@@ -23,9 +27,9 @@ class FolderInfoDialog {
             children: [
               const Icon(Icons.folder, color: Colors.blue, size: 30),
               const SizedBox(width: 8),
-              const Text(
-                'Folder Info',
-                style: TextStyle(
+              Text(
+                HomeStrings.t(lang, 'folder_info_title'),
+                style: const TextStyle(
                   fontWeight: FontWeight.bold,
                   color: Colors.blue,
                 ),
@@ -36,13 +40,13 @@ class FolderInfoDialog {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildInfoRow('Folder Name', folderName),
+              _buildInfoRow(HomeStrings.t(lang, 'folder_info_name_label'), folderName),
               SizedBox(height: 12.h),
-              _buildInfoRow('Size', size),
+              _buildInfoRow(HomeStrings.t(lang, 'folder_info_size_label'), size),
               SizedBox(height: 12.h),
-              _buildInfoRow('Location', location),
+              _buildInfoRow(HomeStrings.t(lang, 'folder_info_location_label'), location),
               SizedBox(height: 12.h),
-              _buildInfoRow('Modified Date', modifiedDate),
+              _buildInfoRow(HomeStrings.t(lang, 'folder_info_modified_label'), modifiedDate),
             ],
           ),
           actions: [
@@ -55,9 +59,9 @@ class FolderInfoDialog {
                   color: Colors.blue,
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
-                  'OK',
-                  style: TextStyle(
+                child: Text(
+                  HomeStrings.t(lang, 'folder_info_ok'),
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),

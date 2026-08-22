@@ -2,6 +2,10 @@ import 'dart:async';
 
 import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../NotifyListeners/LanguageProvider/misc_strings.dart';
 
 /// Slim red banner that slides up from the bottom when the device loses
 /// internet connectivity and slides away again once it's back — non-blocking,
@@ -39,6 +43,7 @@ class _InternetStatusBannerState extends State<InternetStatusBanner> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return IgnorePointer(
       ignoring: !_isOffline,
       child: AnimatedSlide(
@@ -56,12 +61,12 @@ class _InternetStatusBannerState extends State<InternetStatusBanner> {
                 padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
-                    Icon(Icons.wifi_off_rounded, color: Colors.white, size: 16),
-                    SizedBox(width: 8),
+                  children: [
+                    const Icon(Icons.wifi_off_rounded, color: Colors.white, size: 16),
+                    const SizedBox(width: 8),
                     Text(
-                      'No internet connection',
-                      style: TextStyle(
+                      MiscStrings.t(lang, 'internet_banner_offline'),
+                      style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,

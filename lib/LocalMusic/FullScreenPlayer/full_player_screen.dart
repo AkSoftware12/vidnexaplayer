@@ -7,9 +7,12 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:provider/provider.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../NotifyListeners/LanguageProvider/music_strings.dart';
 import '../../TextScroll/text_scroll.dart';
 import '../../Utils/color.dart';
 import '../../Utils/common.dart';
@@ -90,6 +93,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
   @override
   Widget build(BuildContext context) {
     final audio = GlobalAudioController();
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return StreamBuilder<MediaItem?>(
       stream: audio.handler.mediaItem,
@@ -235,7 +239,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                   ),
                 ),
                 Text(
-                  mediaItem.artist ?? "Unknown Artist",
+                  mediaItem.artist ?? MusicStrings.t(lang, 'music_unknown_artist'),
                   style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
                   textAlign: TextAlign.center,
                 ),
@@ -292,7 +296,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                         onTap: () async {
                           showSliderDialog(
                             context: context,
-                            title: "Adjust volume",
+                            title: MusicStrings.t(lang, 'music_adjust_volume'),
                             divisions: 10,
                             min: 0.0,
                             max: 1.0,
@@ -471,6 +475,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
   // ---------------- Sleep Timer Sheet ----------------
   void _openSleepTimerSheet(BuildContext context, GlobalAudioController audio) {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
@@ -493,15 +498,15 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                   borderRadius: BorderRadius.circular(10),
                 ),
               ),
-              const Text(
-                "Sleep Timer",
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+              Text(
+                MusicStrings.t(lang, 'music_sleep_timer'),
+                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
               ),
               const SizedBox(height: 12),
 
               ListTile(
                 leading: const Icon(Icons.timer_off, color: Colors.white70),
-                title: Text("Turn Off", style: GoogleFonts.poppins(color: Colors.white)),
+                title: Text(MusicStrings.t(lang, 'music_turn_off'), style: GoogleFonts.poppins(color: Colors.white)),
                 onTap: () async {
                   setState(() => selectedTimer = null);
                   await audio.cancelSleepTimer();
@@ -533,7 +538,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                         Icon(Icons.timer, color: isSelected ? Colors.blue : Colors.white70),
                         const SizedBox(width: 12),
                         Text(
-                          "$minutes minutes",
+                          "$minutes ${MusicStrings.t(lang, 'music_minutes_suffix')}",
                           style: TextStyle(
                             color: isSelected ? Colors.blue : Colors.white,
                             fontSize: 15,
@@ -551,7 +556,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
               const SizedBox(height: 8),
               TextButton(
                 onPressed: () => Navigator.pop(context),
-                child: const Text("Close", style: TextStyle(color: Colors.white70)),
+                child: Text(MusicStrings.t(lang, 'music_close'), style: const TextStyle(color: Colors.white70)),
               ),
             ],
           ),
@@ -562,6 +567,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
   // ---------------- Queue Sheet ----------------
   void _openQueue(BuildContext context, GlobalAudioController audio) {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -603,7 +609,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                       /// 🔹 Header
                       Text(
-                        "Now Playing Queue",
+                        MusicStrings.t(lang, 'music_now_playing_queue'),
                         style: GoogleFonts.poppins(
                           color: Colors.white,
                           fontSize: 16,
@@ -710,7 +716,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                           const SizedBox(height: 2),
                                           Text(
                                             item.artist ??
-                                                "Unknown Artist",
+                                                MusicStrings.t(lang, 'music_unknown_artist'),
                                             maxLines: 1,
                                             overflow:
                                             TextOverflow.ellipsis,
@@ -782,6 +788,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
       bool isPlaying,
       int index,
       ) {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -849,7 +856,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           ),
                           const SizedBox(height: 2),
                           Text(
-                            song.artist ?? "Unknown Artist",
+                            song.artist ?? MusicStrings.t(lang, 'music_unknown_artist'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: GoogleFonts.poppins(
@@ -871,7 +878,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           ),
                         ),
                         child: Text(
-                          "PLAYING",
+                          MusicStrings.t(lang, 'music_playing_badge'),
                           style: GoogleFonts.poppins(
                             color: const Color(0xFF2EDFB4),
                             fontSize: 10,
@@ -890,8 +897,12 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                 /// options
                 _premiumOptionTile(
                   icon: isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                  title: isPlaying ? "Pause" : "Play",
-                  subtitle: isPlaying ? "Pause current song" : "Play this song now",
+                  title: isPlaying
+                      ? MusicStrings.t(lang, 'music_pause')
+                      : MusicStrings.t(lang, 'music_play'),
+                  subtitle: isPlaying
+                      ? MusicStrings.t(lang, 'music_pause_current_song')
+                      : MusicStrings.t(lang, 'music_play_this_song_now'),
                   color: const Color(0xFF2EDFB4),
                   onTap: () async {
                     if (isPlaying) {
@@ -907,8 +918,8 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                 _premiumOptionTile(
                   icon: Icons.share_rounded,
-                  title: "Share",
-                  subtitle: "Share audio file or song details",
+                  title: MusicStrings.t(lang, 'music_share'),
+                  subtitle: MusicStrings.t(lang, 'music_share_subtitle'),
                   onTap: () async {
                     try {
                       final String filePath =
@@ -945,8 +956,8 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                 _premiumOptionTile(
                   icon: Icons.info_outline_rounded,
-                  title: "Song Info",
-                  subtitle: "View details",
+                  title: MusicStrings.t(lang, 'music_song_info'),
+                  subtitle: MusicStrings.t(lang, 'music_view_details'),
                   onTap: () {
                     Navigator.pop(context);
                     _showSongInfo(context, song);
@@ -955,8 +966,8 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
                 _premiumOptionTile(
                   icon: Icons.delete_outline_rounded,
-                  title: "Delete",
-                  subtitle: "Remove from device",
+                  title: MusicStrings.t(lang, 'music_delete'),
+                  subtitle: MusicStrings.t(lang, 'music_remove_from_device'),
                   color: Colors.redAccent,
                   onTap: () async {
                     Navigator.pop(context);
@@ -1043,6 +1054,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
       MediaItem song,
       int index,
       ) async {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) {
@@ -1050,21 +1062,21 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
           backgroundColor: const Color(0xFF151515),
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           title: Text(
-            "Delete song?",
+            MusicStrings.t(lang, 'music_delete_song_confirm_title'),
             style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
           ),
           content: Text(
-            "This will remove the audio file from your device.",
+            MusicStrings.t(lang, 'music_delete_song_confirm_content'),
             style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: Text("Cancel", style: GoogleFonts.poppins(color: Colors.white70)),
+              child: Text(MusicStrings.t(lang, 'music_cancel'), style: GoogleFonts.poppins(color: Colors.white70)),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: Text("Delete", style: GoogleFonts.poppins(color: Colors.redAccent)),
+              child: Text(MusicStrings.t(lang, 'music_delete'), style: GoogleFonts.poppins(color: Colors.redAccent)),
             ),
           ],
         );
@@ -1102,7 +1114,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Deleted: ${song.title}", style: GoogleFonts.poppins()),
+            content: Text(
+                "${MusicStrings.t(lang, 'music_deleted_prefix')}${song.title}",
+                style: GoogleFonts.poppins()),
             backgroundColor: const Color(0xFF1E1E1E),
           ),
         );
@@ -1111,7 +1125,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text("Delete failed", style: GoogleFonts.poppins()),
+            content: Text(MusicStrings.t(lang, 'music_delete_failed'), style: GoogleFonts.poppins()),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -1123,6 +1137,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
 
   void _showSongInfo(BuildContext context, MediaItem song) {
+    final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
     showDialog(
       context: context,
       barrierColor: Colors.black.withValues(alpha:0.6),
@@ -1152,9 +1167,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                   const Icon(Icons.music_note_rounded,
                       color: Colors.white, size: 26),
                   const SizedBox(width: 10),
-                  const Text(
-                    "Song Information",
-                    style: TextStyle(
+                  Text(
+                    MusicStrings.t(lang, 'music_song_information'),
+                    style: const TextStyle(
                       color: Colors.white,
                       fontSize: 18,
                       fontWeight: FontWeight.w600,
@@ -1201,7 +1216,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          song.artist ?? "Unknown Artist",
+                          song.artist ?? MusicStrings.t(lang, 'music_unknown_artist'),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
@@ -1219,9 +1234,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
               const Divider(color: Colors.white12),
 
               /// Info Rows
-              _infoRow("Duration", _formatDuration(song.duration)),
-              _infoRow("Album", song.album ?? "Unknown"),
-              _infoRow("ID", song.id),
+              _infoRow(MusicStrings.t(lang, 'music_duration_label'), _formatDuration(song.duration)),
+              _infoRow(MusicStrings.t(lang, 'music_album_tag'), song.album ?? MusicStrings.t(lang, 'music_unknown')),
+              _infoRow(MusicStrings.t(lang, 'music_id_label'), song.id),
 
               const SizedBox(height: 16),
 
@@ -1237,9 +1252,9 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                     ),
                   ),
                   onPressed: () => Navigator.pop(context),
-                  child: const Text(
-                    "Close",
-                    style: TextStyle(color: Colors.white),
+                  child: Text(
+                    MusicStrings.t(lang, 'music_close'),
+                    style: const TextStyle(color: Colors.white),
                   ),
                 ),
               )

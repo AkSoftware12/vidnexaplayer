@@ -1,9 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
 
 import '../ads/app_open_ad_manager.dart';
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../NotifyListeners/LanguageProvider/misc_strings.dart';
 
 
 class NotificationScreen extends StatefulWidget {
@@ -19,11 +22,12 @@ class _NotificationScreenState extends State<NotificationScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         backgroundColor: Colors.grey[100],
-        title: Text('Notifications',
+        title: Text(MiscStrings.t(lang, 'notification_title'),
           style: GoogleFonts.openSans(
           textStyle: TextStyle(
             color: Colors.black,
@@ -52,14 +56,14 @@ class _NotificationScreenState extends State<NotificationScreen> {
             ),
             SizedBox(height: 20),
             Text(
-              'No Notifications Yet',
+              MiscStrings.t(lang, 'notification_empty_title'),
               style: TextStyle(fontSize: 20.sp, fontWeight: FontWeight.bold),
             ),
             SizedBox(height: 10),
             Padding(
               padding: const EdgeInsets.all(8.0),
               child: Text(
-                "You're all caught up! We'll notify you when there's something new",
+                MiscStrings.t(lang, 'notification_empty_subtitle'),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontSize: 14.sp, color: Colors.grey[600]),
               ),
@@ -78,7 +82,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                 padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
               ),
               child: Text(
-                'Go Back',
+                MiscStrings.t(lang, 'go_back'),
                 style: GoogleFonts.openSans(
                   textStyle: TextStyle(
                     color: Colors.white,

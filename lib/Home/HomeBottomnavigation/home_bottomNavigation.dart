@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
@@ -17,10 +18,15 @@ import 'package:videoplayer/Utils/color.dart';
 import 'package:videoplayer/Utils/internet_banner.dart';
 import 'package:videoplayer/Utils/rating_popup.dart';
 import '../../DeviceSpace/device_space.dart';
+import '../../features/voice_search/presentation/pages/voice_search_page.dart';
+import '../../features/voice_search/presentation/services/video_index_service.dart';
 import '../../LocalMusic/MiniPlayer/mini_player.dart';
 import '../../NetWork Stream/stream_video.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
+import '../../NotifyListeners/LanguageProvider/app_strings.dart';
+import '../../NotifyListeners/LanguageProvider/language_picker_sheet.dart';
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
 import '../../SplashScreen/splash_screen.dart';
 import '../../StatusSaverScreen/whatsapp_download.dart';
@@ -125,6 +131,11 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       if (!mounted) return;
       Provider.of<AppBarColorProvider>(context, listen: false).loadColor();
     });
+
+    // Fire-and-forget: builds/refreshes the local voice-search video index in
+    // the background. Never blocks the first frame, never throws — see
+    // VideoIndexService.ensureIndexed for the throttling/diffing logic.
+    unawaited(VideoIndexService.instance.ensureIndexed());
   }
 
   @override
@@ -461,6 +472,41 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
 
               Row(
                 children: [
+                  // 🎤 Voice search — offline local video search by spoken
+                  // command (Hindi/Hinglish/English). See features/voice_search.
+                  GestureDetector(
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const VoiceSearchPage(),
+                        ),
+                      );
+                    },
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: const Icon(Icons.mic_none_rounded, color: Colors.black),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+
+                  // 🌐 Language — quick access to the same picker as the drawer.
+                  GestureDetector(
+                    onTap: () => showLanguagePickerSheet(context),
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.grey.shade100,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: const Icon(Icons.language_rounded, color: Colors.black),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
                   Stack(
                     children: [
                       GestureDetector(
@@ -610,6 +656,8 @@ class CustomBottomBarState extends State<CustomBottomBar> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
     return BottomNavigationBar(
       currentIndex: _currentIndex,
       onTap: (index) {
@@ -640,7 +688,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
       items: [
         BottomNavigationBarItem(
           icon: SvgPicture.asset('assets/home.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
-          label: 'Home',
+          label: AppStrings.t(lang, 'nav_home'),
 
           activeIcon: Container(
             padding: EdgeInsets.all(5.sp),
@@ -681,7 +729,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
 
         BottomNavigationBarItem(
           icon: SvgPicture.asset('assets/music.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
-          label: 'Music',
+          label: AppStrings.t(lang, 'nav_music'),
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
             decoration: BoxDecoration(
@@ -698,7 +746,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
         ),
         BottomNavigationBarItem(
           icon: SvgPicture.asset('assets/online_video.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
-          label: 'Online',
+          label: AppStrings.t(lang, 'nav_online'),
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
             decoration: BoxDecoration(
@@ -716,7 +764,7 @@ class CustomBottomBarState extends State<CustomBottomBar> {
         ),
         BottomNavigationBarItem(
           icon: SvgPicture.asset('assets/account.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
-          label: 'Profile',
+          label: AppStrings.t(lang, 'nav_profile'),
           activeIcon: Container(
             padding: EdgeInsets.all(3.sp),
             decoration: BoxDecoration(
@@ -769,6 +817,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   @override
   Widget build(BuildContext context) {
     final userModel = Provider.of<UserModel>(context);
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => AppStrings.t(lang, key);
 
     return Scaffold(
       backgroundColor: isNightMode ? const Color(0xff0F172A) : const Color(0xffF6F8FC),
@@ -783,15 +833,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildProfileCard(context, userModel),
                   SizedBox(height: 12.h),
 
-                  _buildSectionTitle("Main Features"),
+                  _buildSectionTitle(t('drawer_main_features')),
                   SizedBox(height: 6.h),
 
                   _buildSettingsTile(
                     context,
                     icon: Icons.dashboard_customize_rounded,
                     iconBg: const Color(0xff7C3AED),
-                    title: 'Dashboard',
-                    subtitle: 'Track Performance',
+                    title: t('drawer_dashboard'),
+                    subtitle: t('drawer_dashboard_sub'),
                     onTap: () {
                       Navigator.of(context).pop();
                     },
@@ -806,8 +856,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: Colors.white,
                     ),
                     iconBg: const Color(0xffB45309),
-                    title: 'All Photos',
-                    subtitle: 'Captured Bliss',
+                    title: t('drawer_all_photos'),
+                    subtitle: t('drawer_all_photos_sub'),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -827,8 +877,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: Colors.white,
                     ),
                     iconBg: const Color(0xff9333EA),
-                    title: 'All Musics',
-                    subtitle: 'Melodic Echoes',
+                    title: t('drawer_all_musics'),
+                    subtitle: t('drawer_all_musics_sub'),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -850,8 +900,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: Colors.white,
                     ),
                     iconBg: const Color(0xff2563EB),
-                    title: 'VidStream',
-                    subtitle: 'Instant Video, One Click Away',
+                    title: t('drawer_vidstream'),
+                    subtitle: t('drawer_vidstream_sub'),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -871,8 +921,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       color: Colors.white,
                     ),
                     iconBg: const Color(0xff0F766E),
-                    title: 'File Manager',
-                    subtitle: 'All Files, Anywhere, Anytime',
+                    title: t('drawer_file_manager'),
+                    subtitle: t('drawer_file_manager_sub'),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -887,8 +937,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     icon: Icons.download_for_offline_rounded,
                     iconBg: const Color(0xff16A34A),
-                    title: 'Status Saver',
-                    subtitle: 'Save videos and images easily',
+                    title: t('drawer_status_saver'),
+                    subtitle: t('drawer_status_saver_sub'),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -900,15 +950,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   ),
 
                   SizedBox(height: 12.h),
-                  _buildSectionTitle("Preferences"),
+                  _buildSectionTitle(t('drawer_preferences')),
                   SizedBox(height: 6.h),
 
                   _buildSwitchTile(
                     context,
                     icon: Icons.dark_mode_rounded,
                     iconBg: const Color(0xff111827),
-                    title: 'Night Mode',
-                    subtitle: 'Comfortable viewing at night',
+                    title: t('drawer_night_mode'),
+                    subtitle: t('drawer_night_mode_sub'),
                     value: isNightMode,
                     onChanged: (val) {
                       setState(() {
@@ -921,23 +971,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     icon: Icons.color_lens_rounded,
                     iconBg: const Color(0xffF59E0B),
-                    title: 'Theme',
-                    subtitle: 'Choose app appearance',
+                    title: t('drawer_theme'),
+                    subtitle: t('drawer_theme_sub'),
                     onTap: () {
                       _showThemeBottomSheet(context);
                     },
                   ),
 
+                  _buildSettingsTile(
+                    context,
+                    icon: Icons.language_rounded,
+                    iconBg: const Color(0xff0891B2),
+                    title: t('drawer_language'),
+                    subtitle: t('drawer_language_sub'),
+                    onTap: () {
+                      showLanguagePickerSheet(context, isDark: isNightMode);
+                    },
+                  ),
+
                   SizedBox(height: 12.h),
-                  _buildSectionTitle("Support & More"),
+                  _buildSectionTitle(t('drawer_support_more')),
                   SizedBox(height: 6.h),
 
                   _buildSettingsTile(
                     context,
                     icon: Icons.notifications_none_rounded,
                     iconBg: const Color(0xffEC4899),
-                    title: 'Notifications',
-                    subtitle: 'Stay Updated, Never Miss Out',
+                    title: t('drawer_notifications'),
+                    subtitle: t('drawer_notifications_sub'),
                     onTap: () {
                       Navigator.push(
                         context,
@@ -960,8 +1021,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       height: 15.w,
                     ),
                     iconBg: const Color(0xff334155),
-                    title: 'Privacy',
-                    subtitle: 'Privacy & security',
+                    title: t('drawer_privacy'),
+                    subtitle: t('drawer_privacy_sub'),
                     onTap: () async {
                       final Uri url = Uri.parse(
                         'https://www.freeprivacypolicy.com/live/3a47e749-0364-44f5-8cc3-559f2cd90336',
@@ -976,8 +1037,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     icon: Icons.star_rate_rounded,
                     iconBg: const Color(0xffF97316),
-                    title: 'Rate Us',
-                    subtitle: 'Rate app on Play Store',
+                    title: t('drawer_rate_us'),
+                    subtitle: t('drawer_rate_us_sub'),
                     onTap: () async {
                       final Uri url = Uri.parse(
                         'https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer',
@@ -992,8 +1053,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     icon: Icons.support_agent_rounded,
                     iconBg: const Color(0xff0EA5E9),
-                    title: 'Help & Support',
-                    subtitle: 'Get help when you need it',
+                    title: t('drawer_help_support'),
+                    subtitle: t('drawer_help_support_sub'),
                     onTap: () async {
                       final Uri emailLaunchUri = Uri(
                         scheme: 'mailto',
@@ -1008,8 +1069,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     icon: Icons.feedback_rounded,
                     iconBg: const Color(0xff8B5CF6),
-                    title: 'Feedback',
-                    subtitle: 'Share your thoughts with us',
+                    title: t('drawer_feedback'),
+                    subtitle: t('drawer_feedback_sub'),
                     onTap: () async {
                       final Uri emailLaunchUri = Uri(
                         scheme: 'mailto',
@@ -1024,8 +1085,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     context,
                     icon: Icons.share_rounded,
                     iconBg: const Color(0xff0284C7),
-                    title: 'Share App',
-                    subtitle: 'Invite your friends',
+                    title: t('drawer_share_app'),
+                    subtitle: t('drawer_share_app_sub'),
                     onTap: () {
                       SharePlus.instance.share(
                         ShareParams(
@@ -1450,4 +1511,5 @@ class _SettingsScreenState extends State<SettingsScreen> {
       },
     );
   }
+
 }

@@ -5,7 +5,10 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hive_flutter/hive_flutter.dart';
+import 'package:provider/provider.dart';
 
+import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../NotifyListeners/LanguageProvider/video_strings.dart';
 import '../../Utils/color.dart';
 
 /// ✅ Playlist videos screen with Hive cache (per playlist 24 hours me 1 bar API hit)
@@ -155,6 +158,7 @@ class _YouTubePlaylistVideosState extends State<YouTubePlaylistVideos> {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       appBar: AppBar(
         iconTheme:  IconThemeData(color: Colors.white),
@@ -228,9 +232,9 @@ class _YouTubePlaylistVideosState extends State<YouTubePlaylistVideos> {
                     color: Colors.blue,
                   ),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Loading videos...',
-                    style: TextStyle(color: Colors.grey),
+                  Text(
+                    VideoStrings.t(lang, 'yt_loading_videos'),
+                    style: const TextStyle(color: Colors.grey),
                   ),
                 ],
               ),
@@ -239,12 +243,12 @@ class _YouTubePlaylistVideosState extends State<YouTubePlaylistVideos> {
         )
             : (videos.isEmpty
             ? ListView(
-          children: const [
-            SizedBox(height: 220),
+          children: [
+            const SizedBox(height: 220),
             Center(
               child: Text(
-                "No videos found",
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
+                VideoStrings.t(lang, 'yt_no_videos_found'),
+                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600),
               ),
             ),
           ],

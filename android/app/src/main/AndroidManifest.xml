@@ -10,6 +10,9 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
+    <!-- Voice command video search: only used while the mic button is actively
+         listening, requested at runtime via permission_handler. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO"/>
 
     <!-- Legacy storage: only needed up to Android 12 (API 32). From API 33 the
          granular READ_MEDIA_* permissions below take over. -->
@@ -100,6 +103,16 @@
                 <category android:name="android.intent.category.BROWSABLE" />
                 <data android:scheme="content" android:mimeType="video/*" />
                 <data android:scheme="file" android:mimeType="video/*" />
+            </intent-filter>
+
+            <!-- Open local audio files: same "Open with" flow as video, since
+                 the player (media_kit) plays audio-only sources just fine. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="content" android:mimeType="audio/*" />
+                <data android:scheme="file" android:mimeType="audio/*" />
             </intent-filter>
 
             <!-- Open network streams -->

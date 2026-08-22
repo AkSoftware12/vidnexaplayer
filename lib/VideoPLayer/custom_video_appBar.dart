@@ -2,6 +2,10 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:provider/provider.dart';
+
+import '../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../NotifyListeners/LanguageProvider/video_strings.dart';
 
 class CustomVideoAppBar extends StatelessWidget {
   final String title;
@@ -25,6 +29,8 @@ class CustomVideoAppBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => VideoStrings.t(lang, key);
     final barH = isLandscape ? 46.h : 45.h;
 
     return ClipRRect(
@@ -52,7 +58,7 @@ class CustomVideoAppBar extends StatelessWidget {
               children: [
                 _glassIcon(
                   icon: Icons.arrow_back_rounded,
-                  tooltip: "Back",
+                  tooltip: t('appbar_tooltip_back'),
                   onTap: onBackPressed,
                   size: isLandscape ? 34 : 40,
                 ),
@@ -75,7 +81,7 @@ class CustomVideoAppBar extends StatelessWidget {
                       ),
                       SizedBox(height: 2.h),
                       Text(
-                        "${currentIndex + 1}/${videos.length} • Playlist",
+                        "${currentIndex + 1}/${videos.length} • ${t('appbar_playlist_suffix')}",
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: TextStyle(
@@ -90,14 +96,14 @@ class CustomVideoAppBar extends StatelessWidget {
                 SizedBox(width: 10.w),
                 _glassIcon(
                   icon: Icons.playlist_play_rounded,
-                  tooltip: "Playlist",
+                  tooltip: t('appbar_tooltip_playlist'),
                   onTap: () => _showVideoList(context),
                   size: isLandscape ? 34 : 40,
                 ),
                 SizedBox(width: 10.w),
                 _glassIcon(
                   icon: Icons.more_vert,
-                  tooltip: "All Item",
+                  tooltip: t('appbar_tooltip_all_item'),
                   onTap:onBackPressedMore,
                   size: isLandscape ? 34 : 40,
                 ),
@@ -245,6 +251,8 @@ class _PlaylistPanelState extends State<_PlaylistPanel> {
   @override
   Widget build(BuildContext context) {
     final media = MediaQuery.of(context);
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => VideoStrings.t(lang, key);
 
     final topPad = media.padding.top;
     final bottomPad = media.padding.bottom;
@@ -320,9 +328,9 @@ class _PlaylistPanelState extends State<_PlaylistPanel> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            const Text(
-                              "Playlist",
-                              style: TextStyle(
+                            Text(
+                              t('playlist_panel_title'),
+                              style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
@@ -331,7 +339,7 @@ class _PlaylistPanelState extends State<_PlaylistPanel> {
                             ),
                             SizedBox(height: 2.h),
                             Text(
-                              "${playingIndex + 1}/${widget.videos.length} playing", // ✅ updated
+                              "${playingIndex + 1}/${widget.videos.length} ${t('playlist_panel_playing_suffix')}", // ✅ updated
                               style: TextStyle(
                                 color: Colors.white.withValues(alpha:0.6),
                                 fontSize: 11,
@@ -422,6 +430,7 @@ class _PlaylistTileNoThumb extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
       curve: Curves.easeOutCubic,
@@ -514,9 +523,9 @@ class _PlaylistTileNoThumb extends StatelessWidget {
                     ),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Text(
-                    "PLAYING",
-                    style: TextStyle(
+                  child: Text(
+                    VideoStrings.t(lang, 'playlist_tile_playing_badge'),
+                    style: const TextStyle(
                       color: Colors.black,
                       fontSize: 10,
                       fontWeight: FontWeight.w900,

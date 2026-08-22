@@ -1,5 +1,9 @@
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../../NotifyListeners/LanguageProvider/video_strings.dart';
 
 class FilterPopup {
   static void show(
@@ -10,6 +14,9 @@ class FilterPopup {
     final media = MediaQuery.of(context);
     final bool isLandscape =
         media.orientation == Orientation.landscape;
+    final lang =
+        Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+    String t(String key) => VideoStrings.t(lang, key);
 
     showGeneralDialog(
       context: context,
@@ -51,9 +58,9 @@ class FilterPopup {
                       /// 🔥 TITLE + CLOSE
                       Row(
                         children: [
-                          const Expanded(
+                          Expanded(
                             child: Text(
-                              "HDR",
+                              t('hdr_dialog_title'),
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 color: Colors.red,
@@ -86,7 +93,7 @@ class FilterPopup {
                             children: [
                               _radioTile(
                                 context,
-                                title: "Normal",
+                                title: t('hdr_filter_normal'),
                                 color: Colors.white,
                                 value: "normal",
                                 groupValue: selectedKey,
@@ -94,7 +101,7 @@ class FilterPopup {
                               ),
                               _radioTile(
                                 context,
-                                title: "Dark",
+                                title: t('hdr_filter_dark'),
                                 color: Colors.black87,
                                 value: "dark",
                                 groupValue: selectedKey,
@@ -102,7 +109,7 @@ class FilterPopup {
                               ),
                               _radioTile(
                                 context,
-                                title: "Blue",
+                                title: t('hdr_filter_blue'),
                                 color: Color(0xFF3F51FF),
                                 value: "blue",
                                 groupValue: selectedKey,
@@ -110,7 +117,7 @@ class FilterPopup {
                               ),
                               _radioTile(
                                 context,
-                                title: "Warm HDR",
+                                title: t('hdr_filter_warm'),
                                 color: Colors.orangeAccent,
                                 value: "warm",
                                 groupValue: selectedKey,
@@ -118,7 +125,7 @@ class FilterPopup {
                               ),
                               _radioTile(
                                 context,
-                                title: "Sepia",
+                                title: t('hdr_filter_sepia'),
                                 color: Colors.redAccent,
                                 value: "sepia",
                                 groupValue: selectedKey,
@@ -126,7 +133,7 @@ class FilterPopup {
                               ),
                               _radioTile(
                                 context,
-                                title: "Neon",
+                                title: t('hdr_filter_neon'),
                                 color: Colors.purpleAccent,
                                 value: "neon",
                                 groupValue: selectedKey,
@@ -134,7 +141,7 @@ class FilterPopup {
                               ),
                               _radioTile(
                                 context,
-                                title: "Green",
+                                title: t('hdr_filter_green'),
                                 color: Colors.green,
                                 value: "green",
                                 groupValue: selectedKey,
@@ -142,7 +149,7 @@ class FilterPopup {
                               ),
                               _radioTile(
                                 context,
-                                title: "HDR",
+                                title: t('hdr_filter_hdr'),
                                 color: Colors.pink,
                                 value: "hdr",
                                 groupValue: selectedKey,
