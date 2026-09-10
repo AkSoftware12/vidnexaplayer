@@ -1,8 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:videoplayer/Analytics/onboarding_analytics.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:videoplayer/ads/app_open_ad_manager.dart';
 import 'package:videoplayer/OnboardScreen/size_config.dart';
@@ -24,6 +24,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   late PageController _controller;
   int _currentPage = 0;
 
+  /// Skip se aakhri slide par pahunche ya swipe karke — funnel me dono alag
+  /// dikhne chahiye, isliye yaad rakhna padta hai.
+  bool _skippedAhead = false;
+
   // NOTE: this is the LIVE production banner unit, despite the old
   // "✅ TEST ID" comment. It now lives in AdUnits together with the others.
   final List<Color> colors = [
@@ -36,6 +40,12 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   void initState() {
     super.initState();
     _controller = PageController();
+
+    OnboardingAnalytics.begin();
+    // Pehli slide bhi funnel ka step hai — warna drop-off "slide 2 se" shuru
+    // dikhta hai aur jo log slide 1 par hi nikal gaye woh ginti me hi nahi
+    // aate.
+    OnboardingAnalytics.stepViewed(0, contents.length);
   }
 
   // The banner used to be a field initializer holding its own `BannerAd` that
@@ -89,8 +99,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 children: [
                   Text(
                     t('onboard_all_features'),
-                    style: GoogleFonts.poppins(
-                      fontSize: 15.sp,
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 15.sp,
                       fontWeight: FontWeight.w700,
                       color: Colors.white,
                       letterSpacing: 1.2,
@@ -101,6 +110,11 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                     child: InkWell(
                       borderRadius: BorderRadius.circular(10.r),
                       onTap: () {
+                        // jumpToPage se pehle, warna onPageChanged
+                        // _currentPage ko aakhri slide bana deta hai aur asli
+                        // drop-off point kho jaata hai.
+                        OnboardingAnalytics.skipped(_currentPage);
+                        _skippedAhead = true;
                         _controller.jumpToPage(contents.length - 1);
                       },
                       child: Container(
@@ -117,8 +131,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         ),
                         child: Text(
                           t('onboard_skip'),
-                          style: GoogleFonts.openSans(
-                            fontSize: 12.sp,
+                          style: TextStyle(fontFamily: 'OpenSans', fontSize: 12.sp,
                             fontWeight: FontWeight.w600,
                             color: Colors.white,
                           ),
@@ -138,7 +151,10 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             child: PageView.builder(
               physics: const BouncingScrollPhysics(),
               controller: _controller,
-              onPageChanged: (value) => setState(() => _currentPage = value),
+              onPageChanged: (value) {
+                setState(() => _currentPage = value);
+                OnboardingAnalytics.stepViewed(value, contents.length);
+              },
               itemCount: contents.length,
               itemBuilder: (context, i) {
                 final content = contents[i];
@@ -246,8 +262,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                       children: [
                                         Text(
                                           feature.title,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 13.sp,
+                                          style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp,
                                             fontWeight: FontWeight.w500,
                                             color: Colors.white,
                                           ),
@@ -255,8 +270,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                                         SizedBox(height: 4.sp),
                                         Text(
                                           feature.description,
-                                          style: GoogleFonts.poppins(
-                                            fontSize: 10.sp,
+                                          style: TextStyle(fontFamily: 'Poppins', fontSize: 10.sp,
                                             fontWeight: FontWeight.w300,
                                             color: Colors.grey.shade100,
                                           ),
@@ -301,10 +315,15 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                         height: 40.sp,
                         child: TextButton(
                           onPressed: () {
+                            OnboardingAnalytics.completed(
+                              skipped: _skippedAhead,
+                            );
                             Navigator.push(
                               context,
                               MaterialPageRoute(
                                 builder: (context) => const PermissionPage(),
+                                settings: const RouteSettings(name: 'PermissionScreen'),
+
                               ),
                             );
                           },
@@ -324,8 +343,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                           ),
                           child: Text(
                             t('onboard_get_started'),
-                            style: GoogleFonts.openSans(
-                              fontSize: 15.sp,
+                            style: TextStyle(fontFamily: 'OpenSans', fontSize: 15.sp,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
                               letterSpacing: 1.0,
@@ -375,8 +393,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                               SizedBox(width: 5.sp),
                               Text(
                                 t('onboard_next'),
-                                style: GoogleFonts.openSans(
-                                  fontSize: 15.sp,
+                                style: TextStyle(fontFamily: 'OpenSans', fontSize: 15.sp,
                                   fontWeight: FontWeight.w700,
                                   color: Colors.white,
                                   letterSpacing: 1.0,

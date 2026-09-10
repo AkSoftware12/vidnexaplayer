@@ -2,13 +2,14 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
+import '../../Utils/app_palette.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 import '../../Home/HomeScreen/home2.dart'; // VideoProvider yahi se aa raha hai
 import '../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../Utils/video_thumb.dart';
+import '../../VideoPLayer/Resume/watch_progress_bar.dart';
 
 class RecentlyPlayedSection extends StatefulWidget {
   final void Function(List<AssetEntity> videos, int index) onTap;
@@ -97,6 +98,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     final provider = context.watch<VideoProvider>();
     final ids = provider.recentlyPlayed;
@@ -144,20 +146,18 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                         HomeStrings.t(lang, 'home_recently_played_title'),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          fontSize: 14.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: AppPalette.textH,
                         ),
                       ),
                       Text(
                         '${HomeStrings.t(lang, 'home_recently_played_subtitle')} (${_recentEntities.length})',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: GoogleFonts.poppins(
-                          fontSize: 7.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 7.sp,
                           fontWeight: FontWeight.w400,
-                          color: Colors.black54,
+                          color: AppPalette.textS,
                         ),
                       ),
                     ],
@@ -200,8 +200,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                           SizedBox(width: 3.w),
                           Text(
                             HomeStrings.t(lang, 'home_clear'),
-                            style: GoogleFonts.poppins(
-                              fontSize: 12.sp,
+                            style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp,
                               fontWeight: FontWeight.w600,
                               color: Colors.white,
                             ),
@@ -244,6 +243,17 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                           asset: entity,
                           width: 140.w,
                           height: 60.h,
+                        ),
+
+                        /// ▬ Watched-so-far line
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: WatchProgressBar(
+                            id: entity.id,
+                            fallbackDuration: entity.videoDuration,
+                          ),
                         ),
 
                         /// ▶ Play icon
@@ -311,6 +321,7 @@ class _ClearSingleDialog extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     final media = MediaQuery.of(context);
     final maxH = media.size.height * 0.78;
@@ -332,8 +343,8 @@ class _ClearSingleDialog extends StatelessWidget {
                   padding: EdgeInsets.all(16.r),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(18.r),
-                    color: Colors.white.withValues(alpha:0.92),
-                    border: Border.all(color: Colors.white.withValues(alpha:0.7)),
+                    color: AppPalette.card.withValues(alpha: 0.96),
+                    border: Border.all(color: AppPalette.border),
                     boxShadow: [
                       BoxShadow(
                         blurRadius: 26,
@@ -370,10 +381,9 @@ class _ClearSingleDialog extends StatelessWidget {
                       Text(
                         HomeStrings.t(lang, 'recent_remove_video_title'),
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.poppins(
-                          fontSize: 16.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 16.sp,
                           fontWeight: FontWeight.w700,
-                          color: Colors.black87,
+                          color: AppPalette.textH,
                         ),
                       ),
                       SizedBox(height: 6.h),
@@ -381,10 +391,9 @@ class _ClearSingleDialog extends StatelessWidget {
                       Text(
                         HomeStrings.t(lang, 'recent_remove_video_desc'),
                         textAlign: TextAlign.center,
-                        style: GoogleFonts.poppins(
-                          fontSize: 12.5.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 12.5.sp,
                           fontWeight: FontWeight.w500,
-                          color: Colors.black54,
+                          color: AppPalette.textB,
                           height: 1.35,
                         ),
                       ),
@@ -401,7 +410,7 @@ class _ClearSingleDialog extends StatelessWidget {
                                 padding: EdgeInsets.symmetric(vertical: 12.h),
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(14.r),
-                                  color: Colors.black.withValues(alpha:0.06),
+                                  color: AppPalette.raised,
                                   border: Border.all(
                                     color: Colors.black.withValues(alpha:0.08),
                                   ),
@@ -409,10 +418,9 @@ class _ClearSingleDialog extends StatelessWidget {
                                 child: Center(
                                   child: Text(
                                     HomeStrings.t(lang, 'recent_cancel'),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 13.sp,
+                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp,
                                       fontWeight: FontWeight.w700,
-                                      color: Colors.black87,
+                                      color: AppPalette.textH,
                                     ),
                                   ),
                                 ),
@@ -445,8 +453,7 @@ class _ClearSingleDialog extends StatelessWidget {
                                 child: Center(
                                   child: Text(
                                     HomeStrings.t(lang, 'recent_remove_this'),
-                                    style: GoogleFonts.poppins(
-                                      fontSize: 13.sp,
+                                    style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp,
                                       fontWeight: FontWeight.w800,
                                       color: Colors.white,
                                     ),
@@ -475,8 +482,7 @@ class _ClearSingleDialog extends StatelessWidget {
                           child: Center(
                             child: Text(
                               HomeStrings.t(lang, 'recent_clear_all'),
-                              style: GoogleFonts.poppins(
-                                fontSize: 12.5.sp,
+                              style: TextStyle(fontFamily: 'Poppins', fontSize: 12.5.sp,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.red,
                               ),

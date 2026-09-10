@@ -2,10 +2,11 @@ import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
+import 'package:videoplayer/Analytics/screen_analytics.dart';
 
+import 'package:videoplayer/Utils/app_palette.dart';
 import 'package:videoplayer/Utils/color.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../NotifyListeners/LanguageProvider/music_strings.dart';
@@ -28,6 +29,20 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
   late PageController _pageController;
   int _selectedIndex = 0;
 
+  /// Chaaron tab ek hi route par hain — Firebase ko naam yahan se jaata hai,
+  /// warna Songs/Artists/Albums/Genres ek hi screen me chhup jaate.
+  static const List<String> _tabScreenNames = <String>[
+    'OfflineMusicScreen_Songs',
+    'OfflineMusicScreen_Artists',
+    'OfflineMusicScreen_Albums',
+    'OfflineMusicScreen_Genres',
+  ];
+
+  void _reportTab(int index) {
+    if (index < 0 || index >= _tabScreenNames.length) return;
+    ScreenAnalytics.instance.setScreen(_tabScreenNames[index]);
+  }
+
   /// ✅ cache to prevent flicker when coming back to this screen
   static bool? _lastKnownGranted;
 
@@ -42,6 +57,9 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
     super.initState();
     _pageController = PageController(initialPage: 0);
     WidgetsBinding.instance.addObserver(this);
+
+    // Landing tab bhi report ho, sirf badle hue tab nahi.
+    _reportTab(_selectedIndex);
 
     // ✅ instant UI based on last known status (prevents flash)
     if (_lastKnownGranted != null) {
@@ -140,6 +158,7 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return Scaffold(
@@ -186,7 +205,7 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
     return GestureDetector(
       onTap: () => _onItemTapped(index),
       child: Card(
-        color: _selectedIndex == index ? ColorSelect.maineColor : Colors.white,
+        color: _selectedIndex == index ? ColorSelect.maineColor : AppPalette.card,
         child: SizedBox(
           width: 80.sp,
           child: Padding(
@@ -194,16 +213,14 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
             child: Center(
               child: Text(
                 title,
-                style: GoogleFonts.poppins(
-                  textStyle: TextStyle(
+                style: (TextStyle(
                     color: _selectedIndex == index
                         ? Colors.white
                         : ColorSelect.maineColor,
                     fontSize: TextSizes.textmedium,
                     fontWeight: FontWeight.bold,
                     overflow: TextOverflow.ellipsis,
-                  ),
-                ),
+                  )).copyWith(fontFamily: 'Poppins'),
               ),
             ),
           ),
@@ -215,7 +232,12 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
   Widget _buildTabsPageView() {
     return PageView(
       controller: _pageController,
-      onPageChanged: (index) => setState(() => _selectedIndex = index),
+      // Tap bhi yahi se guzarta hai (_onItemTapped jumpToPage karta hai),
+      // isliye swipe aur tap dono ek hi jagah se report hote hain.
+      onPageChanged: (index) {
+        setState(() => _selectedIndex = index);
+        _reportTab(index);
+      },
       children: [
         SongsView(
           color: Theme.of(context).colorScheme.surface,
@@ -254,21 +276,17 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
               SizedBox(height: 16.sp),
               Text(
                 MusicStrings.t(lang, 'music_permission_required_title'),
-                style: GoogleFonts.poppins(
-                  textStyle: TextStyle(
+                style: (TextStyle(
                     fontSize: 18.sp,
                     fontWeight: FontWeight.bold,
-                    color: Colors.black,
-                  ),
-                ),
+                    color: AppPalette.textH,
+                  )).copyWith(fontFamily: 'Poppins'),
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 8.sp),
               Text(
                 MusicStrings.t(lang, 'music_permission_required_desc'),
-                style: GoogleFonts.poppins(
-                  textStyle: TextStyle(fontSize: 12.sp, color: Colors.grey[600]),
-                ),
+                style: (TextStyle(fontSize: 12.sp, color: AppPalette.textS)).copyWith(fontFamily: 'Poppins'),
                 textAlign: TextAlign.center,
               ),
               SizedBox(height: 16.sp),
@@ -276,7 +294,7 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
                 ElevatedButton(
                   onPressed: () => openAppSettings(),
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.black,
+                    backgroundColor: ColorSelect.maineColor,
                     foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -284,12 +302,10 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
                   ),
                   child: Text(
                     MusicStrings.t(lang, 'music_open_settings'),
-                    style: GoogleFonts.poppins(
-                      textStyle: TextStyle(
+                    style: (TextStyle(
                         fontSize: 14.sp,
                         fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                      )).copyWith(fontFamily: 'Poppins'),
                   ),
                 )
               else
@@ -304,12 +320,10 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
                   ),
                   child: Text(
                     MusicStrings.t(lang, 'music_allow_permission'),
-                    style: GoogleFonts.poppins(
-                      textStyle: TextStyle(
+                    style: (TextStyle(
                         fontSize: 14.sp,
                         fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                      )).copyWith(fontFamily: 'Poppins'),
                   ),
                 ),
             ],

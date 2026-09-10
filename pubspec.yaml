@@ -2,7 +2,7 @@ name: videoplayer
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.25+25
+version: 1.0.30+30
 
 environment:
   sdk: ^3.7.0
@@ -22,8 +22,6 @@ dependencies:
   audio_service: ^0.18.18
   audio_session: ^0.2.2
   on_audio_query_forked: ^2.9.1
-  screenshot: ^3.0.0
-  gallery_saver_plus: ^3.2.9
   screen_brightness: ^2.1.7
   country_codes: ^3.1.0
   hive: ^2.2.3
@@ -39,25 +37,19 @@ dependencies:
 #  audio_service_mpris: ^0.2.0
 
   # ✅ UI + Media
-  fancy_bottom_navigation_2: ^0.3.5
   flutter_screenutil: ^5.9.3
   google_fonts: ^6.2.1
   flutter_svg: ^2.2.0
   fluttertoast: ^8.2.12
   flutter_colorpicker: ^1.1.0
   cached_network_image: ^3.4.1
-  video_player: ^2.10.0
-  video_thumbnail: ^0.5.6
   carousel_slider: ^5.1.1
   photo_manager: ^3.7.1
   image_picker: ^1.1.2
 
   # ✅ Navigation & Animation
-  flutter_sequence_animation: ^4.0.0
-  page_transition: ^2.2.1
   animations: ^2.0.11
   flutter_staggered_animations: ^1.1.1
-  sliding_up_panel: ^2.0.0+1
   flutter_portal: ^1.1.4
 
   # ✅ Utility Packages
@@ -71,10 +63,16 @@ dependencies:
   intl: ^0.20.2
   # NOTE: `flutter_localization` was removed — it was never imported anywhere.
   # Localization now goes through `flutter_localizations` (declared above).
-  flutter_tts: ^4.2.3
+  # NOTE: `flutter_tts` was removed -- it was declared but never imported by
+  # any Dart file. Its Android plugin still built a TextToSpeech engine at
+  # onAttachedToEngine and called getDefaultVoice(), which deserialises every
+  # installed Voice through a Parcel. On a low-memory device that allocation
+  # is what threw
+  #   java.lang.OutOfMemoryError ... FlutterTtsPlugin.onInitListenerWithoutCallback
+  # on the main thread during startup. Nothing in the app ever spoke, so the
+  # whole cost was a crash source. Add it back only with a real TTS call site.
   firebase_messaging: ^15.2.9
   device_info_plus: ^11.5.0
-  android_content_provider: ^0.5.2
   share_plus: ^11.0.0
   flutter_local_notifications: ^17.2.1
   # ✅ Was imported by Home/YoutubeScreen/playlists_screen.dart but never declared
@@ -86,23 +84,11 @@ dependencies:
   connectivity_plus: ^6.1.0
 
   # ✅ UI Helpers
-  iconsax: ^0.0.8
-  icons_plus: ^5.0.0
-  marquee: ^2.3.0
   smooth_page_indicator: ^1.2.1
-  text_scroll: ^0.2.0
-  badges: ^3.1.2
-  floating: ^6.0.0
   file_manager: ^1.0.2
-  upgrader: ^11.5.0
   firebase_core: ^3.15.1
   new_version_plus: ^0.1.1
-  image_cropper: ^8.0.2
   image: ^4.2.0
-  media_scanner: ^2.2.0
-  flutter_media_delete: ^1.0.1
-  flutter_speed_dial: ^7.0.0
-  font_awesome_flutter: ^10.9.1
   animate_do: ^4.2.0
   lottie: ^3.3.1
   path: ^1.9.0
@@ -115,14 +101,25 @@ dependencies:
   media_kit_video: ^2.0.0
   media_kit_libs_video: ^1.0.7
   volume_controller: ^3.4.0
-  open_filex: ^4.4.0
 #  disk_space_plus: ^0.2.6
   disk_space_plus: ^0.2.5
   rxdart: ^0.27.7
 #  google_mobile_ads: ^7.0.0
   google_mobile_ads: ^6.0.0
-  advanced_in_app_review: ^1.3.0
   android_intent_plus: ^6.0.0
+
+  # ✅ Google Play Billing (Play Billing Library 8.x via the official plugin).
+  #    `in_app_purchase_android` is pinned explicitly because the paywall
+  #    needs its platform-specific types directly: GooglePlayProductDetails
+  #    (to reach subscriptionOfferDetails and match basePlanId == "yearly",
+  #    which plain ProductDetails does not expose). Depending on
+  #    `in_app_purchase` alone would make that an undeclared transitive import.
+  in_app_purchase: ^3.3.0
+  #    Constraint is ^0.5.0, not ^0.5.3: 0.5.0 is the release that moved Play
+  #    Billing from 7.1.1 to 8.0.0 (the version Google requires from 31 Aug
+  #    2026), and every later 0.5.x needs Dart >=3.12 while this project is on
+  #    3.11. Raise this once the Flutter SDK here is bumped.
+  in_app_purchase_android: ^0.5.0
 
 
   # whatsapp
@@ -134,6 +131,9 @@ dependencies:
   # ✅ Voice command video search (offline-first local index)
   speech_to_text: ^7.0.0
   sqflite: ^2.4.1
+  firebase_crashlytics: ^4.3.10
+  firebase_analytics: ^11.6.0
+  firebase_in_app_messaging: ^0.8.1+10
 
 
 
@@ -179,8 +179,29 @@ flutter:
   assets:
     - assets/
     - assets/permisssion.json
-    - assets/fonts/
+    # `assets/fonts/` deliberately NOT listed here: the `fonts:` section below
+    # already packages those .ttf files, and listing the directory as a plain
+    # asset shipped a second copy of every face in the APK.
+  # Every face the app uses is bundled. Nothing is fetched at runtime any
+  # more: `google_fonts` downloading a .ttf on first paint is what caused the
+  # `_httpFetchFontAndSaveToDevice` / `SocketException` crashes, and
+  # main.dart now also sets `GoogleFonts.config.allowRuntimeFetching = false`
+  # so a missed call site degrades to the default face instead of throwing.
   fonts:
+    # The weighted family. `TextStyle(fontFamily: 'Poppins', fontWeight: ...)`
+    # picks the right file, which is what the old `GoogleFonts.poppins(...)`
+    # call sites expect. The four single-weight families below are kept
+    # because the text-on-photo editor addresses faces by name.
+    - family: Poppins
+      fonts:
+        - asset: assets/fonts/Poppins-Regular.ttf
+          weight: 400
+        - asset: assets/fonts/Poppins-Medium.ttf
+          weight: 500
+        - asset: assets/fonts/Poppins-SemiBold.ttf
+          weight: 600
+        - asset: assets/fonts/Poppins-Bold.ttf
+          weight: 700
     - family: PoppinsRegular
       fonts:
         - asset: assets/fonts/Poppins-Regular.ttf
@@ -193,3 +214,15 @@ flutter:
     - family: PoppinsBold
       fonts:
         - asset: assets/fonts/Poppins-Bold.ttf
+    # Replacements for the former GoogleFonts.outfit / .openSans /
+    # .radioCanada call sites. Variable (wght axis) faces straight from
+    # github.com/google/fonts, so one file covers every weight.
+    - family: Outfit
+      fonts:
+        - asset: assets/fonts/Outfit-Variable.ttf
+    - family: OpenSans
+      fonts:
+        - asset: assets/fonts/OpenSans-Variable.ttf
+    - family: RadioCanada
+      fonts:
+        - asset: assets/fonts/RadioCanada-Variable.ttf

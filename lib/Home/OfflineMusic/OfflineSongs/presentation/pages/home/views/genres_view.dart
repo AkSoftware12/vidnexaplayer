@@ -83,6 +83,7 @@ class _GenresViewState extends State<GenresView>
                         Navigator.push(
                           context,
                           MaterialPageRoute(
+                            settings: const RouteSettings(name: 'MusicGenreScreen'),
                             builder: (context) {
                               return GenrePage(genre: genre,
                                 color:  Theme.of(context).colorScheme.surface, colortext: Theme.of(context).colorScheme.secondary,

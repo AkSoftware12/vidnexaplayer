@@ -1,55 +1,69 @@
+import 'package:android_intent_plus/android_intent.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:google_fonts/google_fonts.dart';
-import 'package:icons_plus/icons_plus.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:videoplayer/Photo/image_album.dart';
+import 'package:videoplayer/features/gallery/presentation/pages/gallery_home_page.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
+import '../../Billing/billing_service.dart';
+import '../../Billing/paywall_screen.dart';
 import '../../DarkMode/dark_mode.dart';
-import '../../DarkMode/styles/theme_data_style.dart';
+import '../../DarkMode/theme_settings_section.dart';
+import '../../Utils/app_palette.dart';
+import '../../ads/app_open_ad_manager.dart';
 import '../../DeviceSpace/device_space.dart';
 import '../../LockScreen/LockScreen/lock_screen.dart';
 import '../../NetWork Stream/stream_video.dart';
 import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
-import '../../NotifyListeners/AppBar/colorList.dart';
 import '../../NotifyListeners/LanguageProvider/language_picker_sheet.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../NotifyListeners/LanguageProvider/paywall_strings.dart';
 import '../../NotifyListeners/LanguageProvider/profile_strings.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
 import '../../StatusSaverScreen/whatsapp_download.dart';
-import '../../Utils/rating_popup.dart';
+import '../../NotifyListeners/LanguageProvider/equalizer_strings.dart';
+import '../../features/equalizer/audio_effects_service.dart';
+import '../../features/equalizer/domain/eq_models.dart';
+import '../../features/equalizer/presentation/equalizer_sheet.dart';
 import '../HomeBottomnavigation/home_bottomNavigation.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  THEME  (Light / White)
 // ─────────────────────────────────────────────────────────────────────────────
+/// This screen's palette.
+///
+/// Was a block of `static const` colours, which is why the profile stayed
+/// bright white after the app was switched to dark. The surface and text
+/// entries now delegate to [AppPalette] so they follow the theme; the brand
+/// colours below stay fixed, because a brand colour that changes with the
+/// theme is no longer a brand colour.
 class _T {
-  // backgrounds
-  static const Color white    = Color(0xFFFFFFFF);
-  static const Color surface  = Color(0xFFF0F1F6);
+  // backgrounds — theme-aware
+  static Color get white    => AppPalette.card;
+  static Color get surface  => AppPalette.surface;
 
-  // brand
+  // brand — deliberately constant in both themes
   static const Color accent    = Color(0xFFE8382C);
   static const Color accentSoft= Color(0x18E8382C);
   static const Color gold      = Color(0xFFFFB800);
 
-  // text
-  static const Color textH = Color(0xFF111827);
-  static const Color textB = Color(0xFF374151);
-  static const Color textS = Color(0xFF9CA3AF);
+  // text — theme-aware
+  static Color get textH => AppPalette.textH;
+  static Color get textB => AppPalette.textB;
+  static Color get textS => AppPalette.textS;
 
-  // border
-  static const Color border  = Color(0xFFE5E7EB);
-  static const Color borderM = Color(0xFFD1D5DB);
+  // border — theme-aware
+  static Color get border  => AppPalette.border;
+  static Color get borderM =>
+      AppPalette.isDark ? Colors.white24 : const Color(0xFFD1D5DB);
 
   // shadows
   static List<BoxShadow> get accentShadow => [
@@ -68,10 +82,10 @@ class _T {
 
   // text styles
   static TextStyle orbitron({double size = 13, FontWeight w = FontWeight.w600, Color? color, double spacing = 0}) =>
-      GoogleFonts.outfit(fontSize: size.sp, fontWeight: w, color: color ?? textH, letterSpacing: spacing);
+      TextStyle(fontFamily: 'Outfit', fontSize: size.sp, fontWeight: w, color: color ?? textH, letterSpacing: spacing);
 
   static TextStyle outfit({double size = 13, FontWeight w = FontWeight.w500, Color? color}) =>
-      GoogleFonts.outfit(fontSize: size.sp, fontWeight: w, color: color ?? textB);
+      TextStyle(fontFamily: 'Outfit', fontSize: size.sp, fontWeight: w, color: color ?? textB);
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -84,6 +98,8 @@ class UserProfilePage extends StatefulWidget {
 }
 
 class _UserProfilePageState extends State<UserProfilePage> with TickerProviderStateMixin {
+
+  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   final TextEditingController _nameController = TextEditingController();
   File? _pickedImage;
@@ -202,9 +218,9 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
       backgroundColor: Colors.transparent,
       builder: (_) => StatefulBuilder(
         builder: (sCtx, local) => Container(
-          decoration: const BoxDecoration(
+          decoration: BoxDecoration(
             color: _T.white,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
           ),
           padding: EdgeInsets.only(bottom: MediaQuery.of(sCtx).viewInsets.bottom + 24),
           child: SingleChildScrollView(
@@ -358,6 +374,7 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
   // ── BUILD ────────────────────────────────────────────────────────────────
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final theme = Provider.of<ThemeProvider>(context);
     final user  = Provider.of<UserModel>(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
@@ -365,7 +382,7 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
     // ✅ FIX 8: Removed addPostFrameCallback from build() — moved to initState()
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppPalette.surface,
       body: FadeTransition(
         opacity: _fadeAnim,
         child: SlideTransition(
@@ -404,7 +421,20 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
                     SizedBox(height: 10.sp),
                     const _QuickActionsGrid(),
 
-                    SizedBox(height: 15.sp),
+                    // Between two sections rather than at either end: the
+                    // bottom nav already pins a banner under this page, and
+                    // the settings tiles below are tap targets an ad has no
+                    // business sitting inside.
+                    //
+                    // The spacers are inside the premium check too: the card
+                    // itself collapses on its own, but leaving 18+15sp of
+                    // padding behind would still read as an unexplained gap
+                    // where the ad used to be.
+                    if (!context.watch<BillingService>().isPremium) ...[
+                      SizedBox(height: 18.sp),
+                      _adManager.nativeWidget(),
+                      SizedBox(height: 15.sp),
+                    ],
 
                     _SectionHeader(title: ProfileStrings.t(lang, 'profile_settings_more')),
                     SizedBox(height: 10.sp),
@@ -445,9 +475,9 @@ class _HeroBanner extends StatelessWidget {
       padding: const EdgeInsets.all(8.0),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white,
+          color: AppPalette.card,
           borderRadius: const BorderRadius.all(Radius.circular(10)),
-          border: Border.all(color: Colors.grey.shade300, width: 1),
+          border: Border.all(color: AppPalette.border, width: 1),
         ),
         child: Stack(
           children: [
@@ -504,36 +534,43 @@ class _HeroBanner extends StatelessWidget {
                           // never fired — a user who had not set a name saw a
                           // blank line instead of the placeholder.
                           user.name.trim().isEmpty ? ProfileStrings.t(lang, 'profile_guest_user') : user.name,
-                          style: GoogleFonts.outfit(
-                            fontSize: 17.sp, fontWeight: FontWeight.w700,
+                          style: TextStyle(fontFamily: 'Outfit', fontSize: 17.sp, fontWeight: FontWeight.w700,
                             color: _T.textH, letterSpacing: 0.5,
                           ),
                         ),
 
-                        SizedBox(height: 8.sp),
-                        // Premium badge
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-                          decoration: BoxDecoration(
-                            color: _T.accentSoft,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: _T.accent.withValues(alpha:0.3), width: 1),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.workspace_premium, color: _T.gold, size: 13),
-                              const SizedBox(width: 5),
-                              Text(
-                                ProfileStrings.t(lang, 'profile_premium_member'),
-                                style: GoogleFonts.outfit(
-                                  fontSize: 9.sp, fontWeight: FontWeight.w700,
-                                  color: _T.accent, letterSpacing: 1.2,
+                        // Premium badge — only for someone who actually paid.
+                        //
+                        // This used to render unconditionally, so every free
+                        // user was labelled "PREMIUM MEMBER". Harmless while
+                        // nothing was for sale; now that the tile directly
+                        // below it sells premium, showing both at once tells
+                        // the user they already own what they are being asked
+                        // to buy.
+                        if (context.watch<BillingService>().isPremium) ...[
+                          SizedBox(height: 8.sp),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+                            decoration: BoxDecoration(
+                              color: _T.accentSoft,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: _T.accent.withValues(alpha:0.3), width: 1),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(Icons.workspace_premium, color: _T.gold, size: 13),
+                                const SizedBox(width: 5),
+                                Text(
+                                  ProfileStrings.t(lang, 'profile_premium_member'),
+                                  style: TextStyle(fontFamily: 'Outfit', fontSize: 9.sp, fontWeight: FontWeight.w700,
+                                    color: _T.accent, letterSpacing: 1.2,
+                                  ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        ),
+                        ],
                       ],
                     ),
                   ),
@@ -555,16 +592,19 @@ class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title});
 
   @override
-  Widget build(BuildContext context) => Row(
+  Widget build(BuildContext context) {
+    AppPalette.sync(context);
+    return Row(
     children: [
       Container(
         width: 4, height: 18,
         decoration: BoxDecoration(gradient: _T.redGrad, borderRadius: BorderRadius.circular(2)),
       ),
       const SizedBox(width: 10),
-      Text(title, style: _T.orbitron(size: 12.sp, w: FontWeight.w700, color: _T.textH, spacing: 0.3)),
+      Text(title, style: _T.orbitron(size: 12, w: FontWeight.w700, color: _T.textH, spacing: 0.3)),
     ],
   );
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -581,18 +621,18 @@ class _StorageRow extends StatelessWidget {
     final cards = [
       _SC(icon: Icons.folder_rounded,        label: ProfileStrings.t(lang, 'profile_files'),   sub: '3.2 GB',
           grad: [const Color(0xFF1D4ED8), const Color(0xFF3B82F6)],
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DeviceSpaceScreen()))),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DeviceSpaceScreen(), settings: const RouteSettings(name: 'DeviceSpaceScreen')))),
       _SC(icon: Icons.video_library_rounded,  label: ProfileStrings.t(lang, 'profile_videos'),  sub: '124 GB',
           grad: [const Color(0xFFD97706), const Color(0xFFFBBF24)], onTap: () {}),
       _SC(icon: Icons.photo_rounded,
           label: isLoading ? '—' : '$totalImages', sub: ProfileStrings.t(lang, 'profile_images'),
           grad: [const Color(0xFFDC2626), const Color(0xFFF87171)],
           isLoading: isLoading,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => AlbumScreen()))),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GalleryHomePage(), settings: const RouteSettings(name: 'GalleryHomeScreen')))),
       _SC(icon: Icons.music_note_rounded,     label: ProfileStrings.t(lang, 'profile_music'),   sub: '5.6 GB',
           grad: [const Color(0xFF7C3AED), const Color(0xFFA78BFA)],
           onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const HomeBottomNavigation(bottomIndex: 1)))),
+              MaterialPageRoute(builder: (_) => const HomeBottomNavigation(bottomIndex: 1), settings: const RouteSettings(name: 'OfflineMusicScreen')))),
     ];
 
     return SizedBox(
@@ -646,8 +686,8 @@ class _StorageCard extends StatelessWidget {
             const CupertinoActivityIndicator(radius: 6, color: Colors.white)
           else
             Text(c.label, textAlign: TextAlign.center,
-                style: GoogleFonts.outfit(fontSize: 10.sp, fontWeight: FontWeight.w700, color: Colors.white)),
-          Text(c.sub, style: GoogleFonts.outfit(fontSize: 9.sp, color: Colors.white70)),
+                style: TextStyle(fontFamily: 'Outfit', fontSize: 10.sp, fontWeight: FontWeight.w700, color: Colors.white)),
+          Text(c.sub, style: TextStyle(fontFamily: 'Outfit', fontSize: 9.sp, color: Colors.white70)),
         ],
       ),
     ),
@@ -670,7 +710,7 @@ class _QuickActionsGrid extends StatelessWidget {
           color: const Color(0xFF2563EB), bg: const Color(0xFFDBEAFE), onTap: () {}),
       _QA(icon: Icons.lock_rounded,        label: ProfileStrings.t(lang, 'profile_private'),   sub: ProfileStrings.t(lang, 'profile_vault'),
           color: const Color(0xFF7C3AED), bg: const Color(0xFFEDE9FE),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VaultScreen()))),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VaultScreen(), settings: const RouteSettings(name: 'VaultScreen')))),
       _QA(icon: Icons.add_circle_rounded,  label: ProfileStrings.t(lang, 'profile_add_new'),   sub: ProfileStrings.t(lang, 'profile_playlist'),
           color: _T.accent, bg: _T.accentSoft, onTap: () {}),
     ];
@@ -717,6 +757,39 @@ class _QA {
     required this.color, required this.bg, required this.onTap});
 }
 
+/// Opens Android's own Cast picker, which mirrors the whole screen.
+///
+/// Deliberately the system picker rather than an in-app Chromecast session:
+/// mirroring covers every screen this app has — the player, the gallery, the
+/// online tab — where a cast SDK would only ever carry the video player, and
+/// would need a receiver app and native config to do that much.
+///
+/// `CAST_SETTINGS` is not present on every OEM build, so a failure falls back
+/// to the general Settings screen, and a failure of *that* says so plainly
+/// instead of leaving the tap looking broken.
+Future<void> _openCastSettings(BuildContext context, String lang) async {
+  final messenger = ScaffoldMessenger.of(context);
+
+  for (final action in const [
+    'android.settings.CAST_SETTINGS',
+    'android.settings.SETTINGS',
+  ]) {
+    try {
+      await AndroidIntent(action: action).launch();
+      return;
+    } catch (e) {
+      debugPrint('Cast intent $action failed: $e');
+    }
+  }
+
+  messenger.showSnackBar(
+    SnackBar(
+      duration: const Duration(seconds: 3),
+      content: Text(ProfileStrings.t(lang, 'profile_screen_cast_failed')),
+    ),
+  );
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 //  SETTINGS CARD
 // ─────────────────────────────────────────────────────────────────────────────
@@ -759,7 +832,7 @@ class _SettingsCard extends StatelessWidget {
               title: t('profile_stream_title'), sub: t('profile_stream_sub'),
               badge: _Badge(text: t('profile_badge_new'), color: _T.accent),
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerStream()));
+                Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerStream(), settings: const RouteSettings(name: 'NetworkStreamScreen')));
               }),
           _Div(),
 
@@ -768,37 +841,87 @@ class _SettingsCard extends StatelessWidget {
               title: t('profile_status_saver_title'), sub: t('profile_status_saver_sub'),
               badge: _Badge(text: t('profile_badge_hot'), color: const Color(0xFFEA580C)),
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => StatusSaverHomePage()));
+                Navigator.push(context, MaterialPageRoute(builder: (context) => StatusSaverHomePage(), settings: const RouteSettings(name: 'StatusSaverScreen')));
               }),
           _Div(),
 
-          _Tile(icon: Icons.style_rounded,
-              iColor: const Color(0xFF7C3AED), iBg: const Color(0xFFEDE9FE),
-              title: t('profile_themes_title'), sub: t('profile_themes_sub'),
-              onTap: () {}),
+          // Android only: this opens the system's own cast picker, which has
+          // no counterpart on the other platforms this project builds for.
+          // Showing the row there would be a button that cannot do anything.
+          if (Platform.isAndroid) ...[
+            // Not `cast_rounded` in sky blue: the Stream row two above already
+            // uses exactly that icon and those two colours, and a list with
+            // the same badge twice reads as a duplicated row. The
+            // phone-to-screen glyph is also the more literal picture of what
+            // this does — mirror this device, rather than send a stream to it.
+            _Tile(icon: Icons.screen_share_rounded,
+                iColor: const Color(0xFF4F46E5), iBg: const Color(0xFFE0E7FF),
+                title: t('profile_screen_cast_title'),
+                sub: t('profile_screen_cast_sub'),
+                onTap: () => _openCastSettings(context, lang)),
+            _Div(),
+          ],
+
+          // _Tile(icon: Icons.style_rounded,
+          //     iColor: const Color(0xFF7C3AED), iBg: const Color(0xFFEDE9FE),
+          //     title: t('profile_themes_title'), sub: t('profile_themes_sub'),
+          //     onTap: () {}),
 
           // ── PREFERENCES ───────────────────────────────────────────────
           _Sub(t('profile_section_preferences')),
+
+          // Shared by the video player and the music player — one curve store,
+          // one set of profiles, reachable from here as well as from either
+          // player's quick-access sheet.
+          //
+          // The subtitle names the two states separately, because they ARE
+          // separate: turning the equalizer on for video leaves music alone.
+          // Without this the row could only say "on", which would be a lie
+          // half the time.
+          Builder(builder: (context) {
+            final effects = context.watch<AudioEffectsService>();
+            final video = effects.settingsFor(MediaType.video).enabled;
+            final music = effects.settingsFor(MediaType.music).enabled;
+            final anyOn = video || music;
+            return _Tile(
+                icon: Icons.graphic_eq_rounded,
+                iColor: anyOn ? const Color(0xFF16A34A) : const Color(0xFF0EA5E9),
+                iBg: anyOn ? const Color(0xFFDCFCE7) : const Color(0xFFE0F2FE),
+                title: EqStrings.t(lang, 'eq_title'),
+                sub: anyOn
+                    ? '${EqStrings.t(lang, 'eq_media_video')}: '
+                        '${EqStrings.t(lang, video ? 'eq_on' : 'eq_off')}'
+                        '  ·  ${EqStrings.t(lang, 'eq_media_music')}: '
+                        '${EqStrings.t(lang, music ? 'eq_on' : 'eq_off')}'
+                    : EqStrings.t(lang, 'eq_entry_sub'),
+                onTap: () => openEqualizerPage(context));
+          }),
+          _Div(),
 
           _Tile(icon: Icons.notifications_none_rounded,
               iColor: const Color(0xFF8B5CF6), iBg: const Color(0xFFF3E8FF),
               title: t('profile_notifications_title'), sub: t('profile_notifications_sub'),
               onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => NotificationScreen()))),
+                  MaterialPageRoute(builder: (_) => NotificationScreen(), settings: const RouteSettings(name: 'NotificationScreen')))),
           _Div(),
 
-          _Tile(icon: HeroIcons.paint_brush,
-              iColor: _T.accent, iBg: _T.accentSoft,
-              title: t('profile_toolbar_color_title'), sub: t('profile_toolbar_color_sub'),
-              onTap: () => showModalBottomSheet(
-                context: context,
-                shape: const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-                builder: (_) => const ColorPickerBottomSheet(),
-              )),
-          _Div(),
+          // _Tile(icon: HeroIcons.paint_brush,
+          //     iColor: _T.accent, iBg: _T.accentSoft,
+          //     title: t('profile_toolbar_color_title'), sub: t('profile_toolbar_color_sub'),
+          //     onTap: () => showModalBottomSheet(
+          //       context: context,
+          //       shape: const RoundedRectangleBorder(
+          //           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          //       builder: (_) => const ColorPickerBottomSheet(),
+          //     )),
+          // _Div(),
 
-          _NightTile(themeProvider: themeProvider),
+          // Supersedes the old night-mode switch: light / dark / system plus
+          // the accent picker, sharing one ThemeProvider with the drawer.
+          Padding(
+            padding: EdgeInsets.symmetric(horizontal: 14.sp, vertical: 10.sp),
+            child: const ThemeSettingsSection(),
+          ),
           _Div(),
 
           _Tile(icon: Icons.language_rounded,
@@ -961,59 +1084,9 @@ class _Badge extends StatelessWidget {
       border: Border.all(color: color.withValues(alpha:0.3)),
     ),
     child: Text(text,
-        style: GoogleFonts.outfit(
-            fontSize: 8.sp, fontWeight: FontWeight.w700,
+        style: TextStyle(fontFamily: 'Outfit', fontSize: 8.sp, fontWeight: FontWeight.w700,
             color: color, letterSpacing: 0.5)),
   );
-}
-
-// ── Night Mode Tile ──────────────────────────────────────────────────────────
-class _NightTile extends StatelessWidget {
-  final ThemeProvider themeProvider;
-  const _NightTile({required this.themeProvider});
-
-  @override
-  Widget build(BuildContext context) {
-    final isDark = themeProvider.themeDataStyle == ThemeDataStyle.dark;
-    final lang = context.watch<LocaleProvider>().locale.languageCode;
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: 14.sp, vertical: 10.sp),
-      child: Row(
-        children: [
-          Container(
-            width: 42.sp, height: 42.sp,
-            decoration: BoxDecoration(
-              color: const Color(0xFFE2E8F0),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(Icons.nightlight_round, color: const Color(0xFF475569), size: 20.sp),
-          ),
-          SizedBox(width: 13.sp),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(ProfileStrings.t(lang, 'profile_night_mode_title'), style: _T.outfit(size: 13, w: FontWeight.w600, color: _T.textH)),
-                Text(isDark ? ProfileStrings.t(lang, 'profile_night_mode_dark') : ProfileStrings.t(lang, 'profile_night_mode_light'),
-                    style: _T.outfit(size: 10.5, color: _T.textS)),
-              ],
-            ),
-          ),
-          Transform.scale(
-            scale: 0.85,
-            child: Switch(
-              value: isDark,
-              activeColor: _T.accent,
-              activeTrackColor: _T.accent.withValues(alpha:0.35),
-              inactiveThumbColor: _T.textS,
-              inactiveTrackColor: _T.border,
-              onChanged: (_) => themeProvider.changeTheme(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 // ── Remove Ads Tile ──────────────────────────────────────────────────────────
@@ -1023,10 +1096,14 @@ class _RemoveAdsTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LocaleProvider>().locale.languageCode;
+    // Watched, not read: buying from the paywall has to flip this tile from
+    // "Upgrade" to the active state as soon as the purchase lands, without
+    // waiting for the Profile tab to be rebuilt by something else.
+    final premium = context.watch<BillingService>().isPremium;
     return Padding(
       padding: EdgeInsets.symmetric(horizontal: 10.sp, vertical: 6.sp),
       child: GestureDetector(
-        onTap: () {},
+        onTap: () => PaywallScreen.show(context),
         child: Container(
           decoration: BoxDecoration(
             gradient: LinearGradient(
@@ -1044,7 +1121,11 @@ class _RemoveAdsTile extends StatelessWidget {
                   color: const Color(0xFFFEF3C7),
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: Icon(Icons.workspace_premium_rounded, color: _T.gold, size: 22.sp),
+                child: Icon(
+                    premium
+                        ? Icons.verified_rounded
+                        : Icons.workspace_premium_rounded,
+                    color: _T.gold, size: 22.sp),
               ),
               SizedBox(width: 13.sp),
               Expanded(
@@ -1053,7 +1134,10 @@ class _RemoveAdsTile extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(ProfileStrings.t(lang, 'profile_remove_ads_title'),
+                        Text(
+                            premium
+                                ? PaywallStrings.t(lang, 'paywall_active_title')
+                                : ProfileStrings.t(lang, 'profile_remove_ads_title'),
                             style: _T.outfit(size: 13, w: FontWeight.w700, color: _T.textH)),
                         const SizedBox(width: 7),
                         Container(
@@ -1063,30 +1147,39 @@ class _RemoveAdsTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(ProfileStrings.t(lang, 'profile_badge_pro'),
-                              style: GoogleFonts.outfit(
-                                  fontSize: 7.sp, fontWeight: FontWeight.w700,
+                              style: TextStyle(fontFamily: 'Outfit', fontSize: 7.sp, fontWeight: FontWeight.w700,
                                   color: Colors.white, letterSpacing: 0.8)),
                         ),
                       ],
                     ),
                     SizedBox(height: 2.sp),
-                    Text(ProfileStrings.t(lang, 'profile_remove_ads_sub'),
+                    Text(
+                        premium
+                            ? PaywallStrings.t(lang, 'paywall_active_subtitle')
+                            : ProfileStrings.t(lang, 'profile_remove_ads_sub'),
                         style: _T.outfit(size: 10.5, color: _T.textS)),
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  gradient: _T.goldGrad,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: [BoxShadow(color: _T.gold.withValues(alpha:0.3), blurRadius: 10)],
+              // Once premium, the call to action becomes a plain chevron: the
+              // tile still opens the paywall, but that screen now shows the
+              // "manage subscription" route rather than another Upgrade
+              // button. Selling an upgrade to someone who already bought it
+              // is the fastest way to earn a refund request.
+              if (premium)
+                Icon(Icons.chevron_right_rounded, color: _T.textS, size: 20.sp)
+              else
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    gradient: _T.goldGrad,
+                    borderRadius: BorderRadius.circular(10),
+                    boxShadow: [BoxShadow(color: _T.gold.withValues(alpha:0.3), blurRadius: 10)],
+                  ),
+                  child: Text(ProfileStrings.t(lang, 'profile_upgrade'),
+                      style: TextStyle(fontFamily: 'Outfit', fontSize: 11.sp, fontWeight: FontWeight.w700,
+                          color: Colors.white)),
                 ),
-                child: Text(ProfileStrings.t(lang, 'profile_upgrade'),
-                    style: GoogleFonts.outfit(
-                        fontSize: 11.sp, fontWeight: FontWeight.w700,
-                        color: Colors.white)),
-              ),
             ],
           ),
         ),

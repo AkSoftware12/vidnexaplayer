@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
+import 'package:videoplayer/Utils/app_palette.dart';
 import 'package:videoplayer/Utils/color.dart';
 
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
@@ -54,6 +54,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
     await Navigator.push(
       context,
       MaterialPageRoute(
+        settings: const RouteSettings(name: 'VideoPlayerScreen'),
         builder: (_) => FullScreenVideoPlayerFixed(
           videos: const [],
           initialUrl: url,
@@ -72,7 +73,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
         backgroundColor: Colors.black87,
         content: Text(
           message,
-          style: GoogleFonts.poppins(color: Colors.redAccent, fontSize: 14),
+          style: TextStyle(fontFamily: 'Poppins', color: Colors.redAccent, fontSize: 14),
         ),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -82,9 +83,10 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppPalette.surface,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
@@ -92,8 +94,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
         ),
         title: Text(
           VideoStrings.t(lang, 'stream_appbar_title'),
-          style: GoogleFonts.poppins(
-            color: Colors.white,
+          style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
@@ -121,8 +122,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
                 children: [
                   Text(
                     VideoStrings.t(lang, 'stream_card_title'),
-                    style: GoogleFonts.poppins(
-                      fontSize: 24,
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 24,
                       fontWeight: FontWeight.w700,
                       color: Colors.indigo[900],
                     ),
@@ -132,10 +132,10 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
                     controller: _urlController,
                     decoration: InputDecoration(
                       labelText: VideoStrings.t(lang, 'stream_url_label'),
-                      labelStyle: GoogleFonts.poppins(color: Colors.grey[600]),
+                      labelStyle: TextStyle(fontFamily: 'Poppins', color: AppPalette.textS),
                       prefixIcon: const Icon(Icons.link, color: Colors.blueAccent),
                       filled: true,
-                      fillColor: Colors.grey[100],
+                      fillColor: AppPalette.raised,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
                         borderSide: BorderSide.none,
@@ -146,11 +146,11 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(16),
-                        borderSide: BorderSide(color: Colors.grey[300]!, width: 1),
+                        borderSide: BorderSide(color: AppPalette.border, width: 1),
                       ),
                     ),
                     keyboardType: TextInputType.url,
-                    style: GoogleFonts.poppins(fontSize: 16),
+                    style: TextStyle(fontFamily: 'Poppins', fontSize: 16),
                     enabled: !_isLoading,
                   ),
                   const SizedBox(height: 24),
@@ -172,8 +172,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
                         _isLoading
                             ? VideoStrings.t(lang, 'common_loading')
                             : VideoStrings.t(lang, 'stream_play_now'),
-                        style: GoogleFonts.poppins(
-                          fontSize: 18,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 18,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

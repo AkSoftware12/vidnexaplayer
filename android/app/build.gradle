@@ -4,6 +4,7 @@ plugins {
     // Processes android/app/google-services.json so Firebase can initialise
     // from the generated resources instead of hardcoded FirebaseOptions in Dart.
     id "com.google.gms.google-services"
+    id "com.google.firebase.crashlytics"
     id "dev.flutter.flutter-gradle-plugin"
 }
 
@@ -45,6 +46,31 @@ android {
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName
         multiDexEnabled true
+
+        // Crash 1: "Could not find 'libflutter.so'" at MainActivity.onCreate.
+        // With no explicit filter the build packages whatever ABI directories
+        // the dependencies happen to contribute, including ones Flutter ships
+        // no engine artifact for — so Play could hand a device a split whose
+        // lib/<abi>/ contained plugin .so files but no libflutter.so. Pinning
+        // the three ABIs the Flutter engine actually builds for means every
+        // generated split either has the engine or is not generated at all.
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86_64'
+
+            // NOTE: do NOT set `debugSymbolLevel 'NONE'` here.
+            //
+            // It looks like an easy ~20 MB off the .aab, but Flutter's own
+            // gradle step then fails with "Release app bundle failed to strip
+            // debug symbols from native libraries" — reproduced on a full
+            // `flutter clean` build, so it is the flag and not a stale cache.
+            // Gradle still writes a bundle, but the build reports failure and
+            // that is not an artifact worth uploading.
+            //
+            // It also optimises the wrong number: symbols are stripped by Play
+            // and never reach a user's download, so the only thing it shrinks
+            // is the file you upload — while costing symbolicated native
+            // crash reports for libmpv and the engine.
+        }
     }
 
     signingConfigs {
@@ -57,6 +83,35 @@ android {
                 keyAlias keystoreProperties['keyAlias']
                 keyPassword keystoreProperties['keyPassword']
             }
+        }
+    }
+
+    // Same crash, second half. There is deliberately NO legacy
+    // `splits { abi { ... } }` block in this file — it would override the
+    // abiFilters above and is the classic way an APK ends up without an
+    // engine. The bundle config below keeps Play's ABI splitting on (that part
+    // is correct and wanted) while making sure nothing strips native libs.
+    bundle {
+        abi {
+            enableSplit true
+        }
+        density {
+            enableSplit true
+        }
+        language {
+            // Flutter carries its own localisations; language splits strip
+            // resources the embedding still resolves at runtime.
+            enableSplit false
+        }
+    }
+
+    packagingOptions {
+        jniLibs {
+            // AGP 8 default, pinned explicitly: the .so files stay uncompressed
+            // and are mapped straight out of the APK. Legacy packaging extracts
+            // them to /data at install time, and a failed/partial extraction is
+            // exactly what surfaces as "Could not find 'libflutter.so'".
+            useLegacyPackaging false
         }
     }
 
@@ -102,6 +157,13 @@ dependencies {
     implementation 'com.google.android.play:review:2.0.1'
     implementation 'com.google.android.play:review-ktx:2.0.1'
     implementation "androidx.documentfile:documentfile:1.0.1"
+    // NOTE: there is deliberately NO explicit com.android.billingclient:billing
+    // line here. The in_app_purchase_android plugin brings Play Billing 8.0.0
+    // itself, and its Java code is compiled against that exact API. Forcing a
+    // different version from this file resolves the whole graph to the forced
+    // one and breaks the plugin at runtime (NoSuchMethodError). Billing 8 is
+    // what Google Play requires from 31 Aug 2026, so v8 is already compliant.
+
 
 
 }

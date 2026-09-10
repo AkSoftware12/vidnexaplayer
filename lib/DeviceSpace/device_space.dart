@@ -1,10 +1,9 @@
 import 'package:disk_space_plus/disk_space_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
-import '../DirectoryFolder/directory_folder.dart';
+import '../DirectoryFolder/file_browser/file_browser_page.dart';
 import '../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../ads/app_open_ad_manager.dart';
@@ -65,8 +64,7 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
         backgroundColor: Theme.of(context).colorScheme.surface,
         title: Text(
           DeviceStrings.t(lang, 'device_appbar_title'),
-          style: GoogleFonts.radioCanada(
-            color: Theme.of(context).colorScheme.secondary,
+          style: TextStyle(fontFamily: 'RadioCanada', color: Theme.of(context).colorScheme.secondary,
             fontSize: 15.sp,
             fontWeight: FontWeight.bold,
           ),
@@ -91,8 +89,7 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
             ),
             title: Text(
               DeviceStrings.t(lang, 'device_internal_storage'),
-              style: GoogleFonts.poppins(
-                color: Theme.of(context).colorScheme.secondary,
+              style: TextStyle(fontFamily: 'Poppins', color: Theme.of(context).colorScheme.secondary,
                 fontSize: 13.sp,
                 fontWeight: FontWeight.bold,
               ),
@@ -101,8 +98,7 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
               DeviceStrings.t(lang, 'device_storage_free_of')
                   .replaceAll('{free}', gb(_freeDiskSpaceGB))
                   .replaceAll('{total}', gb(_totalDiskSpaceGB)),
-              style: GoogleFonts.poppins(
-                color: Colors.grey,
+              style: TextStyle(fontFamily: 'Poppins', color: Colors.grey,
                 fontSize: 11.sp,
               ),
             ),
@@ -110,7 +106,8 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => DirectoryFolder(),
+                  settings: const RouteSettings(name: 'FileBrowserScreen'),
+                  builder: (_) => const FileBrowserPage(),
                 ),
               );
             },

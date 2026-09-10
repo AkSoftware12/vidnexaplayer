@@ -1,6 +1,8 @@
 import 'package:country_codes/country_codes.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
+import '../../Utils/app_palette.dart';
+import '../../ads/app_open_ad_manager.dart';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:hive_flutter/hive_flutter.dart';
@@ -20,7 +22,30 @@ class YouTubeTopPlaylists extends StatefulWidget {
   State<YouTubeTopPlaylists> createState() => _YouTubeTopPlaylistsState();
 }
 
+/// Reads a nested JSON object out of an API item, whatever shape it arrived in.
+///
+/// `json.decode` produces `Map<String, dynamic>`, but Hive gives the same data
+/// back as `Map<dynamic, dynamic>`, so a plain cast throws once the list is
+/// served from cache. See the same note in `playlistvideos.dart`.
+Map<String, dynamic> _asMap(dynamic value) =>
+    value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+
 class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
+  final AppOpenAdManager _adManager = AppOpenAdManager();
+
+  /// Categories to clear before the first in-feed ad, and the gap after that.
+  ///
+  /// The first category stays ad-free: this tab opens straight onto content,
+  /// and an ad in the first screenful of a browse feed is where mis-taps come
+  /// from.
+  static const int _categoriesBeforeFirstAd = 1;
+  static const int _categoriesBetweenAds = 3;
+
+  bool _showAdAfterCategory(int index) {
+    if (index < _categoriesBeforeFirstAd) return false;
+    return (index - _categoriesBeforeFirstAd) % _categoriesBetweenAds == 0;
+  }
+
   /// ⚠️ Supply at build time so the key is not sitting in source control:
   ///     flutter run --dart-define=YT_API_KEY=xxxx
   /// Also restrict the key to this app's package + SHA-1 in Google Cloud
@@ -186,11 +211,12 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     final categories = categoryPlaylists.keys.toList();
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppPalette.surface,
 
       // ✅ Pull to refresh (force refresh)
       body: RefreshIndicator(
@@ -216,7 +242,9 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
         )
             : ListView(
           padding: const EdgeInsets.only(bottom: 16),
-          children: categories.map((category) {
+          children: categories.asMap().entries.map((entry) {
+            final categoryIndex = entry.key;
+            final category = entry.value;
             final playlists = categoryPlaylists[category] ?? [];
 
             if (playlists.isEmpty) return const SizedBox.shrink();
@@ -235,8 +263,8 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
                           category,
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            color: Colors.black,
+                          style: TextStyle(
+                            color: AppPalette.textH,
                             fontSize: 15,
                             fontWeight: FontWeight.w700,
                           ),
@@ -272,17 +300,17 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
                     scrollDirection: Axis.horizontal,
                     itemCount: playlists.length,
                     itemBuilder: (context, index) {
-                      final playlist = playlists[index] as Map<String, dynamic>;
-                      final snippet = (playlist["snippet"] ?? {}) as Map<String, dynamic>;
+                      final playlist = _asMap(playlists[index]);
+                      final snippet = _asMap(playlist["snippet"]);
 
                       final title = (snippet["title"] ?? "").toString();
                       final channelTitle = (snippet["channelTitle"] ?? "").toString();
 
-                      final thumbnails = (snippet["thumbnails"] ?? {}) as Map<String, dynamic>;
-                      final medium = (thumbnails["medium"] ?? {}) as Map<String, dynamic>;
+                      final thumbnails = _asMap(snippet["thumbnails"]);
+                      final medium = _asMap(thumbnails["medium"]);
                       final thumbnail = (medium["url"] ?? "").toString();
 
-                      final idObj = (playlist["id"] ?? {}) as Map<String, dynamic>;
+                      final idObj = _asMap(playlist["id"]);
                       final playlistId = (idObj["playlistId"] ?? "").toString();
 
                       if (playlistId.isEmpty) return const SizedBox.shrink();
@@ -292,6 +320,7 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
+                              settings: const RouteSettings(name: 'YouTubePlaylistVideosScreen'),
                               builder: (_) => YouTubePlaylistVideos(
                                 playlistId: playlistId,
                                 playlistTitle: title,
@@ -308,7 +337,7 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
                             bottom: 8,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.white,
+                            color: AppPalette.card,
                             borderRadius: BorderRadius.circular(5),
                             boxShadow: [
                               BoxShadow(
@@ -374,8 +403,8 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
                                   title,
                                   maxLines: 2,
                                   overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.black,
+                                  style: TextStyle(
+                                    color: AppPalette.textH,
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600,
                                   ),
@@ -402,6 +431,16 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
                     },
                   ),
                 ),
+
+                // In-feed slot, between whole categories rather than inside a
+                // playlist row: those cards are a fast horizontal scroll, and
+                // an ad card sitting among them would collect taps meant for
+                // the next thumbnail.
+                if (_showAdAfterCategory(categoryIndex))
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(10, 6, 10, 14),
+                    child: _adManager.nativeWidget(),
+                  ),
               ],
             );
           }).toList(),

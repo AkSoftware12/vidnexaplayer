@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../NotifyListeners/LanguageProvider/video_strings.dart';
 import '../../Utils/color.dart';
+import '../../ads/app_open_ad_manager.dart';
 
 /// ✅ Playlist videos screen with Hive cache (per playlist 24 hours me 1 bar API hit)
 /// Requirement:
@@ -33,7 +34,28 @@ class YouTubePlaylistVideos extends StatefulWidget {
   State<YouTubePlaylistVideos> createState() => _YouTubePlaylistVideosState();
 }
 
+/// Reads a nested JSON object out of an API item, whatever shape it arrived in.
+///
+/// `json.decode` produces `Map<String, dynamic>`, but Hive gives the same data
+/// back as `Map<dynamic, dynamic>` — so `as Map<String, dynamic>` worked on the
+/// first, freshly fetched visit and threw `_TypeError` the moment the list was
+/// served from cache, replacing the whole list or grid with a red error screen.
+/// `Map.from` accepts both, and a missing or malformed value yields an empty
+/// map rather than an exception.
+Map<String, dynamic> _asMap(dynamic value) =>
+    value is Map ? Map<String, dynamic>.from(value) : <String, dynamic>{};
+
 class _YouTubePlaylistVideosState extends State<YouTubePlaylistVideos> {
+  final AppOpenAdManager _adManager = AppOpenAdManager();
+
+  /// Videos between in-feed ad slots in the list view.
+  ///
+  /// Only the list gets them. Its rows are full width, so an ad band reads as
+  /// its own thing; the grid's cells are 2-up thumbnails a thumb moves through
+  /// quickly, and an ad occupying one of those slots is a mis-tap waiting to
+  /// happen.
+  static const int _videosPerAd = 6;
+
   final Box _box = Hive.box('yt_cache');
 
   static const Duration _cacheDuration = Duration(hours: 24);
@@ -255,6 +277,7 @@ class _YouTubePlaylistVideosState extends State<YouTubePlaylistVideos> {
         )
             : (isGridView ? _buildGrid() : _buildList())),
       ),
+      bottomNavigationBar: _adManager.bannerWidget(),
     );
   }
 
@@ -269,17 +292,17 @@ class _YouTubePlaylistVideosState extends State<YouTubePlaylistVideos> {
       ),
       itemCount: videos.length,
       itemBuilder: (context, index) {
-        final video = videos[index] as Map<String, dynamic>;
-        final snippet = (video["snippet"] ?? {}) as Map<String, dynamic>;
+        final video = _asMap(videos[index]);
+        final snippet = _asMap(video["snippet"]);
 
         final title = (snippet["title"] ?? "").toString();
         final channelTitle = (snippet["channelTitle"] ?? "").toString();
 
-        final thumbs = (snippet["thumbnails"] ?? {}) as Map<String, dynamic>;
-        final medium = (thumbs["medium"] ?? {}) as Map<String, dynamic>;
+        final thumbs = _asMap(snippet["thumbnails"]);
+        final medium = _asMap(thumbs["medium"]);
         final thumbnail = (medium["url"] ?? "").toString();
 
-        final resource = (snippet["resourceId"] ?? {}) as Map<String, dynamic>;
+        final resource = _asMap(snippet["resourceId"]);
         final videoId = (resource["videoId"] ?? "").toString();
 
         if (videoId.isEmpty) return const SizedBox.shrink();
@@ -358,21 +381,35 @@ class _YouTubePlaylistVideosState extends State<YouTubePlaylistVideos> {
   }
 
   Widget _buildList() {
+    // One slot per full block of videos, and only when videos follow it — an
+    // ad stranded at the end of the list is just a footer.
+    const block = _videosPerAd + 1;
+    final adCount = videos.isEmpty ? 0 : (videos.length - 1) ~/ _videosPerAd;
+
     return ListView.builder(
       padding: const EdgeInsets.all(5),
-      itemCount: videos.length,
+      itemCount: videos.length + adCount,
       itemBuilder: (context, index) {
-        final video = videos[index] as Map<String, dynamic>;
-        final snippet = (video["snippet"] ?? {}) as Map<String, dynamic>;
+        if (index % block == _videosPerAd) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            child: _adManager.nativeWidget(),
+          );
+        }
+
+        // Skip back over the ad slots already passed to reach the real index.
+        final videoIndex = index - index ~/ block;
+        final video = _asMap(videos[videoIndex]);
+        final snippet = _asMap(video["snippet"]);
 
         final title = (snippet["title"] ?? "").toString();
         final channelTitle = (snippet["channelTitle"] ?? "").toString();
 
-        final thumbs = (snippet["thumbnails"] ?? {}) as Map<String, dynamic>;
-        final medium = (thumbs["medium"] ?? {}) as Map<String, dynamic>;
+        final thumbs = _asMap(snippet["thumbnails"]);
+        final medium = _asMap(thumbs["medium"]);
         final thumbnail = (medium["url"] ?? "").toString();
 
-        final resource = (snippet["resourceId"] ?? {}) as Map<String, dynamic>;
+        final resource = _asMap(snippet["resourceId"]);
         final videoId = (resource["videoId"] ?? "").toString();
 
         if (videoId.isEmpty) return const SizedBox.shrink();

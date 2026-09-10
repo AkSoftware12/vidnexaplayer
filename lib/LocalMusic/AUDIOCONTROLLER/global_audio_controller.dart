@@ -9,6 +9,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../AudioServiceInit/audio_service_init.dart';
 import '../BackgroundAudioHandler/background_audio_handler.dart';
+import '../../features/playback/playback_coordinator.dart';
 
 class GlobalAudioController {
   static final GlobalAudioController _instance =
@@ -68,6 +69,14 @@ class GlobalAudioController {
 
     // ✅ fixed show/hide logic
     _stateSub = player.playerStateStream.listen((state) {
+      // Music and video are separate engines with no shared audio focus, so
+      // starting music has to pause a video explicitly. Listening on the
+      // player's own stream (rather than the UI button) means this also covers
+      // playback started from the notification or a headset button.
+      if (state.playing) {
+        unawaited(PlaybackCoordinator.instance.onMusicPlaying());
+      }
+
       final hasQueue = handler.queue.value.isNotEmpty;
 
       if (state.processingState == ProcessingState.ready && hasQueue) {

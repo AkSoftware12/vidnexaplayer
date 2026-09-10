@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 import '../../../NetWork Stream/stream_video.dart';
 import '../../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../../NotifyListeners/LanguageProvider/language_provider.dart';
-import '../../../Photo/image_album.dart';
+import '../../../Utils/app_palette.dart';
+import '../../../features/gallery/presentation/pages/gallery_home_page.dart';
 import '../../../StatusSaverScreen/whatsapp_download.dart';
 import '../../../VideoPLayer/VideoList/video_list.dart';
 import '../../HomeBottomnavigation/home_bottomNavigation.dart'; // for AssetPathEntity
@@ -107,6 +107,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Column(
       children: [
@@ -137,18 +138,16 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                     children: [
                       Text(
                         HomeStrings.t(lang, 'home_media_categories_title'),
-                        style: GoogleFonts.poppins(
-                          fontSize: 14.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp,
                           fontWeight: FontWeight.w600,
-                          color: Colors.black87,
+                          color: AppPalette.textH,
                         ),
                       ),
                       Text(
                         HomeStrings.t(lang, 'home_media_categories_subtitle'), // 👈 subtitle
-                        style: GoogleFonts.poppins(
-                          fontSize: 7.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 7.sp,
                           fontWeight: FontWeight.w400,
-                          color: Colors.black45,
+                          color: AppPalette.textS,
                         ),
                       ),
                     ],
@@ -164,7 +163,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                 ),
                 child: Icon(
                   Icons.arrow_forward_ios,
-                  color: Colors.black54,
+                  color: AppPalette.textB,
                   size: 15.sp,
                 ),
               ),
@@ -187,6 +186,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
+                        settings: const RouteSettings(name: 'AllVideosScreen'),
                         builder:
                             (context) => VideoFolderScreen(
                               folderName: 'All Videos',
@@ -199,12 +199,13 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                   else if (index == 1) {
                     Navigator.push(
                       context,
-                      MaterialPageRoute(builder: (context) => AlbumScreen()),
+                      MaterialPageRoute(builder: (context) => const GalleryHomePage(), settings: const RouteSettings(name: 'GalleryHomeScreen')),
                     );
                   } else if (index == 2) {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
+                        settings: const RouteSettings(name: 'OfflineMusicScreen'),
                         builder:
                             (context) => HomeBottomNavigation(bottomIndex: 1),
                       ),
@@ -213,6 +214,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
+                        settings: const RouteSettings(name: 'StatusSaverScreen'),
                         builder: (context) => StatusSaverHomePage(),
                       ),
                     );
@@ -220,6 +222,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
+                        settings: const RouteSettings(name: 'NetworkStreamScreen'),
                         builder: (context) => VideoPlayerStream(),
                       ),
                     );
@@ -283,8 +286,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                             Spacer(),
                             Text(
                               HomeStrings.t(lang, item.text),
-                              style: GoogleFonts.poppins(
-                                fontSize: 10.sp,
+                              style: TextStyle(fontFamily: 'Poppins', fontSize: 10.sp,
                                 fontWeight: FontWeight.w700,
                                 color: Colors.white,
                               ),

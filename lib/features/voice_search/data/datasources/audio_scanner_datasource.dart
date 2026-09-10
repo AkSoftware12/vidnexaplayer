@@ -1,4 +1,5 @@
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:permission_handler/permission_handler.dart';
 
 import '../../domain/entities/media_kind.dart';
 import '../models/video_index_entry.dart';
@@ -16,7 +17,38 @@ class AudioScannerDatasource {
 
   final OnAudioQuery _audioQuery = OnAudioQuery();
 
-  Future<bool> hasPermission() => _audioQuery.checkAndRequest();
+  /// Read-only audio-permission check.
+  ///
+  /// Deliberately NOT `OnAudioQuery.checkAndRequest()`. That routes into the
+  /// plugin's own `PermissionController`, which parks a pending result
+  /// callback on the Activity (request code 88560) and reads it back through
+  /// its static `PluginProvider`. If the Activity is recreated while the
+  /// system dialog is up -- rotation, or Android killing the process behind
+  /// the dialog -- the result is delivered to a `PluginProvider` that was
+  /// never re-initialised, and the plugin throws
+  /// `UninitializedPluginProviderException` straight out of
+  /// `onRequestPermissionsResult`. Android turns that into
+  /// "Failure delivering result ... to activity" and kills the app.
+  ///
+  /// `permission_handler` survives that round trip, and it is already what the
+  /// rest of the app asks with (onboarding's PermissionPage, OfflineMusicTab)
+  /// -- so the grant is requested there, on a screen, and indexing only ever
+  /// *reads* the status. A background scan must never raise a dialog anyway.
+  ///
+  /// Below Android 13 `permission_handler` maps `Permission.audio` onto
+  /// READ_EXTERNAL_STORAGE, so both checks are meaningful on every version.
+  Future<bool> hasPermission() async {
+    try {
+      if (await Permission.audio.isGranted) return true;
+      if (await Permission.storage.isGranted) return true;
+      return false;
+    } catch (_) {
+      // Permission plumbing unavailable (non-Android host, plugin not
+      // attached yet): let the query itself decide rather than reporting an
+      // empty library.
+      return true;
+    }
+  }
 
   Future<int> currentSongCount() async {
     if (!await hasPermission()) return 0;

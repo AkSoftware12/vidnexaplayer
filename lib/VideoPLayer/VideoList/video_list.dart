@@ -2,19 +2,20 @@ import 'dart:io';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../NotifyListeners/LanguageProvider/video_strings.dart';
+import '../../Utils/app_palette.dart';
 import '../../Utils/color.dart';
 import '../../Utils/video_thumb.dart';
 import '../../ads/app_open_ad_manager.dart';
 import '../../main.dart';
 import '../4kPlayer/4k_player.dart';
 import '../4kPlayer/FlotingVideo/floting_video.dart';
+import '../Resume/watch_progress_bar.dart';
 
 
 
@@ -127,18 +128,19 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     _lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppPalette.surface,
       appBar: AppBar(
         title: Text(
           '${widget.folderName} ${'(${_photos.length.toString()})'}',
-          style: const TextStyle(
+          style: TextStyle(
             fontWeight: FontWeight.bold,
-            color: Colors.black,
+            color: AppPalette.textH,
           ),
         ),
-        backgroundColor: Colors.white,
+        backgroundColor: AppPalette.surface,
         elevation: 2,
         actions: [
           Padding(
@@ -154,7 +156,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
                   child: Container(
                     padding: EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: _isGridView ? ColorSelect.maineColor2 : Colors.grey.shade200,
+                      color: _isGridView ? ColorSelect.maineColor2 : AppPalette.raised,
                       borderRadius: BorderRadius.only(
                         topLeft: Radius.circular(10),
                         bottomLeft: Radius.circular(10),
@@ -162,7 +164,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
                     ),
                     child: Icon(
                       Icons.grid_view,
-                      color: _isGridView ? Colors.white : Colors.black87,
+                      color: _isGridView ? Colors.white : AppPalette.textH,
                       size: 20,
                     ),
                   ),
@@ -176,7 +178,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
                   child: Container(
                     padding: EdgeInsets.all(10),
                     decoration: BoxDecoration(
-                      color: !_isGridView ? ColorSelect.maineColor2 : Colors.grey.shade200,
+                      color: !_isGridView ? ColorSelect.maineColor2 : AppPalette.raised,
                       borderRadius: BorderRadius.only(
                         topRight: Radius.circular(10),
                         bottomRight: Radius.circular(10),
@@ -184,7 +186,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
                     ),
                     child: Icon(
                       Icons.list,
-                      color: !_isGridView ? Colors.white : Colors.black87,
+                      color: !_isGridView ? Colors.white : AppPalette.textH,
                       size: 20,
                     ),
                   ),
@@ -222,7 +224,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
           },
           onDelete: () async {
             final file = await _photos[index].file;
-            if (!mounted) return;
+            if (!context.mounted) return;
             if (file == null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text(_t('video_unable_access_file'))),
@@ -233,8 +235,12 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             await _onPhotoDeleted(file.path);
           },
           onShare: () async {
-            // Wait for file to load
+            // Resolving the AssetEntity's file is a platform-channel round
+            // trip; the tile can be gone by the time it completes (list
+            // reloaded, screen popped), and touching this context afterwards
+            // is the async-gap half of the plugin-init crashes.
             final file = await _photos[index].file;
+            if (!context.mounted) return;
             if (file != null) {
               _shareVideo(context, file.path);
             } else {
@@ -265,7 +271,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
           initialIndex: index,
           onDelete: () async {
             final file = await _photos[index].file;
-            if (!mounted) return;
+            if (!context.mounted) return;
             if (file == null) {
               ScaffoldMessenger.of(context).showSnackBar(
                 SnackBar(content: Text(_t('video_unable_access_file'))),
@@ -281,8 +287,12 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
 
           },
           onShare: () async {
-            // Wait for file to load
+            // Resolving the AssetEntity's file is a platform-channel round
+            // trip; the tile can be gone by the time it completes (list
+            // reloaded, screen popped), and touching this context afterwards
+            // is the async-gap half of the plugin-init crashes.
             final file = await _photos[index].file;
+            if (!context.mounted) return;
             if (file != null) {
               _shareVideo(context, file.path);
             } else {
@@ -448,7 +458,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(16.0),
           ),
-          backgroundColor: Colors.white,
+          backgroundColor: AppPalette.card,
           title: Row(
             children: [
               Icon(Icons.video_file, color: ColorSelect.maineColor, size: 30),
@@ -537,13 +547,13 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
           label,
           style: TextStyle(
             fontWeight: FontWeight.w500,
-            color: Colors.grey[600],
+            color: AppPalette.textS,
           ),
         ),
         SizedBox(height: 4),
         Text(
           value,
-          style: TextStyle(fontWeight: FontWeight.w400, color: Colors.black),
+          style: TextStyle(fontWeight: FontWeight.w400, color: AppPalette.textH),
         ),
       ],
     );
@@ -587,6 +597,7 @@ class PhotoTile extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
+                settings: const RouteSettings(name: 'VideoPlayerScreen'),
                 builder: (_) => FullScreenVideoPlayerFixed(
                   videos: photos,
                   initialIndex: initialIndex,
@@ -611,13 +622,28 @@ class PhotoTile extends StatelessWidget {
                 children: [
                   ClipRRect(
                     borderRadius: BorderRadius.circular(10.sp),
-                    child: VideoThumb(
-                      // Keyed by asset so ListView recycling swaps the image
-                      // instead of showing the previous row's frame.
-                      key: ValueKey(photo.id),
-                      asset: photo,
-                      width: 100.sp,
-                      height: 70.sp,
+                    child: Stack(
+                      children: [
+                        VideoThumb(
+                          // Keyed by asset so ListView recycling swaps the
+                          // image instead of showing the previous row's frame.
+                          key: ValueKey(photo.id),
+                          asset: photo,
+                          width: 100.sp,
+                          height: 70.sp,
+                        ),
+                        // Watched-so-far line, clipped by the same rounded
+                        // corners as the thumbnail.
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: WatchProgressBar(
+                            id: photo.id,
+                            fallbackDuration: photo.videoDuration,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   Icon(
@@ -643,8 +669,7 @@ class PhotoTile extends StatelessWidget {
                       // decide whether to show it.
                       child: Text(
                         _formatDuration(photo.videoDuration),
-                        style: GoogleFonts.poppins(
-                          fontSize: 9.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 9.sp,
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
@@ -662,8 +687,7 @@ class PhotoTile extends StatelessWidget {
                       photo.title ?? t('video_untitled'),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: 12.sp,
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -687,7 +711,7 @@ class PhotoTile extends StatelessWidget {
                       _buildMenuItem(Icons.play_circle, "play", t('common_play'), Colors.blue),
                       _buildMenuItem(Icons.delete, "delete", t('common_delete'), Colors.red),
                       _buildMenuItem(Icons.info, "info", t('common_info'), Colors.teal),
-                      _buildMenuItem(Icons.share, "share", t('common_share'), Colors.black54),
+                      _buildMenuItem(Icons.share, "share", t('common_share'), AppPalette.textB),
                     ],
                   ).then((value) async {
                     if (value == "play") {
@@ -698,6 +722,7 @@ class PhotoTile extends StatelessWidget {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
+                              settings: const RouteSettings(name: 'VideoPlayerScreen'),
                               builder: (_) => FullScreenVideoPlayerFixed(
                                 videos: photos,
                                 initialIndex: initialIndex,
@@ -721,7 +746,7 @@ class PhotoTile extends StatelessWidget {
                   padding: EdgeInsets.only(left: 4.sp),
                   child: Icon(
                     Icons.more_vert,
-                    color: Colors.black87,
+                    color: AppPalette.textH,
                     size: 18.sp,
                   ),
                 ),
@@ -745,7 +770,7 @@ class PhotoTile extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 20.sp),
           SizedBox(width: 8),
-          Text(label, style: GoogleFonts.poppins(fontSize: 12.sp)),
+          Text(label, style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp)),
         ],
       ),
     );
@@ -851,17 +876,15 @@ class _PhotoTileFileInfoState extends State<_PhotoTileFileInfo> {
           !_resolved
               ? ''
               : (sizeMB > 0 ? '${sizeMB.toStringAsFixed(2)} MB' : VideoStrings.t(lang, 'video_file_missing')),
-          style: GoogleFonts.poppins(
-            fontSize: 10.sp,
-            color: sizeMB > 0 ? Colors.grey[600] : Colors.redAccent,
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 10.sp,
+            color: sizeMB > 0 ? AppPalette.textS : Colors.redAccent,
             fontWeight: FontWeight.w600,
           ),
         ),
         Text(
           _formatDuration(duration),
-          style: GoogleFonts.poppins(
-            fontSize: 10.sp,
-            color: Colors.grey[700],
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 10.sp,
+            color: AppPalette.textS,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -900,6 +923,7 @@ class GridviewList extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
+                settings: const RouteSettings(name: 'VideoPlayerScreen'),
                 builder: (_) => FullScreenVideoPlayerFixed(
                   videos: photos,
                   initialIndex: initialIndex,
@@ -927,11 +951,24 @@ class GridviewList extends StatelessWidget {
                       topLeft: Radius.circular(5.sp),
                       topRight: Radius.circular(5.sp),
                     ),
-                    child: VideoThumb(
-                      key: ValueKey(photo.id),
-                      asset: photo,
-                      width: double.infinity,
-                      height: 140.sp,
+                    child: Stack(
+                      children: [
+                        VideoThumb(
+                          key: ValueKey(photo.id),
+                          asset: photo,
+                          width: double.infinity,
+                          height: 140.sp,
+                        ),
+                        Positioned(
+                          left: 0,
+                          right: 0,
+                          bottom: 0,
+                          child: WatchProgressBar(
+                            id: photo.id,
+                            fallbackDuration: photo.videoDuration,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                   Icon(
@@ -960,8 +997,7 @@ class GridviewList extends StatelessWidget {
                       ),
                       child: Text(
                         _formatDuration(photo.videoDuration),
-                        style: GoogleFonts.poppins(
-                          fontSize: 9.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 9.sp,
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
@@ -983,8 +1019,7 @@ class GridviewList extends StatelessWidget {
                             photo.title ?? t('video_untitled'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              fontSize: 11.sp,
+                            style: TextStyle(fontFamily: 'Poppins', fontSize: 11.sp,
                               fontWeight: FontWeight.w600,
                             ),
                           ),
@@ -1007,7 +1042,7 @@ class GridviewList extends StatelessWidget {
                           _buildMenuItem(Icons.play_circle, "play", t('common_play'), Colors.blue),
                           _buildMenuItem(Icons.delete, "delete", t('common_delete'), Colors.red),
                           _buildMenuItem(Icons.info, "info", t('common_info'), Colors.teal),
-                          _buildMenuItem(Icons.share, "share", t('common_share'), Colors.black54),
+                          _buildMenuItem(Icons.share, "share", t('common_share'), AppPalette.textB),
                         ],
                       ).then((value) async {
                         if (value == "play") {
@@ -1018,6 +1053,7 @@ class GridviewList extends StatelessWidget {
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
+                                  settings: const RouteSettings(name: 'VideoPlayerScreen'),
                                   builder: (_) => FullScreenVideoPlayerFixed(
                                     videos: photos,
                                     initialIndex: initialIndex,
@@ -1039,7 +1075,7 @@ class GridviewList extends StatelessWidget {
                       padding: EdgeInsets.only(left: 4.sp),
                       child: Icon(
                         Icons.more_vert,
-                        color: Colors.black87,
+                        color: AppPalette.textH,
                         size: 18.sp,
                       ),
                     ),
@@ -1062,7 +1098,7 @@ class GridviewList extends StatelessWidget {
         children: [
           Icon(icon, color: color, size: 20.sp),
           SizedBox(width: 8),
-          Text(label, style: GoogleFonts.poppins(fontSize: 12.sp)),
+          Text(label, style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp)),
         ],
       ),
     );

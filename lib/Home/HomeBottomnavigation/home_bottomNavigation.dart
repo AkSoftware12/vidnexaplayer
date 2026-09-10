@@ -5,26 +5,33 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:new_version_plus/new_version_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:videoplayer/Analytics/screen_analytics.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
-import 'package:videoplayer/Photo/image_album.dart';
+import '../../features/gallery/presentation/pages/gallery_home_page.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:videoplayer/Utils/internet_banner.dart';
 import 'package:videoplayer/Utils/rating_popup.dart';
+import '../../Billing/billing_service.dart';
+import '../../Billing/paywall_screen.dart';
+import '../../NotifyListeners/LanguageProvider/paywall_strings.dart';
+import '../../DarkMode/theme_settings_section.dart';
+import '../../Utils/app_palette.dart';
 import '../../DeviceSpace/device_space.dart';
 import '../../features/voice_search/presentation/pages/voice_search_page.dart';
 import '../../features/voice_search/presentation/services/video_index_service.dart';
 import '../../LocalMusic/MiniPlayer/mini_player.dart';
 import '../../NetWork Stream/stream_video.dart';
 import '../../Notification/notification.dart';
+import '../../Notification/notification_store.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/LanguageProvider/app_strings.dart';
+import '../../NotifyListeners/LanguageProvider/equalizer_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_picker_sheet.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
@@ -33,6 +40,9 @@ import '../../StatusSaverScreen/whatsapp_download.dart';
 import '../../Utils/textSize.dart';
 import '../../ads/app_open_ad_manager.dart';
 import '../../app_store/app_store.dart';
+import '../../features/equalizer/audio_effects_service.dart';
+import '../../features/equalizer/domain/eq_models.dart';
+import '../../features/equalizer/presentation/equalizer_sheet.dart';
 import '../HomeScreen/home2.dart';
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
@@ -63,21 +73,42 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   String userImage = "";
 
   // ================= EXIT DIALOG AD =================
-  /// Banner ad shown inside the exit confirmation dialog.
-  /// Loaded up-front in [initState] so it is ready the moment the
-  /// user presses back — loading it lazily would show a blank space.
+  /// Banner shown inside the exit confirmation dialog. Loaded up front so the
+  /// dialog never opens with an empty 250px hole where the ad will land.
+  ///
+  /// Ownership is **transferred** to the dialog when it opens (see
+  /// [_takeExitAd]): the field is cleared, `_ExitDialogAd` disposes the ad
+  /// when that route goes away, and a fresh one is loaded for next time.
+  ///
+  /// Handing one BannerAd to a second AdWidget is what produced
+  ///   "The Android view returned from PlatformView#getView() was already
+  ///    added to a parent view"
+  /// out of `SurfaceAndroidViewController._sendCreateMessage`. Closing the
+  /// dialog tears its platform view down asynchronously, so a quick
+  /// back / cancel / back sequence asked for a second Android view backed by
+  /// the same native ad View while it was still parented to the first route.
+  /// One BannerAd is now used by exactly one AdWidget, ever.
   BannerAd? _exitBannerAd;
   bool _isExitAdLoaded = false;
 
   void _loadExitAd() {
-    _exitBannerAd = BannerAd(
-      // TODO: Google TEST ad unit ID — release se pehle apni real ID lagana!
+    // Another ad request a subscriber must never make. This one is easy to
+    // miss because it fires from initState rather than from a widget: the exit
+    // dialog preloads its 300x250 banner long before the dialog is opened.
+    if (BillingService.instance.isPremium) return;
+
+    final ad = BannerAd(
       adUnitId: AdUnits.banner,
-      size: AdSize.mediumRectangle, // 300x250 — dialog ke liye best fit
+      size: AdSize.mediumRectangle, // 300x250 -- dialog ke liye best fit
       request: const AdRequest(),
       listener: BannerAdListener(
         onAdLoaded: (ad) {
-          if (!mounted) return;
+          if (!mounted) {
+            // Screen went away mid-flight; nothing will ever render this.
+            ad.dispose();
+            _exitBannerAd = null;
+            return;
+          }
           setState(() => _isExitAdLoaded = true);
         },
         onAdFailedToLoad: (ad, error) {
@@ -87,7 +118,31 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
           _isExitAdLoaded = false;
         },
       ),
-    )..load();
+    );
+    _exitBannerAd = ad;
+    ad.load();
+  }
+
+  /// Hands the loaded ad (if there is one) to the caller and gives up the
+  /// field's claim on it. Returns null while a load is still in flight or has
+  /// failed, in which case the dialog simply shows no ad.
+  BannerAd? _takeExitAd() {
+    // Gating only [_loadExitAd] is not enough. A user who opened the app as a
+    // free user already has this banner in hand; buying premium afterwards
+    // cannot un-load it, so without this check the very next back press would
+    // still show them an ad. Drop it instead of handing it to the dialog.
+    if (BillingService.instance.isPremium) {
+      _exitBannerAd?.dispose();
+      _exitBannerAd = null;
+      _isExitAdLoaded = false;
+      return null;
+    }
+
+    if (!_isExitAdLoaded) return null;
+    final ad = _exitBannerAd;
+    _exitBannerAd = null;
+    _isExitAdLoaded = false;
+    return ad;
   }
   // ==================================================
 
@@ -103,7 +158,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     checkForVersion();
 
     _getUsername();
-    _loadExitAd(); // 👈 exit dialog ka ad pehle se load
+
+    _loadExitAd(); // exit dialog ka ad pehle se load
     currentPage = widget.bottomIndex;
 
     final newVersion = NewVersionPlus(
@@ -140,6 +196,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
 
   @override
   void dispose() {
+    // Only ever the *unclaimed* preload: once a dialog takes it, _ExitDialogAd
+    // owns it and the field is null.
     _exitBannerAd?.dispose();
     super.dispose();
   }
@@ -191,37 +249,47 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   /// invoked with `android:enableOnBackInvokedCallback="true"` (Android 13+),
   /// which is why the dialog stopped appearing.
   Future<bool> _confirmExit() async {
-    return (await showGeneralDialog<bool>(
-      context: context,
-      barrierDismissible: true,
-      barrierLabel: 'Exit',
-      barrierColor: Colors.black54,
-      transitionDuration: const Duration(milliseconds: 450),
-      pageBuilder: (context, anim1, anim2) => const SizedBox.shrink(),
-      transitionBuilder: (context, animation, secondaryAnimation, child) {
-        // Elastic bounce + fade + background blur
-        final curvedValue = Curves.easeOutBack.transform(animation.value);
-        return BackdropFilter(
-          filter: ImageFilter.blur(
-            sigmaX: 5 * animation.value,
-            sigmaY: 5 * animation.value,
-          ),
-          child: Transform.scale(
-            scale: curvedValue,
-            child: Opacity(
-              opacity: animation.value.clamp(0.0, 1.0),
-              child: _buildExitDialog(context),
+    // Taken once, before the route is built: the transitionBuilder below runs
+    // on every animation frame, and the dialog must see the same BannerAd
+    // instance each time or its AdWidget would be re-created mid-transition.
+    final exitAd = _takeExitAd();
+    try {
+      return (await showGeneralDialog<bool>(
+        context: context,
+        barrierDismissible: true,
+        barrierLabel: 'Exit',
+        barrierColor: Colors.black54,
+        transitionDuration: const Duration(milliseconds: 450),
+        pageBuilder: (context, anim1, anim2) => const SizedBox.shrink(),
+        transitionBuilder: (context, animation, secondaryAnimation, child) {
+          // Elastic bounce + fade + background blur
+          final curvedValue = Curves.easeOutBack.transform(animation.value);
+          return BackdropFilter(
+            filter: ImageFilter.blur(
+              sigmaX: 5 * animation.value,
+              sigmaY: 5 * animation.value,
             ),
-          ),
-        );
-      },
-    )) ??
-        false;
+            child: Transform.scale(
+              scale: curvedValue,
+              child: Opacity(
+                opacity: animation.value.clamp(0.0, 1.0),
+                child: _buildExitDialog(context, exitAd),
+              ),
+            ),
+          );
+        },
+      )) ??
+          false;
+    } finally {
+      // Prime the next dialog. The one just shown (if any) now belongs to
+      // _ExitDialogAd; only start a load when no other is already in flight.
+      if (mounted && _exitBannerAd == null) _loadExitAd();
+    }
   }
 
   /// Clean white exit dialog — white background, black text,
   /// subtle border, red Exit button. Sirf ye method replace karo.
-  Widget _buildExitDialog(BuildContext context) {
+  Widget _buildExitDialog(BuildContext context, BannerAd? exitAd) {
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.symmetric(horizontal: 24.sp),
@@ -267,24 +335,20 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
 
             Text(
               'Exit App',
-              style: GoogleFonts.openSans(
-                textStyle: TextStyle(
+              style: (TextStyle(
                   color: Colors.black,
                   fontSize: TextSizes.textlarge,
                   fontWeight: FontWeight.w800,
                   letterSpacing: 1.2,
-                ),
-              ),
+                )).copyWith(fontFamily: 'OpenSans'),
             ),
             SizedBox(height: 6.sp),
             Text(
               'Are you sure you want to exit the app?',
-              style: GoogleFonts.openSans(
-                textStyle: TextStyle(
+              style: (TextStyle(
                   color: Colors.black54,
                   fontSize: TextSizes.textmedium,
-                ),
-              ),
+                )).copyWith(fontFamily: 'OpenSans'),
               textAlign: TextAlign.center,
             ),
 
@@ -299,21 +363,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
             ),
 
             // ============ AD SECTION ============
-            if (_isExitAdLoaded && _exitBannerAd != null) ...[
-              Container(
-                decoration: BoxDecoration(
-                  color: Colors.white,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: Colors.black.withValues(alpha: 0.1),
-                    width: 1,
-                  ),
-                ),
-                clipBehavior: Clip.antiAlias,
-                width: _exitBannerAd!.size.width.toDouble(),
-                height: _exitBannerAd!.size.height.toDouble(),
-                child: AdWidget(ad: _exitBannerAd!),
-              ),
+            // Nothing at all when no ad was ready -- better than a 250px hole.
+            if (exitAd != null) ...[
+              _ExitDialogAd(ad: exitAd),
               SizedBox(height: 16.sp),
             ],
             // ====================================
@@ -337,14 +389,12 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                     onPressed: () => Navigator.of(context).pop(false),
                     child: Text(
                       'Cancel',
-                      style: GoogleFonts.openSans(
-                        textStyle: TextStyle(
+                      style: (TextStyle(
                           color: Colors.black87,
                           fontSize: TextSizes.textmedium,
                           fontWeight: FontWeight.bold,
                           letterSpacing: 0.5,
-                        ),
-                      ),
+                        )).copyWith(fontFamily: 'OpenSans'),
                     ),
                   ),
                 ),
@@ -365,14 +415,12 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                     onPressed: () => Navigator.of(context).pop(true),
                     child: Text(
                       'Exit',
-                      style: GoogleFonts.openSans(
-                        textStyle: TextStyle(
+                      style: (TextStyle(
                           color: Colors.white,
                           fontSize: TextSizes.textmedium,
                           fontWeight: FontWeight.w800,
                           letterSpacing: 0.5,
-                        ),
-                      ),
+                        )).copyWith(fontFamily: 'OpenSans'),
                     ),
                   ),
                 ),
@@ -385,6 +433,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   }
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     return PopScope(
       // Block the automatic pop so we can ask first.
       canPop: false,
@@ -411,9 +460,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
       child: Scaffold(
         key: _scaffoldKey,
         // Assign the key to the Scaffold
-        backgroundColor: Colors.white,
+        backgroundColor: AppPalette.surface,
         appBar: AppBar(
-          backgroundColor: Colors.white,
+          backgroundColor: AppPalette.surface,
           elevation: 0,
           automaticallyImplyLeading: false,
           title: Row(
@@ -443,6 +492,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
+                          settings: const RouteSettings(name: 'DeviceSpaceScreen'),
                           builder: (context) => DeviceSpaceScreen(),
                         ),
                       );
@@ -468,10 +518,53 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
               // Grid icon
               SizedBox(
                 height: 35.sp,
-                  child: Image.network('https://cdn.vidnexaplayer.com/images/logo_text.webp')),
+                  child: Image.network(
+                    'https://cdn.vidnexaplayer.com/images/logo_text.webp',
+                    // Offline (or CDN down) an Image.network with no
+                    // errorBuilder rethrows its SocketException through
+                    // FlutterError.onError, and Crashlytics logs that as a
+                    // fatal. Same mark ships in the APK, so falling back to
+                    // it is invisible to the user and cannot fail.
+                    errorBuilder: (_, __, ___) =>
+                        Image.asset('assets/logo_blue_text.png'),
+                  )),
 
               Row(
                 children: [
+                  // ✦ PRO — first in the right-hand cluster rather than last,
+                  // so the notification bell keeps the far-right corner users
+                  // already reach for. Hidden once bought: there is nothing
+                  // left to sell, and the space is better given back.
+                  if (!context.watch<BillingService>().isPremium) ...[
+                    GestureDetector(
+                      onTap: () => PaywallScreen.show(context),
+                      child: Container(
+                        decoration: BoxDecoration(
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFFFFB800), Color(0xFFFF8C00)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFFFFB800)
+                                  .withValues(alpha: 0.35),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(8),
+                        child: const Icon(
+                          Icons.workspace_premium_rounded,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                  ],
+
                   // 🎤 Voice search — offline local video search by spoken
                   // command (Hindi/Hinglish/English). See features/voice_search.
                   GestureDetector(
@@ -479,6 +572,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
+                          settings: const RouteSettings(name: 'VoiceSearchScreen'),
                           builder: (context) => const VoiceSearchPage(),
                         ),
                       );
@@ -514,6 +608,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                           Navigator.push(
                             context,
                             MaterialPageRoute(
+                              settings: const RouteSettings(name: 'NotificationScreen'),
                               builder: (context) => NotificationScreen(),
                             ),
                           );
@@ -528,16 +623,44 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                               color: Colors.black),
                         ),
                       ),
-                      // Positioned(
-                      //   top: 0, // 👈 ye line badli
-                      //   right: 0,
-                      //   child: badges.Badge(
-                      //     label: const Text(
-                      //       '15',
-                      //       style: TextStyle(color: Colors.white, fontSize: 10),
-                      //     ),
-                      //   ),
-                      // )
+                      // Unread count, straight from the store. Rebuilds on its
+                      // own when a push arrives or the list is read, so this
+                      // screen never has to poll.
+                      Positioned(
+                        top: 0,
+                        right: 0,
+                        child: ValueListenableBuilder<int>(
+                          valueListenable:
+                              NotificationStore.instance.unreadCount,
+                          builder: (context, unread, _) {
+                            if (unread == 0) return const SizedBox.shrink();
+                            return Container(
+                              constraints: const BoxConstraints(minWidth: 16),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 1,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.red.shade600,
+                                borderRadius: BorderRadius.circular(9),
+                                border: Border.all(
+                                  color: AppPalette.surface,
+                                  width: 1.5,
+                                ),
+                              ),
+                              child: Text(
+                                unread > 99 ? '99+' : '$unread',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.w700,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
                     ],
                   ),
 
@@ -552,7 +675,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
         body: Stack(
           children: [
             Container(
-              decoration: BoxDecoration(color: Colors.white),
+              decoration: BoxDecoration(color: AppPalette.surface),
               child: Center(
                 child: _getPage(currentPage),
               ),
@@ -583,6 +706,10 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                 setState(() {
                   currentPage = position;
                 });
+                // Tab switch koi naya route nahi banata, isliye Firebase ko
+                // naam yahan se bhejna padta hai — warna chaaron tab ek hi
+                // screen ke andar chhup jaate.
+                ScreenAnalytics.instance.setScreen(_tabScreenName(position));
               },
             ),
 
@@ -617,6 +744,22 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
         return UserProfilePage();
       default:
         return DemoHomeScreen(); // Fallback to HomeScreen
+    }
+  }
+
+  /// Firebase "Screens" report ke naam — [_getPage] ke saath hi rakha hai
+  /// taaki naya tab jodte waqt dono ek saath dikhein.
+  static String _tabScreenName(int page) {
+    switch (page) {
+      case 1:
+        return 'OfflineMusicScreen';
+      case 2:
+        return 'YouTubePlaylistsScreen';
+      case 3:
+        return 'ProfileScreen';
+      case 0:
+      default:
+        return 'HomeScreen';
     }
   }
 
@@ -671,20 +814,16 @@ class CustomBottomBarState extends State<CustomBottomBar> {
       unselectedItemColor: Colors.grey,
       showUnselectedLabels: true,
       type: BottomNavigationBarType.fixed,
-      selectedLabelStyle: GoogleFonts.openSans(
-        textStyle: TextStyle(
+      selectedLabelStyle: (TextStyle(
           color: Theme.of(context).colorScheme.secondary,
           fontSize: 11.sp,
           fontWeight: FontWeight.w600,
-        ),
-      ),
-      unselectedLabelStyle: GoogleFonts.openSans(
-        textStyle: TextStyle(
+        )).copyWith(fontFamily: 'OpenSans'),
+      unselectedLabelStyle: (TextStyle(
           color: Theme.of(context).colorScheme.secondary,
           fontSize: 11.sp,
           fontWeight: FontWeight.w600,
-        ),
-      ),
+        )).copyWith(fontFamily: 'OpenSans'),
       items: [
         BottomNavigationBarItem(
           icon: SvgPicture.asset('assets/home.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
@@ -804,18 +943,21 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  bool isNightMode = false;
-  String selectedTheme = "Blue";
+  /// Follows the real theme instead of a local flag.
+  ///
+  /// This screen was already written with a full dark palette — every tile,
+  /// divider and label had an `isNightMode ? ... : ...` branch. The flag it
+  /// read was just a `bool` that nothing ever set to true (the switch that
+  /// used to flip it only called `setState` and never reached ThemeProvider),
+  /// so the dark half of this file had never once been drawn.
+  bool get isNightMode => Theme.of(context).brightness == Brightness.dark;
 
-  final List<Map<String, dynamic>> themes = [
-    {"name": "Blue", "color": const Color(0xff2563EB)},
-    {"name": "Purple", "color": const Color(0xff7C3AED)},
-    {"name": "Green", "color": const Color(0xff059669)},
-    {"name": "Orange", "color": const Color(0xffEA580C)},
-  ];
+
+
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final userModel = Provider.of<UserModel>(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     String t(String key) => AppStrings.t(lang, key);
@@ -832,6 +974,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 children: [
                   _buildProfileCard(context, userModel),
                   SizedBox(height: 12.h),
+
+                  // Only shown to someone who can still buy it. A subscriber
+                  // already sees their status on the Profile tab, and an
+                  // "Upgrade" card sitting in the drawer of a paying user is
+                  // the kind of thing that gets refunded.
+                  if (!context.watch<BillingService>().isPremium) ...[
+                    _buildProCard(context, lang),
+                    SizedBox(height: 12.h),
+                  ],
 
                   _buildSectionTitle(t('drawer_main_features')),
                   SizedBox(height: 6.h),
@@ -862,7 +1013,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
-                          builder: (context) => AlbumScreen(),
+                          settings: const RouteSettings(name: 'GalleryHomeScreen'),
+                          builder: (context) => const GalleryHomePage(),
                         ),
                       );
                     },
@@ -883,6 +1035,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
+                          settings: const RouteSettings(name: 'OfflineMusicScreen'),
                           builder: (context) => const HomeBottomNavigation(
                             bottomIndex: 1,
                           ),
@@ -906,6 +1059,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
+                          settings: const RouteSettings(name: 'NetworkStreamScreen'),
                           builder: (context) => VideoPlayerStream(),
                         ),
                       );
@@ -927,6 +1081,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
+                          settings: const RouteSettings(name: 'DeviceSpaceScreen'),
                           builder: (context) => DeviceSpaceScreen(),
                         ),
                       );
@@ -943,6 +1098,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
+                          settings: const RouteSettings(name: 'StatusSaverScreen'),
                           builder: (context) => StatusSaverHomePage(),
                         ),
                       );
@@ -953,29 +1109,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   _buildSectionTitle(t('drawer_preferences')),
                   SizedBox(height: 6.h),
 
-                  _buildSwitchTile(
-                    context,
-                    icon: Icons.dark_mode_rounded,
-                    iconBg: const Color(0xff111827),
-                    title: t('drawer_night_mode'),
-                    subtitle: t('drawer_night_mode_sub'),
-                    value: isNightMode,
-                    onChanged: (val) {
-                      setState(() {
-                        isNightMode = val;
-                      });
-                    },
+                  // Same shared equalizer the two players open. Its own Builder
+                  // so the live on/off state only rebuilds this tile, not the
+                  // whole drawer.
+                  //
+                  // Video and music keep separate master switches, so the
+                  // subtitle names both — "on" alone would be wrong half the
+                  // time.
+                  Builder(builder: (tileContext) {
+                    final effects = tileContext.watch<AudioEffectsService>();
+                    final video = effects.settingsFor(MediaType.video).enabled;
+                    final music = effects.settingsFor(MediaType.music).enabled;
+                    final anyOn = video || music;
+
+                    return _buildSettingsTile(
+                      tileContext,
+                      icon: Icons.graphic_eq_rounded,
+                      iconBg: anyOn
+                          ? const Color(0xff16A34A)
+                          : const Color(0xff0EA5E9),
+                      title: EqStrings.t(lang, 'eq_title'),
+                      subtitle: anyOn
+                          ? '${EqStrings.t(lang, 'eq_media_video')}: '
+                              '${EqStrings.t(lang, video ? 'eq_on' : 'eq_off')}'
+                              '  ·  ${EqStrings.t(lang, 'eq_media_music')}: '
+                              '${EqStrings.t(lang, music ? 'eq_on' : 'eq_off')}'
+                          : EqStrings.t(lang, 'eq_entry_sub'),
+                      onTap: () {
+                        // Close the drawer first, otherwise the equalizer opens
+                        // behind it and the scrim stays over the page.
+                        Navigator.pop(tileContext);
+                        openEqualizerPage(tileContext);
+                      },
+                    );
+                  }),
+
+                  // Replaces a dark-mode switch that only ever wrote a local
+                  // `setState` flag — it never reached ThemeProvider, so
+                  // flipping it changed nothing. This drives the real theme,
+                  // and adds "follow system" and the accent picker, which a
+                  // two-state switch could not express.
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 4.w,
+                      vertical: 6.h,
+                    ),
+                    child: const ThemeSettingsSection(showHeader: false),
                   ),
 
-                  _buildSettingsTile(
-                    context,
-                    icon: Icons.color_lens_rounded,
-                    iconBg: const Color(0xffF59E0B),
-                    title: t('drawer_theme'),
-                    subtitle: t('drawer_theme_sub'),
-                    onTap: () {
-                      _showThemeBottomSheet(context);
-                    },
+                  SizedBox(
+                    height: 10,
                   ),
 
                   _buildSettingsTile(
@@ -1003,6 +1186,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
+                          settings: const RouteSettings(name: 'NotificationScreen'),
                           builder: (context) => NotificationScreen(),
                         ),
                       );
@@ -1117,7 +1301,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           SizedBox(
             height: 28.h,
-          child: Image.network('https://cdn.vidnexaplayer.com/images/logo_text.webp')),
+          child: Image.network(
+                    'https://cdn.vidnexaplayer.com/images/logo_text.webp',
+                    // Offline (or CDN down) an Image.network with no
+                    // errorBuilder rethrows its SocketException through
+                    // FlutterError.onError, and Crashlytics logs that as a
+                    // fatal. Same mark ships in the APK, so falling back to
+                    // it is invisible to the user and cannot fail.
+                    errorBuilder: (_, __, ___) =>
+                        Image.asset('assets/logo_blue_text.png'),
+                  )),
 
           const Spacer(),
           GestureDetector(
@@ -1197,24 +1390,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   user.name.trim().isNotEmpty ? user.name : 'User',
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  style: GoogleFonts.radioCanada(
-                    textStyle: TextStyle(
+                  style: (TextStyle(
                       color: Colors.white,
                       fontSize: 13.sp,
                       fontWeight: FontWeight.w700,
-                    ),
-                  ),
+                    )).copyWith(fontFamily: 'RadioCanada'),
                 ),
                 SizedBox(height: 4.h),
                 Text(
                   'Premium Member',
-                  style: GoogleFonts.openSans(
-                    textStyle: TextStyle(
+                  style: (TextStyle(
                       color: Colors.white70,
                       fontSize: 9.sp,
                       fontWeight: FontWeight.w600,
-                    ),
-                  ),
+                    )).copyWith(fontFamily: 'OpenSans'),
                 ),
               ],
             ),
@@ -1224,18 +1413,115 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
+  /// Gold upsell card at the top of the drawer.
+  ///
+  /// Styled to match the "Remove Ads" tile on the Profile tab rather than the
+  /// neutral `_buildSettingsTile` rows around it — this is the one entry here
+  /// that is selling something, so it should not read as another setting.
+  Widget _buildProCard(BuildContext context, String lang) {
+    const gold = Color(0xFFFFB800);
+    const goldGrad = LinearGradient(
+      colors: [Color(0xFFFFB800), Color(0xFFFF8C00)],
+      begin: Alignment.topLeft,
+      end: Alignment.bottomRight,
+    );
+
+    return GestureDetector(
+      onTap: () {
+        // Close the drawer first: leaving it open puts the paywall behind a
+        // scrim the user then has to dismiss twice.
+        Navigator.of(context).pop();
+        PaywallScreen.show(context);
+      },
+      child: Container(
+        padding: EdgeInsets.symmetric(horizontal: 12.w, vertical: 12.h),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              gold.withValues(alpha: isNightMode ? 0.18 : 0.10),
+              const Color(0xFFE8382C).withValues(alpha: 0.06),
+            ],
+          ),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: gold.withValues(alpha: 0.35)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 34.w,
+              height: 34.w,
+              decoration: BoxDecoration(
+                gradient: goldGrad,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.workspace_premium_rounded,
+                color: Colors.white,
+                size: 18.w,
+              ),
+            ),
+            SizedBox(width: 10.w),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    PaywallStrings.t(lang, 'paywall_title'),
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 13.sp,
+                      fontWeight: FontWeight.w700,
+                      color: isNightMode ? Colors.white : const Color(0xFF111827),
+                    ),
+                  ),
+                  SizedBox(height: 2.h),
+                  Text(
+                    PaywallStrings.t(lang, 'paywall_subtitle'),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontFamily: 'Outfit',
+                      fontSize: 10.sp,
+                      color: isNightMode ? Colors.white70 : const Color(0xFF6B7280),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            SizedBox(width: 6.w),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 5.h),
+              decoration: BoxDecoration(
+                gradient: goldGrad,
+                borderRadius: BorderRadius.circular(9),
+              ),
+              child: Text(
+                'PRO',
+                style: TextStyle(
+                  fontFamily: 'Outfit',
+                  fontSize: 10.sp,
+                  fontWeight: FontWeight.w700,
+                  color: Colors.white,
+                  letterSpacing: 0.8,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildSectionTitle(String title) {
     return Padding(
       padding: EdgeInsets.only(left: 2.w),
       child: Text(
         title,
-        style: GoogleFonts.openSans(
-          textStyle: TextStyle(
+        style: (TextStyle(
             color: isNightMode ? Colors.white : const Color(0xff0F172A),
             fontSize: 11.sp,
             fontWeight: FontWeight.w700,
-          ),
-        ),
+          )).copyWith(fontFamily: 'OpenSans'),
       ),
     );
   }
@@ -1285,25 +1571,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
         title: Text(
           title,
-          style: GoogleFonts.openSans(
-            textStyle: TextStyle(
+          style: (TextStyle(
               color: isNightMode ? Colors.white : const Color(0xff111827),
               fontSize: 11.5.sp,
               fontWeight: FontWeight.w700,
-            ),
-          ),
+            )).copyWith(fontFamily: 'OpenSans'),
         ),
         subtitle: Text(
           subtitle,
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.openSans(
-            textStyle: TextStyle(
+          style: (TextStyle(
               color: isNightMode ? Colors.white70 : Colors.grey.shade600,
               fontSize: 8.5.sp,
               fontWeight: FontWeight.w500,
-            ),
-          ),
+            )).copyWith(fontFamily: 'OpenSans'),
         ),
         trailing: Icon(
           Icons.arrow_forward_ios_rounded,
@@ -1315,80 +1597,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
 
-  Widget _buildSwitchTile(
-      BuildContext context, {
-        required IconData icon,
-        required Color iconBg,
-        required String title,
-        required String subtitle,
-        required bool value,
-        required ValueChanged<bool> onChanged,
-      }) {
-    return Container(
-      margin: EdgeInsets.only(bottom: 8.h),
-      decoration: BoxDecoration(
-        color: isNightMode ? const Color(0xff1E293B) : Colors.white,
-        borderRadius: BorderRadius.circular(14.r),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.035),
-            blurRadius: 8,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      child: ListTile(
-        minLeadingWidth: 0,
-        dense: true,
-        visualDensity: const VisualDensity(vertical: -2),
-        contentPadding: EdgeInsets.symmetric(horizontal: 10.w, vertical: 2.h),
-        leading: Container(
-          height: 34.h,
-          width: 34.w,
-          decoration: BoxDecoration(
-            color: iconBg,
-            borderRadius: BorderRadius.circular(10.r),
-          ),
-          child: Center(
-            child: Icon(
-              icon,
-              color: Colors.white,
-              size: 17.sp,
-            ),
-          ),
-        ),
-        title: Text(
-          title,
-          style: GoogleFonts.openSans(
-            textStyle: TextStyle(
-              color: isNightMode ? Colors.white : const Color(0xff111827),
-              fontSize: 11.5.sp,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ),
-        subtitle: Text(
-          subtitle,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.openSans(
-            textStyle: TextStyle(
-              color: isNightMode ? Colors.white70 : Colors.grey.shade600,
-              fontSize: 8.5.sp,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ),
-        trailing: Transform.scale(
-          scale: 0.75,
-          child: Switch(
-            value: value,
-            onChanged: onChanged,
-          ),
-        ),
-      ),
-    );
-  }
 
   Widget _buildVersionCard() {
     return Container(
@@ -1414,102 +1622,61 @@ class _SettingsScreenState extends State<SettingsScreen> {
           SizedBox(height: 5.h),
           Text(
             'Version : ${widget.currentVersion}',
-            style: GoogleFonts.radioCanada(
-              textStyle: TextStyle(
+            style: (TextStyle(
                 color: isNightMode ? Colors.white70 : Colors.grey.shade700,
                 fontSize: 8.8.sp,
                 fontWeight: FontWeight.w600,
-              ),
-            ),
+              )).copyWith(fontFamily: 'RadioCanada'),
           ),
-          SizedBox(height: 4.h),
-          Text(
-            'Theme : $selectedTheme',
-            style: GoogleFonts.openSans(
-              textStyle: TextStyle(
-                color: isNightMode ? Colors.white54 : Colors.grey.shade500,
-                fontSize: 8.sp,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
+
         ],
       ),
     );
   }
 
-  void _showThemeBottomSheet(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: isNightMode ? const Color(0xff1E293B) : Colors.white,
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20.r)),
-      ),
-      builder: (_) {
-        return Padding(
-          padding: EdgeInsets.all(16.w),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "Choose Theme",
-                style: GoogleFonts.openSans(
-                  textStyle: TextStyle(
-                    fontSize: 14.sp,
-                    fontWeight: FontWeight.bold,
-                    color: isNightMode ? Colors.white : Colors.black,
-                  ),
-                ),
-              ),
-              SizedBox(height: 14.h),
-              ...themes.map((theme) {
-                final bool isSelected = selectedTheme == theme["name"];
-                return Container(
-                  margin: EdgeInsets.only(bottom: 10.h),
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(14.r),
-                    color: isSelected
-                        ? (theme["color"] as Color).withValues(alpha: 0.12)
-                        : Colors.transparent,
-                    border: Border.all(
-                      color: isSelected
-                          ? theme["color"] as Color
-                          : Colors.grey.shade300,
-                    ),
-                  ),
-                  child: ListTile(
-                    leading: CircleAvatar(
-                      radius: 10.r,
-                      backgroundColor: theme["color"] as Color,
-                    ),
-                    title: Text(
-                      theme["name"],
-                      style: GoogleFonts.openSans(
-                        textStyle: TextStyle(
-                          fontSize: 12.sp,
-                          fontWeight: FontWeight.w600,
-                          color: isNightMode ? Colors.white : Colors.black,
-                        ),
-                      ),
-                    ),
-                    trailing: isSelected
-                        ? Icon(Icons.check_circle, color: theme["color"] as Color)
-                        : null,
-                    onTap: () {
-                      setState(() {
-                        selectedTheme = theme["name"];
-                      });
-                      Navigator.pop(context);
-                    },
-                  ),
-                );
-              }).toList(),
-              SizedBox(height: 8.h),
-            ],
-          ),
-        );
-      },
-    );
+
+}
+
+/// Renders the exit dialog's banner and **owns** it: the ad is disposed when
+/// this route is torn down.
+///
+/// The ad is created by `_HomeBottomNavigationState._loadExitAd` and handed
+/// over by `_takeExitAd`, so exactly one `AdWidget` ever points at a given
+/// `BannerAd`. That is the invariant that keeps
+/// "The Android view returned from PlatformView#getView() was already added to
+/// a parent view" from firing when the dialog is opened, cancelled and opened
+/// again before the previous platform view has finished detaching.
+class _ExitDialogAd extends StatefulWidget {
+  const _ExitDialogAd({required this.ad});
+
+  final BannerAd ad;
+
+  @override
+  State<_ExitDialogAd> createState() => _ExitDialogAdState();
+}
+
+class _ExitDialogAdState extends State<_ExitDialogAd> {
+  @override
+  void dispose() {
+    widget.ad.dispose();
+    super.dispose();
   }
 
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(
+          color: Colors.black.withValues(alpha: 0.1),
+          width: 1,
+        ),
+      ),
+      clipBehavior: Clip.antiAlias,
+      width: widget.ad.size.width.toDouble(),
+      height: widget.ad.size.height.toDouble(),
+      child: AdWidget(ad: widget.ad),
+    );
+  }
 }

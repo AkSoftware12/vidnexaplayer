@@ -6,6 +6,7 @@ import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
 import com.ryanheise.audioservice.AudioServiceActivity
+import com.vidnexa.videoplayer.audiofx.AudioEffectsPlugin
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
@@ -54,6 +55,16 @@ class MainActivity : AudioServiceActivity() {
     /// instead — `consumed` is deliberately NOT set here, only by
     /// `getVideoPath` itself, so that fallback always stays available.
     private var channel: MethodChannel? = null
+
+    /// Shared AI-Equalizer bridge (android.media.audiofx) used by BOTH the
+    /// music player and the video player. Owned by the Activity so every
+    /// AudioEffect is released with the engine — leaking them is what produces
+    /// "effect creation failed" on the next launch.
+    private var audioEffects: AudioEffectsPlugin? = null
+
+    /// Bulk MediaStore size lookup for the gallery's signature pass. See
+    /// [MediaSizePlugin] for why the plugin's own file API cannot be used.
+    private var mediaSize: MediaSizePlugin? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -115,6 +126,16 @@ class MainActivity : AudioServiceActivity() {
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
 
+        audioEffects = AudioEffectsPlugin(
+            applicationContext,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
+
+        mediaSize = MediaSizePlugin(
+            applicationContext,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
+
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .apply {
                 setMethodCallHandler { call, result ->
@@ -140,5 +161,17 @@ class MainActivity : AudioServiceActivity() {
                     }
                 }
             }
+    }
+
+    override fun cleanUpFlutterEngine(flutterEngine: FlutterEngine) {
+        // Release every AudioEffect BEFORE the engine goes away — native effect
+        // handles that outlive the isolate make the next attach fail.
+        audioEffects?.dispose()
+        audioEffects = null
+        mediaSize?.dispose()
+        mediaSize = null
+        channel?.setMethodCallHandler(null)
+        channel = null
+        super.cleanUpFlutterEngine(flutterEngine)
     }
 }

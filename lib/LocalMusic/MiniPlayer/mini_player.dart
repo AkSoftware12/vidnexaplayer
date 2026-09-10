@@ -51,6 +51,7 @@ class MiniPlayer extends StatelessWidget {
                           Navigator.push(
                             context,
                             PageRouteBuilder(
+                              settings: const RouteSettings(name: 'MusicFullPlayerScreen'),
                               transitionDuration:
                               const Duration(milliseconds: 800),
                               reverseTransitionDuration:

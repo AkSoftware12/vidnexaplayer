@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 
@@ -83,7 +82,7 @@ class _VoiceSearchViewState extends State<_VoiceSearchView> {
         iconTheme: IconThemeData(color: scheme.secondary),
         title: Text(
           MiscStrings.t(lang, 'voice_search_title'),
-          style: GoogleFonts.poppins(fontWeight: FontWeight.w600, color: scheme.secondary),
+          style: TextStyle(fontFamily: 'Poppins', fontWeight: FontWeight.w600, color: scheme.secondary),
         ),
       ),
       body: Column(
@@ -141,8 +140,7 @@ class _RecognizedTextBanner extends StatelessWidget {
       child: Text(
         isListening && text.isEmpty ? MiscStrings.t(lang, 'voice_search_listening') : '"$text"',
         textAlign: TextAlign.center,
-        style: GoogleFonts.poppins(
-          fontSize: 13,
+        style: TextStyle(fontFamily: 'Poppins', fontSize: 13,
           fontStyle: FontStyle.italic,
           color: ColorSelect.subtextColor,
         ),
@@ -188,7 +186,7 @@ class _ResultsList extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               foundText,
-              style: GoogleFonts.poppins(fontSize: 12, color: ColorSelect.subtextColor),
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: ColorSelect.subtextColor),
             ),
           ),
         ),

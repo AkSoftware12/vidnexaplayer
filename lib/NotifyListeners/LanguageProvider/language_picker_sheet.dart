@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
 
@@ -51,13 +50,11 @@ void showLanguagePickerSheet(BuildContext context, {bool isDark = false}) {
                 SizedBox(height: 14.h),
                 Text(
                   AppStrings.t(lang, 'choose_language'),
-                  style: GoogleFonts.openSans(
-                    textStyle: TextStyle(
+                  style: (TextStyle(
                       fontSize: 14.sp,
                       fontWeight: FontWeight.bold,
                       color: isDark ? Colors.white : Colors.black,
-                    ),
-                  ),
+                    )).copyWith(fontFamily: 'OpenSans'),
                 ),
                 SizedBox(height: 14.h),
                 ConstrainedBox(
@@ -88,22 +85,18 @@ void showLanguagePickerSheet(BuildContext context, {bool isDark = false}) {
                           ),
                           title: Text(
                             option.nativeName,
-                            style: GoogleFonts.openSans(
-                              textStyle: TextStyle(
+                            style: (TextStyle(
                                 fontSize: 12.sp,
                                 fontWeight: FontWeight.w600,
                                 color: isDark ? Colors.white : Colors.black,
-                              ),
-                            ),
+                              )).copyWith(fontFamily: 'OpenSans'),
                           ),
                           subtitle: Text(
                             option.englishName,
-                            style: GoogleFonts.openSans(
-                              textStyle: TextStyle(
+                            style: (TextStyle(
                                 fontSize: 10.sp,
                                 color: isDark ? Colors.white70 : Colors.grey.shade600,
-                              ),
-                            ),
+                              )).copyWith(fontFamily: 'OpenSans'),
                           ),
                           trailing: isSelected
                               ? const Icon(Icons.check_circle, color: Color(0xff0891B2))
@@ -137,12 +130,10 @@ void showLanguagePickerSheet(BuildContext context, {bool isDark = false}) {
                     },
                     child: Text(
                       AppStrings.t(lang, 'apply'),
-                      style: GoogleFonts.openSans(
-                        textStyle: TextStyle(
+                      style: (TextStyle(
                           fontSize: 13.sp,
                           fontWeight: FontWeight.w700,
-                        ),
-                      ),
+                        )).copyWith(fontFamily: 'OpenSans'),
                     ),
                   ),
                 ),

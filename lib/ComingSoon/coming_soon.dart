@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
 import '../NotifyListeners/LanguageProvider/home_strings.dart';
@@ -19,15 +18,13 @@ class ComingSoonScreen extends StatelessWidget {
       appBar: AppBar(
         backgroundColor: Colors.grey[100],
         title: Text('${title}',
-          style: GoogleFonts.openSans(
-            textStyle: TextStyle(
+          style: (TextStyle(
               color: Colors.black,
               fontSize: 16.sp,
               // Adjust font size as needed
               fontWeight: FontWeight
                   .bold, // Adjust font weight as needed
-            ),
-          ),),
+            )).copyWith(fontFamily: 'OpenSans'),),
       ),
       body: Center(
         child: Column(
@@ -54,15 +51,13 @@ class ComingSoonScreen extends StatelessWidget {
               ),
               child: Text(
                 HomeStrings.t(lang, 'coming_soon_go_back'),
-                style: GoogleFonts.openSans(
-                  textStyle: TextStyle(
+                style: (TextStyle(
                     color: Colors.white,
                     fontSize: 16.sp,
                     // Adjust font size as needed
                     fontWeight: FontWeight
                         .bold, // Adjust font weight as needed
-                  ),
-                ),              ),
+                  )).copyWith(fontFamily: 'OpenSans'),              ),
             ),
           ],
         ),

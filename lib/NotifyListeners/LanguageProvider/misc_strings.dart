@@ -15,6 +15,11 @@ class MiscStrings {
       'notification_empty_subtitle':
           "You're all caught up! We'll notify you when there's something new",
       'go_back': 'Go Back',
+      'notification_new': 'NEW',
+      'notification_clear_all': 'Clear all',
+      'notification_just_now': 'Just now',
+      'notification_minutes_ago': '{n}m ago',
+      'notification_hours_ago': '{n}h ago',
 
       // ---- Toolbar color picker ----
       'colorpicker_title': 'Select ToolBar Color',
@@ -46,6 +51,21 @@ class MiscStrings {
 
       // ---- Ads ----
       'ads_sponsored': 'Sponsored',
+      'rewarded_watch': 'Watch ad',
+      'rewarded_not_now': 'Not now',
+      'rewarded_unlocked': 'Unlocked for the next {minutes} minutes',
+      'rewarded_incomplete': 'The ad was not finished, so nothing was unlocked.',
+      'rewarded_enhance_title': 'Unlock Enhance to 4K',
+      'rewarded_enhance_body':
+          'Watch a short video ad and 4K enhance is unlocked for the next '
+          '{minutes} minutes — enhance as many photos as you like in that '
+          'time. You can close this and keep using everything else.',
+      'rewarded_filters_title': 'Unlock saving filtered photos',
+      'rewarded_filters_body':
+          'Watch a short video ad and saving filtered photos is unlocked for '
+          'the next {minutes} minutes — save as many as you like in that '
+          'time. Trying filters stays free, and you can close this and keep '
+          'using everything else.',
 
       // ---- Voice search ----
       'voice_search_title': 'Voice Search',
@@ -78,6 +98,11 @@ class MiscStrings {
       'notification_empty_subtitle':
           'आप पूरी तरह अपडेट हैं! कुछ नया होने पर हम आपको सूचित करेंगे',
       'go_back': 'वापस जाएं',
+      'notification_new': 'नया',
+      'notification_clear_all': 'सभी हटाएँ',
+      'notification_just_now': 'अभी',
+      'notification_minutes_ago': '{n} मिनट पहले',
+      'notification_hours_ago': '{n} घंटे पहले',
 
       // ---- Toolbar color picker ----
       'colorpicker_title': 'टूलबार का रंग चुनें',
@@ -109,6 +134,21 @@ class MiscStrings {
 
       // ---- Ads ----
       'ads_sponsored': 'प्रायोजित',
+      'rewarded_watch': 'विज्ञापन देखें',
+      'rewarded_not_now': 'अभी नहीं',
+      'rewarded_unlocked': 'अगले {minutes} मिनट के लिए अनलॉक हो गया',
+      'rewarded_incomplete': 'विज्ञापन पूरा नहीं हुआ, इसलिए कुछ अनलॉक नहीं हुआ।',
+      'rewarded_enhance_title': '4K एन्हांस अनलॉक करें',
+      'rewarded_enhance_body':
+          'एक छोटा वीडियो विज्ञापन देखें और अगले {minutes} मिनट के लिए 4K '
+          'एन्हांस अनलॉक हो जाएगा — उतनी देर में जितनी चाहें उतनी फ़ोटो '
+          'एन्हांस करें। इसे बंद करके बाकी सब कुछ वैसे ही इस्तेमाल कर सकते हैं।',
+      'rewarded_filters_title': 'फ़िल्टर वाली फ़ोटो सेव करना अनलॉक करें',
+      'rewarded_filters_body':
+          'एक छोटा वीडियो विज्ञापन देखें और अगले {minutes} मिनट के लिए '
+          'फ़िल्टर वाली फ़ोटो सेव करना अनलॉक हो जाएगा — उतनी देर में जितनी '
+          'चाहें उतनी सेव करें। फ़िल्टर आज़माना हमेशा फ़्री है, और इसे बंद '
+          'करके बाकी सब कुछ वैसे ही इस्तेमाल कर सकते हैं।',
 
       // ---- Voice search ----
       'voice_search_title': 'आवाज़ से खोजें',

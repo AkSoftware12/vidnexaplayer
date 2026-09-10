@@ -67,6 +67,11 @@ class ProfileStrings {
       'profile_feedback_sub': 'Share your thoughts with us',
       'profile_share_app_title': 'Share App',
       'profile_share_app_sub': 'Invite your friends',
+      'profile_screen_cast_title': 'Screen Cast',
+      'profile_screen_cast_sub': 'Mirror this phone to your TV',
+      'profile_screen_cast_failed':
+          "This phone doesn't have a cast screen. Look for Cast or Screen "
+          'mirroring in your Settings or quick tiles.',
 
       'profile_night_mode_title': 'Night Mode',
       'profile_night_mode_dark': 'Dark theme active',
@@ -235,6 +240,11 @@ class ProfileStrings {
       'profile_feedback_sub': 'अपने विचार हमारे साथ साझा करें',
       'profile_share_app_title': 'ऐप शेयर करें',
       'profile_share_app_sub': 'अपने दोस्तों को आमंत्रित करें',
+      'profile_screen_cast_title': 'स्क्रीन कास्ट',
+      'profile_screen_cast_sub': 'इस फ़ोन को अपने TV पर दिखाएँ',
+      'profile_screen_cast_failed':
+          'इस फ़ोन में कास्ट स्क्रीन नहीं है। सेटिंग्स या क्विक टाइल्स में '
+          'Cast या Screen mirroring ढूँढें।',
 
       'profile_night_mode_title': 'नाइट मोड',
       'profile_night_mode_dark': 'डार्क थीम सक्रिय',

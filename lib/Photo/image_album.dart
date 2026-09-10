@@ -1,9 +1,27 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// RETIRED — nothing imports this file any more.
+//
+// Replaced by `lib/features/gallery/`. Every entry point that used to push
+// `AlbumScreen` (the drawer's All Photos, Home/Me, HorizontalGridList) now
+// opens `GalleryHomePage`, and the two helpers other screens borrowed from
+// here have moved out:
+//
+//   AnimatedScale            -> lib/Utils/scale_in.dart  (as `ScaleIn`, renamed
+//                               because the old name shadowed Flutter's own
+//                               widget and forced `hide AnimatedScale` imports)
+//   AnimatedProgressIndicator -> lib/Utils/animated_progress_indicator.dart
+//
+// Kept on disk only so the old behaviour can be diffed against the new module.
+// TODO: delete this file once the gallery module has shipped in a release.
+// ─────────────────────────────────────────────────────────────────────────────
+
+import 'dart:async';
 import 'dart:io';
 
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'package:flutter/cupertino.dart' show CupertinoActivityIndicator;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
@@ -82,8 +100,7 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
         iconTheme: IconThemeData(color: Colors.white),
         title:Text(
           DeviceStrings.t(lang, 'album_title'),
-          style: GoogleFonts.openSans(
-            color: Colors.white,
+          style: TextStyle(fontFamily: 'OpenSans', color: Colors.white,
             fontSize: 16.sp,
             fontWeight: FontWeight.w500,
           ),
@@ -171,6 +188,7 @@ class AlbumTile extends StatelessWidget {
             Navigator.push(
               context,
               PageRouteBuilder(
+                settings: const RouteSettings(name: 'PhotosScreen'),
                 pageBuilder: (context, animation, secondaryAnimation) => PhotosScreen(album: album),
                 transitionsBuilder: (context, animation, secondaryAnimation, child) {
                   const begin = Offset(1.0, 0.0);
@@ -219,8 +237,7 @@ class AlbumTile extends StatelessWidget {
                       children: [
                         Text(
                           album.name,
-                          style: GoogleFonts.poppins(
-                            color: Colors.black,
+                          style: TextStyle(fontFamily: 'Poppins', color: Colors.black,
                             fontSize: 12.sp,
                             fontWeight: FontWeight.w600,
                           ),
@@ -231,8 +248,7 @@ class AlbumTile extends StatelessWidget {
                         Text(
                           DeviceStrings.t(lang, 'album_photos_count')
                               .replaceAll('{count}', '${snapshot.data ?? 0}'),
-                          style: GoogleFonts.poppins(
-                            color: Colors.grey[600],
+                          style: TextStyle(fontFamily: 'Poppins', color: Colors.grey[600],
                             fontSize: 11.sp,
                             fontWeight: FontWeight.w500,
                           ),
@@ -306,8 +322,7 @@ class _PhotosScreenState extends State<PhotosScreen> with SingleTickerProviderSt
         iconTheme: IconThemeData(color: Colors.white),
         title:Text(
           widget.album.name,
-          style: GoogleFonts.openSans(
-          color: Colors.white,
+          style: TextStyle(fontFamily: 'OpenSans', color: Colors.white,
           fontSize: 16.sp,
           fontWeight: FontWeight.w500,
         ),
@@ -365,6 +380,7 @@ class PhotoTile extends StatelessWidget {
         Navigator.push(
           context,
           PageRouteBuilder(
+            settings: const RouteSettings(name: 'FullScreenPhotoScreen'),
             pageBuilder: (context, animation, secondaryAnimation) => FullScreenPhoto(
               photos: photos,
               initialIndex: initialIndex,
@@ -451,14 +467,25 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
     if (confirm == true) {
       try {
         final result = await PhotoManager.editor.deleteWithIds([_photos[_currentIndex].id]);
+        // The delete is a platform-channel call and the user can leave the
+        // viewer while the system delete dialog is up. Everything below
+        // touches this State and this context, so bail out if it is gone.
+        if (!context.mounted) return;
+
         if (result.isNotEmpty) {
+          // Emptying the list pops the screen — do that outside setState.
+          // A Navigator.pop from inside the setState callback runs while the
+          // element is being rebuilt, and the `return` there only exited the
+          // closure, so the snackbar below ran on a popped route anyway.
+          if (_photos.length <= 1) {
+            _photos.clear();
+            widget.onDelete();
+            Navigator.pop(context);
+            return;
+          }
+
           setState(() {
             _photos.removeAt(_currentIndex);
-            if (_photos.isEmpty) {
-              widget.onDelete();
-              Navigator.pop(context);
-              return;
-            }
             if (_currentIndex >= _photos.length) {
               _currentIndex = _photos.length - 1;
             }
@@ -481,7 +508,16 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
             ),
           );
         }
-      } catch (e) {
+      } catch (e, s) {
+        // Non-fatal: a failed delete is worth knowing about in Crashlytics,
+        // but it must not take the viewer down with it.
+        unawaited(FirebaseCrashlytics.instance.recordError(
+          e,
+          s,
+          reason: 'PhotoManager.editor.deleteWithIds failed',
+          fatal: false,
+        ));
+        if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${DeviceStrings.t(lang, 'album_delete_error_prefix')}$e', style: TextStyle(color: Colors.white)),
@@ -502,8 +538,7 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
         iconTheme: IconThemeData(color: Colors.white),
         title:Text(
           _photos.isEmpty ? '0/0' : '${_currentIndex + 1}/${_photos.length}',
-          style: GoogleFonts.openSans(
-            color: Colors.white,
+          style: TextStyle(fontFamily: 'OpenSans', color: Colors.white,
             fontSize: 14.sp,
             fontWeight: FontWeight.w500,
           ),

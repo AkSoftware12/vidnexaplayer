@@ -171,6 +171,7 @@ class VideoIntentService {
       unawaited(
         navigator.push(
           MaterialPageRoute(
+            settings: const RouteSettings(name: 'VideoPlayerScreen'),
             builder: (_) => FullScreenVideoPlayerFixed(
               videos: const [],
               initialIndex: 0,

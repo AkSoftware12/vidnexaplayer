@@ -1,13 +1,13 @@
-import 'package:flutter/material.dart' hide AnimatedScale;
+import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
 import '../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
-import '../../Photo/image_album.dart';
+import '../../Utils/app_palette.dart';
+import '../../Utils/scale_in.dart';
 import '../../RecentlyVideos/RecentlyPlayedScreen/recently_played_screen.dart';
 import '../../VideoPLayer/4kPlayer/4k_player.dart';
 import '../../VideoPLayer/VideoList/video_list.dart';
@@ -215,23 +215,19 @@ class _HomeScreenState extends State<DemoHomeScreen>
                 SizedBox(height: 16.sp),
                 Text(
                   HomeStrings.t(lang, 'home_permission_required_title'),
-                  style: GoogleFonts.poppins(
-                    textStyle: TextStyle(
+                  style: (TextStyle(
                       fontSize: 18.sp,
                       fontWeight: FontWeight.bold,
-                      color: Colors.black,
-                    ),
-                  ),
+                      color: AppPalette.textH,
+                    )).copyWith(fontFamily: 'Poppins'),
                 ),
                 SizedBox(height: 8.sp),
                 Text(
                   HomeStrings.t(lang, 'home_permission_required_desc'),
-                  style: GoogleFonts.poppins(
-                    textStyle: TextStyle(
+                  style: (TextStyle(
                       fontSize: 14.sp,
-                      color: Colors.grey[600],
-                    ),
-                  ),
+                      color: AppPalette.textS,
+                    )).copyWith(fontFamily: 'Poppins'),
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 16.sp),
@@ -250,12 +246,10 @@ class _HomeScreenState extends State<DemoHomeScreen>
                   ),
                   child: Text(
                     HomeStrings.t(lang, 'home_allow_permissions'),
-                    style: GoogleFonts.poppins(
-                      textStyle: TextStyle(
+                    style: (TextStyle(
                         fontSize: 16.sp,
                         fontWeight: FontWeight.w600,
-                      ),
-                    ),
+                      )).copyWith(fontFamily: 'Poppins'),
                   ),
                 ),
               ],
@@ -268,9 +262,10 @@ class _HomeScreenState extends State<DemoHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppPalette.surface,
       body: RefreshIndicator(
         onRefresh: () async {
           // Pull-to-refresh now also rescans the device for new folders —
@@ -304,6 +299,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                               Navigator.push(
                                 context,
                                 MaterialPageRoute(
+                                  settings: const RouteSettings(name: 'VideoPlayerScreen'),
                                   builder: (_) => FullScreenVideoPlayerFixed(
                                     videos: videos,
                                     initialIndex: index,
@@ -348,13 +344,11 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                         SizedBox(width: 8.sp),
                                         Text(
                                           HomeStrings.t(lang, 'home_folders'),
-                                          style: GoogleFonts.poppins(
-                                            textStyle: TextStyle(
-                                              color: Colors.black87,
+                                          style: (TextStyle(
+                                              color: AppPalette.textH,
                                               fontSize: 15.sp,
                                               fontWeight: FontWeight.w600,
-                                            ),
-                                          ),
+                                            )).copyWith(fontFamily: 'Poppins'),
                                         ),
                                       ],
                                     ),
@@ -428,13 +422,11 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                   padding: EdgeInsets.only(top: 50.sp),
                                   child: Text(
                                     HomeStrings.t(lang, 'home_no_albums_found'),
-                                    style: GoogleFonts.poppins(
-                                      textStyle: TextStyle(
-                                        color: Colors.black54,
+                                    style: (TextStyle(
+                                        color: AppPalette.textS,
                                         fontSize: 13.sp,
                                         fontWeight: FontWeight.w500,
-                                      ),
-                                    ),
+                                      )).copyWith(fontFamily: 'Poppins'),
                                   ),
                                 ),
                               )
@@ -565,7 +557,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
         ),
         child: Icon(
           icon,
-          color: isActive ? Colors.white : Colors.black,
+          color: isActive ? Colors.white : AppPalette.textH,
           size: 18.sp,
         ),
       ),
@@ -620,6 +612,7 @@ class AlbumTile extends StatelessWidget {
                 Navigator.push(
                   context,
                   MaterialPageRoute(
+                    settings: const RouteSettings(name: 'VideoFolderScreen'),
                     builder:
                         (context) => VideoFolderScreen(
                       folderName: album.name,
@@ -631,7 +624,7 @@ class AlbumTile extends StatelessWidget {
             );
 
           },
-          child: AnimatedScale(
+          child: ScaleIn(
             duration: Duration(milliseconds: 500),
             scale: snapshot.hasData ? 1.0 : 1,
             child: Container(
@@ -665,36 +658,30 @@ class AlbumTile extends StatelessWidget {
                           album.name.isNotEmpty
                               ? Text(
                                 album.name,
-                                style: GoogleFonts.poppins(
-                                  textStyle: TextStyle(
+                                style: (TextStyle(
                                     color:
                                         Theme.of(context).colorScheme.secondary,
                                     fontSize: 13.sp,
                                     fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                                  )).copyWith(fontFamily: 'Poppins'),
                               )
                               : Text(
                                 HomeStrings.t(lang, 'home_sd_card'),
-                                style: GoogleFonts.poppins(
-                                  textStyle: TextStyle(
+                                style: (TextStyle(
                                     color:
                                         Theme.of(context).colorScheme.secondary,
                                     fontSize: 13.sp,
                                     fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                                  )).copyWith(fontFamily: 'Poppins'),
                               ),
                           SizedBox(height: 4.h),
                           Text(
                             '${snapshot.data ?? 0} ${HomeStrings.t(lang, 'home_videos_suffix')}',
-                            style: GoogleFonts.poppins(
-                              textStyle: TextStyle(
+                            style: (TextStyle(
                                 color: Theme.of(context).colorScheme.secondary,
                                 fontSize: 10.sp,
                                 fontWeight: FontWeight.w500,
-                              ),
-                            ),
+                              )).copyWith(fontFamily: 'Poppins'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -799,6 +786,7 @@ class AlbumGridTile extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
+                settings: const RouteSettings(name: 'VideoFolderScreen'),
                 builder:
                     (context) => VideoFolderScreen(
                       folderName: album.name,
@@ -807,13 +795,13 @@ class AlbumGridTile extends StatelessWidget {
               ),
             );
           },
-          child: AnimatedScale(
+          child: ScaleIn(
             duration: Duration(milliseconds: 500),
             scale: snapshot.hasData ? 1.0 : 1,
             child: Container(
               margin: EdgeInsets.all(4.sp),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: AppPalette.card,
                 borderRadius: BorderRadius.circular(10.sp),
                 boxShadow: [
                   BoxShadow(
@@ -855,42 +843,36 @@ class AlbumGridTile extends StatelessWidget {
                             album.name.isNotEmpty
                                 ? Text(
                                   album.name,
-                                  style: GoogleFonts.poppins(
-                                    textStyle: TextStyle(
+                                  style: (TextStyle(
                                       color:
                                           Theme.of(
                                             context,
                                           ).colorScheme.secondary,
                                       fontSize: 13.sp,
                                       fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                                    )).copyWith(fontFamily: 'Poppins'),
                                   maxLines: 1,
                                 )
                                 : Text(
                                   HomeStrings.t(lang, 'home_sd_card'),
-                                  style: GoogleFonts.poppins(
-                                    textStyle: TextStyle(
+                                  style: (TextStyle(
                                       color:
                                           Theme.of(
                                             context,
                                           ).colorScheme.secondary,
                                       fontSize: 13.sp,
                                       fontWeight: FontWeight.w600,
-                                    ),
-                                  ),
+                                    )).copyWith(fontFamily: 'Poppins'),
                                 ),
                             SizedBox(height: 4.h),
                             Text(
                               '${snapshot.data ?? 0} ${HomeStrings.t(lang, 'home_videos_suffix')}',
-                              style: GoogleFonts.poppins(
-                                textStyle: TextStyle(
+                              style: (TextStyle(
                                   color:
                                       Theme.of(context).colorScheme.secondary,
                                   fontSize: 10.sp,
                                   fontWeight: FontWeight.w500,
-                                ),
-                              ),
+                                )).copyWith(fontFamily: 'Poppins'),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -994,6 +976,7 @@ class AlbumGridTile3 extends StatelessWidget {
             Navigator.push(
               context,
               MaterialPageRoute(
+                settings: const RouteSettings(name: 'VideoFolderScreen'),
                 builder:
                     (context) => VideoFolderScreen(
                       folderName: album.name,
@@ -1007,7 +990,7 @@ class AlbumGridTile3 extends StatelessWidget {
             curve: Curves.easeOut,
             margin: EdgeInsets.all(2.sp),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppPalette.card,
               borderRadius: BorderRadius.circular(10.sp),
               boxShadow: [
                 BoxShadow(
@@ -1070,25 +1053,21 @@ class AlbumGridTile3 extends StatelessWidget {
                                 album.name.isNotEmpty
                                     ? album.name
                                     : HomeStrings.t(lang, 'home_untitled_album'),
-                                style: GoogleFonts.poppins(
-                                  textStyle: TextStyle(
-                                    color: Colors.black,
+                                style: (TextStyle(
+                                    color: AppPalette.textH,
                                     fontSize: 12.sp,
                                     fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                  )).copyWith(fontFamily: 'Poppins'),
                                 overflow: TextOverflow.ellipsis,
                               ),
                               SizedBox(height: 0.h),
                               Text(
                                 '$count ${HomeStrings.t(lang, 'home_videos_suffix_lower')}',
-                                style: GoogleFonts.poppins(
-                                  textStyle: TextStyle(
-                                    color: Colors.black54,
+                                style: (TextStyle(
+                                    color: AppPalette.textS,
                                     fontSize: 10.sp,
                                     fontWeight: FontWeight.w500,
-                                  ),
-                                ),
+                                  )).copyWith(fontFamily: 'Poppins'),
                               ),
                             ],
                           ),

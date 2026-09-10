@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/color.dart';
 
 import '../../../../../../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../../../../../../Utils/app_palette.dart';
 import '../../../../../../../NotifyListeners/LanguageProvider/music_strings.dart';
 import '../../artist_page.dart';
 
@@ -81,6 +82,7 @@ class _ArtistsViewState extends State<ArtistsView> {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final bg = widget.color;
     final textColor = widget.colortext;
     final lang = context.watch<LocaleProvider>().locale.languageCode;
@@ -173,6 +175,7 @@ class _ArtistsViewState extends State<ArtistsView> {
                                 Navigator.push(
                                   context,
                                   MaterialPageRoute(
+                                    settings: const RouteSettings(name: 'MusicArtistScreen'),
                                     builder: (_) => ArtistPage(
                                       artist: artist,
                                       color: Theme.of(context).colorScheme.surface,
@@ -276,11 +279,12 @@ class _ArtistCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final songs = artist.numberOfTracks ?? 0;
     final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return Material(
-      color: Colors.white.withValues(alpha:1),
+      color: AppPalette.card,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -288,13 +292,13 @@ class _ArtistCard extends StatelessWidget {
         child: Container(
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: Colors.white.withValues(alpha:0.06)),
+            border: Border.all(color: AppPalette.border),
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                Colors.white.withValues(alpha:1),
-                Colors.white.withValues(alpha:1),
+                AppPalette.card,
+                AppPalette.card,
               ],
             ),
             boxShadow: [
@@ -410,6 +414,7 @@ class _SearchField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     return Card(
       child: Container(
         height: 35,

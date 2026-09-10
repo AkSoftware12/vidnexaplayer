@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../../Billing/billing_service.dart';
 import '../app_open_ad_manager.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../NotifyListeners/LanguageProvider/misc_strings.dart';
@@ -93,6 +94,24 @@ class InlineBannerList<T> extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LocaleProvider>().locale.languageCode;
+
+    // Premium: build a plain list with no ad rows at all.
+    //
+    // Collapsing the inner [AdaptiveBannerAd] is not enough here — the ad tile
+    // wraps it in its own padding, rounded grey panel and "Sponsored" label, so
+    // a subscriber would still scroll past an empty box every few items. The
+    // rows are dropped from the index arithmetic entirely instead.
+    if (context.watch<BillingService>().isPremium) {
+      return ListView.builder(
+        shrinkWrap: shrinkWrap,
+        physics: physics,
+        padding: padding,
+        itemCount: items.length,
+        itemBuilder: (context, index) =>
+            itemBuilder(context, index, items[index]),
+      );
+    }
+
     return ListView.builder(
       shrinkWrap: shrinkWrap,
       physics: physics,

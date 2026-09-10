@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
@@ -104,7 +103,7 @@ class VoiceSearchStateView extends StatelessWidget {
         children: [
           const CircularProgressIndicator(),
           const SizedBox(height: 12),
-          Text(label, style: GoogleFonts.poppins(fontSize: 13, color: ColorSelect.subtextColor)),
+          Text(label, style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: ColorSelect.subtextColor)),
         ],
       ),
     );
@@ -118,7 +117,7 @@ class VoiceSearchStateView extends StatelessWidget {
           Text(
             title,
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(fontSize: 13, color: ColorSelect.subtextColor),
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 13, color: ColorSelect.subtextColor),
           ),
           const SizedBox(height: 14),
           _exampleChips(),
@@ -140,12 +139,12 @@ class VoiceSearchStateView extends StatelessWidget {
         children: [
           Icon(icon, size: 44, color: ColorSelect.subtextColor),
           const SizedBox(height: 12),
-          Text(title, style: GoogleFonts.poppins(fontSize: 15, fontWeight: FontWeight.w600)),
+          Text(title, style: TextStyle(fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           Text(
             subtitle,
             textAlign: TextAlign.center,
-            style: GoogleFonts.poppins(fontSize: 12, color: ColorSelect.subtextColor),
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 12, color: ColorSelect.subtextColor),
           ),
           if (showExamples) ...[
             const SizedBox(height: 14),
@@ -168,7 +167,7 @@ class VoiceSearchStateView extends StatelessWidget {
       children: _examples
           .map(
             (e) => ActionChip(
-              label: Text(e, style: GoogleFonts.poppins(fontSize: 11.5)),
+              label: Text(e, style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5)),
               onPressed: () => onExampleTap(e),
             ),
           )

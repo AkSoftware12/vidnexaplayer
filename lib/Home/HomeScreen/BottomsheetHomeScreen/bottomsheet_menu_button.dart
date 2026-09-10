@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 import '../../../NotifyListeners/LanguageProvider/home_strings.dart';
@@ -76,23 +75,19 @@ class FolderBottomSheet {
                         children: [
                           Text(
                             'Vidnexa Player',
-                            style: GoogleFonts.poppins(
-                              textStyle: TextStyle(
+                            style: (TextStyle(
                                 color: Colors.blue,
                                 fontSize: 16.sp,
                                 fontWeight: FontWeight.bold,
-                              ),
-                            ),
+                              )).copyWith(fontFamily: 'Poppins'),
                           ),
                           Text(
                             '($folderName)',
-                            style: GoogleFonts.poppins(
-                              textStyle: TextStyle(
+                            style: (TextStyle(
                                 color: Colors.purple,
                                 fontSize: 10.sp,
                                 fontWeight: FontWeight.w600,
-                              ),
-                            ),
+                              )).copyWith(fontFamily: 'Poppins'),
                           ),
                         ],
                       ),
@@ -135,6 +130,7 @@ class FolderBottomSheet {
                       Navigator.push(
                         context,
                         MaterialPageRoute(
+                          settings: const RouteSettings(name: 'VideoFolderScreen'),
                           builder: (context) => VideoFolderScreen(
                             folderName: folderName,
                             videos: videos,
@@ -223,13 +219,11 @@ class FolderBottomSheet {
             SizedBox(height: 6.h),
             Text(
               label,
-              style: GoogleFonts.openSans(
-                textStyle: TextStyle(
+              style: (TextStyle(
                   color: color,
                   fontSize: 13.sp,
                   fontWeight: FontWeight.w600,
-                ),
-              ),
+                )).copyWith(fontFamily: 'OpenSans'),
               textAlign: TextAlign.center,
             ),
           ],

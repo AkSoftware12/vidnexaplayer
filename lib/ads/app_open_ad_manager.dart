@@ -5,8 +5,10 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../Billing/billing_service.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../NotifyListeners/LanguageProvider/misc_strings.dart';
+import '../Utils/color.dart';
 
 /// Ad unit ids in one place instead of scattered string literals.
 ///
@@ -24,17 +26,29 @@ class AdUnits {
   static const String _liveAppOpen = 'ca-app-pub-6478840988045325/9137962029';
   static const String _liveBanner = 'ca-app-pub-6478840988045325/7764390357';
   static const String _liveInterstitial = 'ca-app-pub-6478840988045325/2955697053';
+  static const String _liveNative = 'ca-app-pub-6478840988045325/9759998301';
+  static const String _liveRewarded = 'ca-app-pub-6478840988045325/2605437798';
+  static const String _liveRewardedInterstitial =
+      'ca-app-pub-6478840988045325/5231601134';
 
   // ---- Google's public test units (debug builds) ----
   // https://developers.google.com/admob/android/test-ads
   static const String _testAppOpen = 'ca-app-pub-3940256099942544/9257395921';
   static const String _testBanner = 'ca-app-pub-3940256099942544/6300978111';
   static const String _testInterstitial = 'ca-app-pub-3940256099942544/1033173712';
+  static const String _testNative = 'ca-app-pub-3940256099942544/2247696110';
+  static const String _testRewarded = 'ca-app-pub-3940256099942544/5224354917';
+  static const String _testRewardedInterstitial =
+      'ca-app-pub-3940256099942544/5354046379';
 
   static const String appOpen = kDebugMode ? _testAppOpen : _liveAppOpen;
   static const String banner = kDebugMode ? _testBanner : _liveBanner;
   static const String interstitial =
       kDebugMode ? _testInterstitial : _liveInterstitial;
+  static const String native = kDebugMode ? _testNative : _liveNative;
+  static const String rewarded = kDebugMode ? _testRewarded : _liveRewarded;
+  static const String rewardedInterstitial =
+      kDebugMode ? _testRewardedInterstitial : _liveRewardedInterstitial;
 }
 
 /// App-wide ad manager.
@@ -148,6 +162,38 @@ class AppOpenAdManager with WidgetsBindingObserver {
   }
 
   // =========================================================
+  // REWARDED
+  // =========================================================
+  RewardedAd? _rewardedAd;
+  RewardedInterstitialAd? _rewardedInterstitialAd;
+
+  bool _isRewardedLoading = false;
+  bool _isRewardedInterstitialLoading = false;
+
+  /// True when a rewarded ad of either kind is in hand.
+  ///
+  /// The caller uses this to decide whether to offer the opt-in prompt at all.
+  /// Offering "watch an ad to unlock" and then failing to produce one is worse
+  /// than never offering it.
+  bool get hasRewardedAd =>
+      _rewardedAd != null || _rewardedInterstitialAd != null;
+
+  // =========================================================
+  // PREMIUM GATE
+  // =========================================================
+  /// Whether this user has paid to remove ads.
+  ///
+  /// Read live rather than captured once, because the flag flips the instant a
+  /// purchase completes on the paywall — a user who has just paid must not sit
+  /// through an interstitial that was already queued up. main.dart skips
+  /// `MobileAds.initialize()` entirely for a user who was already premium at
+  /// launch, so in practice this guard covers the mid-session case.
+  ///
+  /// Deliberately the same top-level getter the banner and native widgets use,
+  /// so there is exactly one definition of "ads are off for this user".
+  bool get _isPremiumUser => _isPremium;
+
+  // =========================================================
   // INIT
   // =========================================================
   bool _initialized = false;
@@ -155,6 +201,7 @@ class AppOpenAdManager with WidgetsBindingObserver {
   /// Safe to call more than once — extra calls are ignored.
   void init() {
     if (_initialized) return;
+    if (_isPremiumUser) return;
     _initialized = true;
 
     WidgetsBinding.instance.addObserver(this);
@@ -164,6 +211,8 @@ class AppOpenAdManager with WidgetsBindingObserver {
 
     loadAd();
     _loadInterstitial();
+    _loadRewarded();
+    _loadRewardedInterstitial();
   }
 
   /// Only for full app teardown. Screens must not call this.
@@ -178,6 +227,12 @@ class AppOpenAdManager with WidgetsBindingObserver {
 
     _interstitialAd?.dispose();
     _interstitialAd = null;
+
+    _rewardedAd?.dispose();
+    _rewardedAd = null;
+
+    _rewardedInterstitialAd?.dispose();
+    _rewardedInterstitialAd = null;
   }
 
   /// Resume listener.
@@ -195,6 +250,7 @@ class AppOpenAdManager with WidgetsBindingObserver {
   // APP OPEN
   // =========================================================
   void loadAd() {
+    if (_isPremiumUser) return;
     if (_isAppOpenLoading || _appOpenAd != null) return;
     _isAppOpenLoading = true;
 
@@ -263,8 +319,10 @@ class AppOpenAdManager with WidgetsBindingObserver {
       onDone();
     }
 
+    // Premium check comes before the ad lookup so a purchase made mid-session
+    // suppresses an App Open ad that was already loaded and waiting.
     final ad = _appOpenAd;
-    if (ad == null || _isShowingAd) {
+    if (_isPremiumUser || ad == null || _isShowingAd) {
       finish();
       return;
     }
@@ -309,6 +367,7 @@ class AppOpenAdManager with WidgetsBindingObserver {
   // INTERSTITIAL
   // =========================================================
   void _loadInterstitial() {
+    if (_isPremiumUser) return;
     if (_isInterstitialLoading || _interstitialAd != null) return;
     _isInterstitialLoading = true;
 
@@ -361,6 +420,15 @@ class AppOpenAdManager with WidgetsBindingObserver {
       onContinue();
     }
 
+    // Premium users go straight through. Returning before the counter bump
+    // matters: the action count is persisted, so incrementing it here would
+    // have a paying user silently building up credit toward an interstitial
+    // that fires the day their subscription lapses.
+    if (_isPremiumUser) {
+      proceed();
+      return;
+    }
+
     _rollDayIfNeeded();
     _actionCount++;
 
@@ -403,6 +471,155 @@ class AppOpenAdManager with WidgetsBindingObserver {
   }
 
   // =========================================================
+  // REWARDED
+  // =========================================================
+  //
+  // Two units back one placement. The rewarded unit is preferred; the rewarded
+  // interstitial is the fallback when it has no fill. Both carry the same
+  // AdMob requirement — an opt-in screen naming the reward, with a way to
+  // decline — and the caller satisfies it once for both (see
+  // `RewardedUnlockPrompt`). Nothing here shows an ad on its own.
+
+  void _loadRewarded() {
+    if (_isPremiumUser) return;
+    if (_isRewardedLoading || _rewardedAd != null) return;
+    _isRewardedLoading = true;
+
+    RewardedAd.load(
+      adUnitId: AdUnits.rewarded,
+      request: const AdRequest(),
+      rewardedAdLoadCallback: RewardedAdLoadCallback(
+        onAdLoaded: (ad) {
+          debugPrint('✅ Rewarded loaded');
+          _isRewardedLoading = false;
+          _rewardedAd = ad;
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('❌ Rewarded failed to load: $error');
+          _isRewardedLoading = false;
+          _rewardedAd = null;
+          Future.delayed(const Duration(seconds: 30), () {
+            if (_initialized) _loadRewarded();
+          });
+        },
+      ),
+    );
+  }
+
+  void _loadRewardedInterstitial() {
+    if (_isPremiumUser) return;
+    if (_isRewardedInterstitialLoading || _rewardedInterstitialAd != null) {
+      return;
+    }
+    _isRewardedInterstitialLoading = true;
+
+    RewardedInterstitialAd.load(
+      adUnitId: AdUnits.rewardedInterstitial,
+      request: const AdRequest(),
+      rewardedInterstitialAdLoadCallback: RewardedInterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          debugPrint('✅ Rewarded interstitial loaded');
+          _isRewardedInterstitialLoading = false;
+          _rewardedInterstitialAd = ad;
+        },
+        onAdFailedToLoad: (error) {
+          debugPrint('❌ Rewarded interstitial failed to load: $error');
+          _isRewardedInterstitialLoading = false;
+          _rewardedInterstitialAd = null;
+          Future.delayed(const Duration(seconds: 30), () {
+            if (_initialized) _loadRewardedInterstitial();
+          });
+        },
+      ),
+    );
+  }
+
+  /// Shows a rewarded ad and resolves to whether the reward was earned.
+  ///
+  /// Call this **only** after the user has opted in through a prompt that
+  /// named the reward — AdMob requires that, and it is also the only version
+  /// of this that is fair to the user.
+  ///
+  /// Returns false when no ad could be shown. The caller decides what that
+  /// means; the convention in this app is to grant the reward anyway rather
+  /// than punish someone for our empty inventory.
+  Future<bool> showRewarded() async {
+    if (_isShowingAd) return false;
+
+    final rewarded = _rewardedAd;
+    if (rewarded != null) {
+      _rewardedAd = null;
+      return _showFullScreenRewarded<RewardedAd>(
+        ad: rewarded,
+        show: (onEarned) => rewarded.show(onUserEarnedReward: onEarned),
+        setCallback: (callback) => rewarded.fullScreenContentCallback = callback,
+        reload: _loadRewarded,
+      );
+    }
+
+    final fallback = _rewardedInterstitialAd;
+    if (fallback != null) {
+      _rewardedInterstitialAd = null;
+      return _showFullScreenRewarded<RewardedInterstitialAd>(
+        ad: fallback,
+        show: (onEarned) => fallback.show(onUserEarnedReward: onEarned),
+        setCallback: (callback) =>
+            fallback.fullScreenContentCallback = callback,
+        reload: _loadRewardedInterstitial,
+      );
+    }
+
+    // Nothing in hand — start filling for next time.
+    _loadRewarded();
+    _loadRewardedInterstitial();
+    return false;
+  }
+
+  /// Shared show/dispose/reload dance for the two rewarded kinds.
+  ///
+  /// The reward is recorded when it is earned but only returned once the ad is
+  /// dismissed, so the caller never unlocks something behind an ad that is
+  /// still covering the screen.
+  Future<bool> _showFullScreenRewarded<T extends AdWithoutView>({
+    required T ad,
+    required void Function(OnUserEarnedRewardCallback) show,
+    required void Function(FullScreenContentCallback<T>) setCallback,
+    required VoidCallback reload,
+  }) {
+    final completer = Completer<bool>();
+    var earned = false;
+
+    void finish(bool result) {
+      if (completer.isCompleted) return;
+      completer.complete(result);
+    }
+
+    _isShowingAd = true;
+
+    setCallback(
+      FullScreenContentCallback<T>(
+        onAdDismissedFullScreenContent: (ad) {
+          ad.dispose();
+          _isShowingAd = false;
+          reload();
+          finish(earned);
+        },
+        onAdFailedToShowFullScreenContent: (ad, err) {
+          debugPrint('❌ Rewarded show failed: $err');
+          ad.dispose();
+          _isShowingAd = false;
+          reload();
+          finish(false);
+        },
+      ),
+    );
+
+    show((_, __) => earned = true);
+
+    return completer.future;
+  }
+
+  // =========================================================
   // BANNER
   // =========================================================
   /// A banner sized for a bottom bar.
@@ -415,7 +632,41 @@ class AppOpenAdManager with WidgetsBindingObserver {
   /// A banner in a card with a "Sponsored" label.
   Widget bannerWidget({EdgeInsets? margin}) =>
       AdaptiveBannerAd(margin: margin, bare: false);
+
+  // =========================================================
+  // NATIVE
+  // =========================================================
+  /// An in-content native ad, styled to sit inside a page rather than pinned
+  /// to its edge.
+  ///
+  /// Uses the plugin's built-in template, so there is no `NativeAdFactory` to
+  /// register on the Android side and nothing to keep in step with a layout
+  /// XML. Each call owns its own [NativeAd], for the same reason each banner
+  /// does.
+  /// Defaults to the small template. The medium one needs a ~600px slot to
+  /// render a square-media creative without clipping (see [NativeAdCard]),
+  /// which is more of a screen than any of these surfaces can spare.
+  Widget nativeWidget({
+    EdgeInsets? margin,
+    TemplateType template = TemplateType.small,
+  }) =>
+      NativeAdCard(margin: margin, template: template);
+
+  /// The short native template, for slots inside a scrolling feed.
+  ///
+  /// Exists so screens can pick a size without importing the ads SDK to name
+  /// a [TemplateType] — the gallery has no other reason to know that package
+  /// exists.
+  Widget nativeCompactWidget({EdgeInsets? margin}) =>
+      NativeAdCard(margin: margin, template: TemplateType.small);
 }
+
+/// Whether the user has paid ads away.
+///
+/// Read off the singleton rather than through the widget tree because the ad
+/// widgets need it in `initState`, where `context.watch` is illegal. Their
+/// `build` methods still watch the provider so the UI reacts to a purchase.
+bool get _isPremium => BillingService.instance.isPremium;
 
 /// Self-contained banner: loads its own ad, disposes it, and renders nothing
 /// until (and unless) the ad actually loads.
@@ -454,10 +705,64 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
   @override
   void initState() {
     super.initState();
+
+    // The listener is attached ALWAYS, premium or not.
+    //
+    // It used to be skipped for a premium user, together with the load. That
+    // made the gate one-way: a banner mounted while premium never learned the
+    // subscription had lapsed, so after expiry every other format came back
+    // (their loaders are called repeatedly from elsewhere) while banners —
+    // which only load here, once, in initState — stayed dead for good.
+    BillingService.instance.addListener(_onPremiumChanged);
+
+    // A premium user must not even generate an ad *request*. main.dart skips
+    // `MobileAds.initialize()` and the manager's own load paths are gated, but
+    // this widget loads its own BannerAd, so without this a subscriber would
+    // still see banners.
+    if (_isPremium) return;
+
     _load();
   }
 
+  /// Tears the banner down the moment a purchase completes, without waiting for
+  /// the screen to be rebuilt by something else.
+  /// Reacts to the entitlement flipping in EITHER direction.
+  ///
+  /// Premium on  -> tear the ad down now, don't wait for a rebuild.
+  /// Premium off -> start loading again. This half was missing, which is what
+  ///                left banners blank for the rest of the install once a
+  ///                subscription lapsed.
+  void _onPremiumChanged() {
+    if (!mounted) return;
+
+    if (_isPremium) {
+      _retryTimer?.cancel();
+      _ad?.dispose();
+      _ad = null;
+      _loaded = false;
+      setState(() {});
+      return;
+    }
+
+    // Back to free. Nothing to do if an ad is already in hand or in flight.
+    if (_ad != null || _loaded) return;
+
+    // Fresh budget: the attempts burned before (or while) the user was premium
+    // must not count against them now.
+    _retryTimer?.cancel();
+    _attempt = 0;
+    _givenUp = false;
+    _load();
+    setState(() {});
+  }
+
   void _load() {
+    // Last line of defence. The retry Timer below fires up to three times over
+    // ~30s, and a purchase can complete in that window: [_onPremiumChanged]
+    // cancels the timer, but a callback already queued on the event loop still
+    // runs. Without this a subscriber could still emit one request.
+    if (_isPremium) return;
+
     _attempt++;
 
     final ad = BannerAd(
@@ -499,7 +804,14 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
           });
 
           _retryTimer?.cancel();
-          _retryTimer = Timer(Duration(seconds: 5 * _attempt), () {
+          // 30s, 60s — not 5s.
+          //
+          // A 5-second retry lands inside AdMob's own rate limiter, which
+          // answers "Too many recently failed requests for ad unit ID" (code
+          // 1) instead of making a real request. Attempts 2 and 3 were being
+          // spent on that error, so a unit that was merely short on fill got
+          // one genuine try before the slot gave up for good.
+          _retryTimer = Timer(Duration(seconds: 30 * _attempt), () {
             if (mounted) _load();
           });
         },
@@ -512,6 +824,7 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
 
   @override
   void dispose() {
+    BillingService.instance.removeListener(_onPremiumChanged);
     _retryTimer?.cancel();
     _ad?.dispose();
     _ad = null;
@@ -520,6 +833,13 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
 
   @override
   Widget build(BuildContext context) {
+    // Collapse to nothing — NOT to the 50px placeholder below. Reserving the
+    // banner's height for a user who will never see a banner is exactly the
+    // blank gap that showed up after subscribing.
+    if (context.watch<BillingService>().isPremium) {
+      return const SizedBox.shrink();
+    }
+
     final ad = _ad;
     if (!_loaded || ad == null) {
       // Hold the banner's height while attempts are still in flight so a late
@@ -567,6 +887,240 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
             borderRadius: BorderRadius.circular(12),
             child: adView,
           ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Self-contained native ad: loads its own [NativeAd], disposes it, and
+/// renders nothing until (and unless) it fills.
+///
+/// Rendered with the plugin's native template rather than a custom factory —
+/// the template already carries the "Ad" attribution badge AdMob requires, so
+/// there is nothing here that can accidentally present an ad as app content.
+class NativeAdCard extends StatefulWidget {
+  const NativeAdCard({
+    super.key,
+    this.margin,
+    this.template = TemplateType.medium,
+    this.adUnitId = AdUnits.native,
+  });
+
+  final EdgeInsets? margin;
+  final TemplateType template;
+  final String adUnitId;
+
+  @override
+  State<NativeAdCard> createState() => _NativeAdCardState();
+}
+
+class _NativeAdCardState extends State<NativeAdCard> {
+  NativeAd? _ad;
+  bool _loaded = false;
+
+  /// Matches the banner's policy: a single "no fill" is normal on a
+  /// low-traffic unit, so retry a few times before collapsing the slot.
+  static const int _maxAttempts = 3;
+  int _attempt = 0;
+  Timer? _retryTimer;
+  bool _givenUp = false;
+
+  /// The height the slot is always given.
+  ///
+  /// [AdWidget] has no intrinsic size — it fills whatever it is handed — so
+  /// the template's Android layout, whose own heights are `wrap_content`, is
+  /// measured against exactly this number. Give it less than the creative
+  /// needs and the asset views end up outside the ad view: the SDK's
+  /// validator reports "not all asset views lie inside the native ad view"
+  /// and the ad draws clipped or blank.
+  ///
+  /// A *range* is not a fix — under loose constraints the widget settles at
+  /// the minimum, which is the same clipping with extra steps — and neither
+  /// is the documented 400 maximum for [TemplateType.medium]: that template
+  /// carries a full-width media view, so a creative with a square image wants
+  /// roughly the screen's width plus another 180 for the header, body and
+  /// call to action. 400 fits a 16:9 image and clips a square one, which is
+  /// why it failed on some ads and not others.
+  ///
+  /// [TemplateType.small] has an icon rather than a media view, so its height
+  /// barely varies with the creative. That is why it is what this app uses.
+  double get _height => widget.template == TemplateType.small ? 200 : 600;
+
+  @override
+  void initState() {
+    super.initState();
+
+    // Attached unconditionally, so this card also recovers when a
+    // subscription lapses — see [_AdaptiveBannerAdState.initState].
+    BillingService.instance.addListener(_onPremiumChanged);
+
+    // No ad request at all for a subscriber.
+    if (_isPremium) return;
+
+    // Deferred to the first frame: the template is styled from the active
+    // theme, which is not resolvable during initState.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      // Re-checked: a purchase can complete between initState and this frame.
+      if (mounted && !_isPremium) _load();
+    });
+  }
+
+  /// Reacts to the entitlement flipping in EITHER direction.
+  ///
+  /// Premium on  -> tear the ad down now, don't wait for a rebuild.
+  /// Premium off -> start loading again. This half was missing, which is what
+  ///                left banners blank for the rest of the install once a
+  ///                subscription lapsed.
+  void _onPremiumChanged() {
+    if (!mounted) return;
+
+    if (_isPremium) {
+      _retryTimer?.cancel();
+      _ad?.dispose();
+      _ad = null;
+      _loaded = false;
+      setState(() {});
+      return;
+    }
+
+    // Back to free. Nothing to do if an ad is already in hand or in flight.
+    if (_ad != null || _loaded) return;
+
+    // Fresh budget: the attempts burned before (or while) the user was premium
+    // must not count against them now.
+    _retryTimer?.cancel();
+    _attempt = 0;
+    _givenUp = false;
+    // The native template needs a themed context, which is only safe after a
+    // frame — same reason initState defers its first load.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted && !_isPremium) _load();
+    });
+    setState(() {});
+  }
+
+  @override
+  void dispose() {
+    BillingService.instance.removeListener(_onPremiumChanged);
+    _retryTimer?.cancel();
+    _ad?.dispose();
+    _ad = null;
+    super.dispose();
+  }
+
+  void _load() {
+    // See [_AdaptiveBannerAdState._load].
+    if (_isPremium) return;
+
+    _attempt++;
+
+    final dark = Theme.of(context).brightness == Brightness.dark;
+    final onSurface = dark ? Colors.white : const Color(0xFF111827);
+
+    final ad = NativeAd(
+      adUnitId: widget.adUnitId,
+      request: const AdRequest(),
+      nativeTemplateStyle: NativeTemplateStyle(
+        templateType: widget.template,
+        mainBackgroundColor: dark ? const Color(0xFF1E293B) : Colors.white,
+        cornerRadius: 12,
+        primaryTextStyle: NativeTemplateTextStyle(textColor: onSurface),
+        secondaryTextStyle: NativeTemplateTextStyle(
+          textColor: dark ? Colors.white70 : const Color(0xFF4B5563),
+        ),
+        tertiaryTextStyle: NativeTemplateTextStyle(
+          textColor: dark ? Colors.white38 : const Color(0xFF9CA3AF),
+        ),
+        callToActionTextStyle: NativeTemplateTextStyle(
+          textColor: Colors.white,
+          backgroundColor: ColorSelect.maineColor,
+        ),
+      ),
+      listener: NativeAdListener(
+        onAdLoaded: (_) {
+          debugPrint('✅ Native loaded (${widget.adUnitId})');
+          if (!mounted) {
+            _ad?.dispose();
+            _ad = null;
+            return;
+          }
+          setState(() => _loaded = true);
+        },
+        onAdFailedToLoad: (ad, error) {
+          debugPrint(
+            '❌ Native failed (attempt $_attempt/$_maxAttempts) '
+            'code=${error.code} msg=${error.message}',
+          );
+          ad.dispose();
+          if (!mounted) return;
+
+          if (_attempt >= _maxAttempts) {
+            setState(() {
+              _ad = null;
+              _loaded = false;
+              _givenUp = true;
+            });
+            return;
+          }
+
+          setState(() {
+            _ad = null;
+            _loaded = false;
+          });
+
+          _retryTimer?.cancel();
+          // 30s, 60s — not 5s.
+          //
+          // A 5-second retry lands inside AdMob's own rate limiter, which
+          // answers "Too many recently failed requests for ad unit ID" (code
+          // 1) instead of making a real request. Attempts 2 and 3 were being
+          // spent on that error, so a unit that was merely short on fill got
+          // one genuine try before the slot gave up for good.
+          _retryTimer = Timer(Duration(seconds: 30 * _attempt), () {
+            if (mounted) _load();
+          });
+        },
+      ),
+    );
+
+    _ad = ad;
+    ad.load();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // See [_AdaptiveBannerAdState.build]: collapse fully rather than holding
+    // `_height` (200–600px) open for an ad that will never arrive.
+    if (context.watch<BillingService>().isPremium) {
+      return const SizedBox.shrink();
+    }
+
+    final ad = _ad;
+    if (!_loaded || ad == null) {
+      if (_givenUp) return const SizedBox.shrink();
+      return SizedBox(height: _height);
+    }
+
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
+    return Container(
+      margin: widget.margin ?? EdgeInsets.zero,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Padding(
+              padding: const EdgeInsets.only(right: 4, bottom: 4),
+              child: Text(
+                MiscStrings.t(lang, 'ads_sponsored'),
+                style: TextStyle(fontSize: 10, color: Colors.grey.shade600),
+              ),
+            ),
+          ),
+          SizedBox(height: _height, child: AdWidget(ad: ad)),
         ],
       ),
     );

@@ -10,9 +10,18 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
     <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
-    <!-- Voice command video search: only used while the mic button is actively
-         listening, requested at runtime via permission_handler. -->
+
+    <uses-permission android:name="com.android.vending.BILLING" />
+    <!-- Two consumers, both runtime-requested via permission_handler:
+         1. Voice command video search — only while the mic button is listening.
+         2. The equalizer's spectrum / Auto-EQ. android.media.audiofx.Visualizer
+            is gated behind RECORD_AUDIO even though it only reads THIS app's
+            own output mix; nothing from the microphone is captured. Asked for
+            only when the user turns the visualizer or Auto-EQ on. -->
     <uses-permission android:name="android.permission.RECORD_AUDIO"/>
+    <!-- Required to create BassBoost / Virtualizer / PresetReverb /
+         LoudnessEnhancer on an audio session. Install-time, no prompt. -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS"/>
 
     <!-- Legacy storage: only needed up to Android 12 (API 32). From API 33 the
          granular READ_MEDIA_* permissions below take over. -->
@@ -57,6 +66,13 @@
       android:usesCleartextTraffic is required: the "Stream Video" screen plays
       user-supplied URLs, which legitimately include plain http:// (local
       network / RTSP cameras). Without it every non-https stream fails to open.
+
+      android:largeHeap is for the java.lang.OutOfMemoryError reports: video
+      thumbnail decoding, the photo grid and media_kit's frame buffers all live
+      on the native/Java heap, and the default per-app cap on mid-range devices
+      is small enough that scrolling a large library hits it. It raises the cap;
+      the Dart-side image cache limits set in main.dart are the other half of
+      the fix.
     -->
     <application
         android:label="Video Player"
@@ -64,6 +80,8 @@
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true"
         android:usesCleartextTraffic="true"
+        android:largeHeap="true"
+        android:hardwareAccelerated="true"
         tools:targetApi="tiramisu">
 
         <meta-data

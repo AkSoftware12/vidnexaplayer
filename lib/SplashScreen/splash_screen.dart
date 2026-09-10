@@ -4,7 +4,6 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart' show defaultTargetPlatform, TargetPlatform;
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -78,6 +77,11 @@ class _SplashScreenState extends State<SplashScreen> {
         builder: (_) => onboardingDone
             ? const HomeBottomNavigation()
             : const OnboardingScreen(),
+        // Naam wahi jo yahan se khul raha hai — splash apne aap ko report
+        // nahi karta, woh MaterialApp ka `home:` route hai.
+        settings: RouteSettings(
+          name: onboardingDone ? 'HomeScreen' : 'OnboardingScreen',
+        ),
       ),
     );
 
@@ -108,6 +112,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
     navigator.push(
       MaterialPageRoute(
+        settings: const RouteSettings(name: 'VideoPlayerScreen'),
         builder: (_) => FullScreenVideoPlayerFixed(
           videos: const [],
           initialIndex: 0,
@@ -152,8 +157,7 @@ class _SplashScreenState extends State<SplashScreen> {
             // App name
             Text(
             AppConstants.appName, // Replace with your app name
-              style: GoogleFonts.poppins(
-                fontSize: 12.sp,
+              style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp,
                 fontWeight: FontWeight.bold,
                 color: Colors.white, // White text for contrast
               ),
@@ -261,8 +265,7 @@ class CustomUpgradeDialog extends StatelessWidget {
               SizedBox(height: 10.sp),
               Text(
                 t('splash_new_update_available'),
-                style: GoogleFonts.poppins(
-                  color: Colors.white,
+                style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
                   fontSize: 16.sp,
                   fontWeight: FontWeight.bold,
                   letterSpacing: 1.2,
@@ -282,8 +285,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                   t('splash_update_body')
                       .replaceAll('{new}', newVersion)
                       .replaceAll('{current}', currentVersion),
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
+                  style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
                     fontSize: 10.sp,
                     fontWeight: FontWeight.w500,
                   ),
@@ -295,8 +297,7 @@ class CustomUpgradeDialog extends StatelessWidget {
               Center(
                 child: Text(
                   t('splash_update_prompt'),
-                  style: GoogleFonts.poppins(
-                    color: Colors.white,
+                  style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
                     fontSize: 11.sp,
                     fontWeight: FontWeight.w600,
                   ),
@@ -316,8 +317,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                   children: [
                     Text(
                       t('splash_whats_new').replaceAll('{version}', newVersion),
-                      style: GoogleFonts.poppins(
-                        color: Colors.white,
+                      style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
                         fontSize: 13.sp,
                         fontWeight: FontWeight.w600,
                       ),
@@ -330,8 +330,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                         children: [
                           Text(
                             "• ",
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
+                            style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
                               fontSize: 12.sp,
                               fontWeight: FontWeight.w500,
                             ),
@@ -339,8 +338,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                           Expanded(
                             child: Text(
                               entry.value,
-                              style: GoogleFonts.poppins(
-                                color: Colors.white.withValues(alpha:0.9),
+                              style: TextStyle(fontFamily: 'Poppins', color: Colors.white.withValues(alpha:0.9),
                                 fontSize: 10.sp,
                                 fontWeight: FontWeight.w500,
                               ),
@@ -366,8 +364,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                 icon: Icon(Icons.rocket_launch, size: 20.sp,color: Colors.white,),
                 label: Text(
                   t('splash_update_now').toUpperCase(),
-                  style: GoogleFonts.poppins(
-                    fontSize: 14.sp,
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp,
                     fontWeight: FontWeight.w700,
                     color: Colors.white
                   ),

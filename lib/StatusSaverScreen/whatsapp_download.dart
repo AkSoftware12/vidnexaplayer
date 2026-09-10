@@ -8,12 +8,14 @@ import 'package:gal/gal.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:videoplayer/Analytics/screen_analytics.dart';
 import 'package:videoplayer/StatusSaverScreen/status_saver.dart';
 import 'package:videoplayer/Utils/color.dart';
 
 import '../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
-import '../Photo/image_album.dart';
+import '../Utils/animated_progress_indicator.dart';
+import '../Utils/app_palette.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
 
 const _prefsTreeUriKey = 'whatsapp_tree_uri';
@@ -132,6 +134,18 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     with SingleTickerProviderStateMixin {
   late final TabController _tabController;
 
+  static const List<String> _tabScreenNames = <String>[
+    'StatusSaverScreen_All',
+    'StatusSaverScreen_Images',
+    'StatusSaverScreen_Videos',
+    'StatusSaverScreen_Downloads',
+  ];
+
+  void _reportTab(int index) {
+    if (index < 0 || index >= _tabScreenNames.length) return;
+    ScreenAnalytics.instance.setScreen(_tabScreenNames[index]);
+  }
+
   final Map<String, Future<File?>> _previewFutures = {};
   final Map<String, StatusItem> _statusById = {};
 
@@ -172,10 +186,15 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
 
     _tabController = TabController(length: 4, vsync: this)
       ..addListener(() {
-        if (mounted) {
-          setState(() {});
-        }
+        if (!mounted) return;
+        setState(() {});
+        // Chaaron tab ek hi route par hain — Firebase ko naam yahan se jaata
+        // hai. `indexIsChanging` ke dauraan controller baar baar notify karta
+        // hai, isliye sirf jam chuke index par report karte hain.
+        if (!_tabController.indexIsChanging) _reportTab(_tabController.index);
       });
+
+    _reportTab(_tabController.index);
 
     unawaited(_bootstrap());
   }
@@ -785,9 +804,15 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
           return;
         }
 
+        // `cacheFile()` copies through a platform channel and `exists()` is a
+        // second IO hop — the screen can be popped in between, and pushing
+        // onto a dead Navigator throws.
+        if (!mounted) return;
+
         await Navigator.push(
           context,
           MaterialPageRoute(
+            settings: const RouteSettings(name: 'VideoPlayerScreen'),
             builder: (_) => FullScreenVideoPlayerFixed(
               videos: const [],
               initialIndex: 0,
@@ -807,12 +832,14 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
 
     await Navigator.of(context).push(
       MaterialPageRoute(
+        settings: const RouteSettings(name: 'StatusPreviewScreen'),
         builder: (_) => StatusPreviewPage(item: item),
       ),
     );
   }
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     final imageCount = _imageStatuses.length;
     final videoCount = _videoStatuses.length;
@@ -871,7 +898,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
           ),
           IconButton(
             onPressed: (){
-              Navigator.push(context, MaterialPageRoute(builder: (context) => StatusSaverScreen()));
+              Navigator.push(context, MaterialPageRoute(builder: (context) => StatusSaverScreen(), settings: const RouteSettings(name: 'StatusSaverGuideScreen')));
 
             },
             icon:  const Icon(Icons.info, color: Colors.white),
@@ -1006,26 +1033,26 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       );
     }
 
-    return ListView(
+    // ListView.builder, not ListView(children: [...]): the old version called
+    // `_previewFile()` for EVERY saved status on every rebuild and held all of
+    // the resulting decoded thumbnails alive at once. On a device with a few
+    // hundred saved statuses that is the java.lang.OutOfMemoryError. Index 0
+    // is the access banner so it scrolls with the list as before.
+    return ListView.builder(
       padding: const EdgeInsets.fromLTRB(5, 5, 5, 10),
-      children: [
-        _buildAccessBanner(context),
-        ...List.generate(_downloads.length, (index) {
-          final item = _downloads[index];
-          final source = _statusById[item.id];
+      itemCount: _downloads.length + 1,
+      itemBuilder: (context, index) {
+        if (index == 0) return _buildAccessBanner(context);
 
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 0),
-            child: _DownloadTile(
-              item: item,
-              previewFuture: source == null ? null : _previewFile(source),
-              onTap: source == null
-                  ? null
-                  : () => _openPreview(source),
-            ),
-          );
-        }),
-      ],
+        final item = _downloads[index - 1];
+        final source = _statusById[item.id];
+
+        return _DownloadTile(
+          item: item,
+          previewFuture: source == null ? null : _previewFile(source),
+          onTap: source == null ? null : () => _openPreview(source),
+        );
+      },
     );
   }
 
@@ -1062,7 +1089,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: AppPalette.card,
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
@@ -1205,10 +1232,11 @@ class _StatusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return Material(
-      color: Colors.white,
+      color: AppPalette.card,
       borderRadius: BorderRadius.circular(10),
       child: InkWell(
         borderRadius: BorderRadius.circular(10),
@@ -1353,10 +1381,10 @@ class _StatusCard extends StatelessWidget {
                       height: 30, // 🔥 height kam ki
                       child: OutlinedButton.icon(
                         onPressed: onShare,
-                        icon: const Icon(Icons.share_rounded, size: 16,color: Colors.black,), // 🔥 icon small
+                        icon: Icon(Icons.share_rounded, size: 16, color: AppPalette.textH), // 🔥 icon small
                         label: Text(
                           DeviceStrings.t(lang, 'wa_share'),
-                          style: TextStyle(fontSize: 12, color: Colors.black), // 🔥 font small
+                          style: TextStyle(fontSize: 12, color: AppPalette.textH), // 🔥 font small
                         ),
                         style: OutlinedButton.styleFrom(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),

@@ -5,6 +5,7 @@ import 'package:flutter_staggered_animations/flutter_staggered_animations.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 import 'package:provider/provider.dart';
 
+import '../../../../../../../Utils/app_palette.dart';
 import '../../../../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../../../../NotifyListeners/LanguageProvider/music_strings.dart';
 import '../../album_page.dart';
@@ -98,6 +99,7 @@ class _AlbumsViewState extends State<AlbumsView> {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return Scaffold(
@@ -226,6 +228,7 @@ class _AlbumsViewState extends State<AlbumsView> {
                                   Navigator.push(
                                     context,
                                     MaterialPageRoute(
+                                      settings: const RouteSettings(name: 'MusicAlbumScreen'),
                                       builder: (_) => AlbumPage(
                                         album: album,
                                         color: Theme.of(context).colorScheme.surface,
@@ -332,7 +335,7 @@ class _AlbumsViewState extends State<AlbumsView> {
       title: Text(
         title,
         style: TextStyle(
-          color: Colors.white,
+          color: AppPalette.card,
           fontSize: 13.sp,
           fontWeight: FontWeight.w600,
         ),
@@ -354,6 +357,7 @@ class _AlbumCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return InkWell(
@@ -362,7 +366,7 @@ class _AlbumCard extends StatelessWidget {
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(10.r),
-          color: Colors.white,
+          color: AppPalette.card,
         ),
         padding: EdgeInsets.all(0.w),
         child: Column(

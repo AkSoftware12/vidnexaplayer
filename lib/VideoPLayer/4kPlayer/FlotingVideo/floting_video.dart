@@ -4,7 +4,9 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../../../features/playback/playback_coordinator.dart';
 import '../4k_player.dart';
+import '../../safe_player_dispose.dart';
 
 /// Picture-in-picture style floating player rendered in the app's [Overlay].
 ///
@@ -29,6 +31,9 @@ class FloatingVideoManager {
   static Offset _offset = const Offset(20, 100);
 
   static StreamSubscription<bool>? _playingSub;
+
+  /// Identifies this window to the PlaybackCoordinator.
+  static int? _coordinatorToken;
   static bool _showControls = true;
   static Timer? _hideTimer;
 
@@ -78,8 +83,32 @@ class FloatingVideoManager {
     _videos = List<AssetEntity>.unmodifiable(videos);
     _currentIndex = currentIndex;
 
+    // The full-screen player detached itself from the coordinator on the way
+    // out, so the floating window has to take over as "the video that is
+    // playing" — otherwise starting music would find nothing to pause and both
+    // would play at once.
+    _coordinatorToken = PlaybackCoordinator.instance.attachVideo(
+      pauseVideo: () async {
+        try {
+          await _player?.pause();
+        } catch (_) {}
+      },
+      isVideoPlaying: () {
+        try {
+          return _player?.state.playing ?? false;
+        } catch (_) {
+          return false;
+        }
+      },
+    );
+
     _playingSub?.cancel();
     _playingSub = player.stream.playing.listen((playing) {
+      if (playing) {
+        unawaited(PlaybackCoordinator.instance.onVideoPlaying());
+      } else {
+        PlaybackCoordinator.instance.onVideoPaused();
+      }
       globalPlayPause.update(playing);
       _entry?.markNeedsBuild();
     });
@@ -216,6 +245,7 @@ class FloatingVideoManager {
 
     navigator.push(
       MaterialPageRoute(
+        settings: const RouteSettings(name: 'VideoPlayerScreen'),
         builder: (_) => FullScreenVideoPlayerFixed(
           videos: videos,
           initialIndex: index,
@@ -232,6 +262,12 @@ class FloatingVideoManager {
     final player = _player;
     final controller = _controller;
 
+    // Going back to fullscreen: the video keeps playing, so music must NOT be
+    // resumed. The fullscreen page re-registers itself in its own initState.
+    unawaited(PlaybackCoordinator.instance
+        .detachVideo(token: _coordinatorToken, resumeMusic: false));
+    _coordinatorToken = null;
+
     _teardownOverlay();
 
     _player = null;
@@ -245,6 +281,12 @@ class FloatingVideoManager {
   static Future<void> close() async {
     final player = _player;
 
+    // The ✕: the video is really gone, so music the video interrupted comes
+    // back here.
+    await PlaybackCoordinator.instance
+        .detachVideo(token: _coordinatorToken, resumeMusic: true);
+    _coordinatorToken = null;
+
     _teardownOverlay();
 
     _player = null;
@@ -252,11 +294,15 @@ class FloatingVideoManager {
     _videos = const [];
 
     if (player == null) return;
-    try {
-      await player.dispose();
-    } catch (_) {
-      // Already disposed elsewhere — nothing to do.
-    }
+
+    // Deferred for the same reason as the full-screen player: the
+    // `_teardownOverlay()` above removes the OverlayEntry, which destroys the
+    // video platform view and fires media_kit's widListener. That listener
+    // finishes with a `seek()` on this player and does not check whether it is
+    // still alive, so releasing it here on the same frame throws
+    // `Assertion failed: "[Player] has been disposed"`. See
+    // [disposePlayerSafely].
+    disposePlayerSafely(player);
   }
 
   /// Backwards-compatible alias for [close].

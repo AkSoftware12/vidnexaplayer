@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../NotifyListeners/LanguageProvider/profile_strings.dart';
+import '../../Utils/app_palette.dart';
 import '../service/vault_service.dart';
 
 class VaultScreen extends StatefulWidget {
@@ -362,12 +363,13 @@ class _VaultScreenState extends State<VaultScreen> {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final safeTop = MediaQuery.of(context).padding.top;
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     String t(String key) => ProfileStrings.t(lang, key);
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FF),
+      backgroundColor: AppPalette.surface,
       body: Stack(
         children: [
           // Background gradient
@@ -461,11 +463,11 @@ class _VaultScreenState extends State<VaultScreen> {
       hintText: hint,
       prefixIcon: Icon(icon),
       filled: true,
-      fillColor: Colors.white.withValues(alpha:0.95),
+      fillColor: AppPalette.card,
       border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
-        borderSide: BorderSide(color: Colors.black.withValues(alpha:0.08)),
+        borderSide: BorderSide(color: AppPalette.border),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(14),
@@ -550,6 +552,7 @@ class _LockedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     String t(String key) => ProfileStrings.t(lang, key);
     return Center(
@@ -562,9 +565,9 @@ class _LockedView extends StatelessWidget {
             child: Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha:0.92),
+                color: AppPalette.card.withValues(alpha: 0.94),
                 borderRadius: BorderRadius.circular(22),
-                border: Border.all(color: Colors.white.withValues(alpha:0.75)),
+                border: Border.all(color: AppPalette.border),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withValues(alpha:0.10),
@@ -597,7 +600,7 @@ class _LockedView extends StatelessWidget {
                     style: TextStyle(
                       fontSize: 13,
                       height: 1.35,
-                      color: Colors.black.withValues(alpha:0.65),
+                      color: AppPalette.textB,
                       fontWeight: FontWeight.w500,
                     ),
                   ),
@@ -645,6 +648,7 @@ class _UnlockedView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     String t(String key) => ProfileStrings.t(lang, key);
     if (files.isEmpty) {
@@ -654,9 +658,9 @@ class _UnlockedView extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(18),
             decoration: BoxDecoration(
-              color: Colors.white,
+              color: AppPalette.card,
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: Colors.black.withValues(alpha:0.06)),
+              border: Border.all(color: AppPalette.border),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withValues(alpha:0.06),
@@ -673,7 +677,7 @@ class _UnlockedView extends StatelessWidget {
                   width: 56,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.black.withValues(alpha:0.04),
+                    color: AppPalette.raised,
                   ),
                   child: const Icon(Icons.folder_off_rounded, size: 28),
                 ),
@@ -686,7 +690,7 @@ class _UnlockedView extends StatelessWidget {
                 Text(
                   t('lock_no_files_body'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.black.withValues(alpha:0.65), fontWeight: FontWeight.w500),
+                  style: TextStyle(color: AppPalette.textB, fontWeight: FontWeight.w500),
                 ),
               ],
             ),

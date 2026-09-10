@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -83,8 +82,7 @@ class VoiceSearchResultTile extends StatelessWidget {
                       video.fileName,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: GoogleFonts.poppins(
-                        fontSize: 12.5,
+                      style: TextStyle(fontFamily: 'Poppins', fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
@@ -170,6 +168,7 @@ class VoiceSearchResultTile extends StatelessWidget {
     Navigator.push(
       context,
       MaterialPageRoute(
+        settings: const RouteSettings(name: 'VideoPlayerScreen'),
         builder: (_) => FullScreenVideoPlayerFixed(videos: [asset], initialIndex: 0),
       ),
     );
@@ -185,7 +184,7 @@ class VoiceSearchResultTile extends StatelessWidget {
     if (!context.mounted) return;
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => FullScreenImageViewer(imagePath: file.path)),
+      MaterialPageRoute(builder: (_) => FullScreenImageViewer(imagePath: file.path), settings: const RouteSettings(name: 'FullScreenImageViewer')),
     );
   }
 
@@ -214,7 +213,7 @@ class VoiceSearchResultTile extends StatelessWidget {
     if (!context.mounted) return;
     await GlobalAudioController().playSongs([song], 0);
     if (!context.mounted) return;
-    Navigator.push(context, MaterialPageRoute(builder: (_) => const FullPlayerScreen()));
+    Navigator.push(context, MaterialPageRoute(builder: (_) => const FullPlayerScreen(), settings: const RouteSettings(name: 'MusicFullPlayerScreen')));
   }
 
   void _reportStale(BuildContext context, String messageKey) {
@@ -254,7 +253,7 @@ class _MetaChip extends StatelessWidget {
         const SizedBox(width: 3),
         Text(
           text,
-          style: GoogleFonts.poppins(fontSize: 10.5, color: ColorSelect.subtextColor),
+          style: TextStyle(fontFamily: 'Poppins', fontSize: 10.5, color: ColorSelect.subtextColor),
         ),
       ],
     );

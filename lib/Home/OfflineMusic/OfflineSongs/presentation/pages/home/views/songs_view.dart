@@ -1,10 +1,10 @@
 import 'package:animations/animations.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 import 'package:provider/provider.dart';
 import '../../../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
+import '../../../../../../../Utils/app_palette.dart';
 import '../../../../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../../../../NotifyListeners/LanguageProvider/music_strings.dart';
 
@@ -151,6 +151,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
   }
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return Scaffold(
@@ -195,24 +196,20 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
                             return  ListTile(
                               title: Text(
                                 item.data![index].title,
-                                style: GoogleFonts.openSans(
-                                  textStyle: TextStyle(
+                                style: (TextStyle(
                                     color:widget.colortext,
                                     fontSize: 13.sp,
                                     fontWeight: FontWeight.bold,
-                                  ),
-                                ),
+                                  )).copyWith(fontFamily: 'OpenSans'),
                               ),
                               subtitle: Text(
                                 item.data![index].artist ??
                                     MusicStrings.t(lang, 'music_no_artist'),
-                                style: GoogleFonts.poppins(
-                                  textStyle: TextStyle(
+                                style: (TextStyle(
                                     color: Colors.grey,
                                     fontSize: 11.sp,
                                     fontWeight: FontWeight.w600,
-                                  ),
-                                ),
+                                  )).copyWith(fontFamily: 'Poppins'),
                               ),
                               trailing:  GestureDetector(
                                   onTap: () {
@@ -225,7 +222,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
                                     child: Icon(
                                       Icons.more_vert,
                                       size: 20.sp,
-                                      color: Colors.black54,
+                                      color: AppPalette.textB,
                                     ),
                                   )),
 
@@ -257,7 +254,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
 
 
                         // Add a Divider after each ListTile, except for the last one
-                        if (index < item.data!.length - 1) Divider(color: Colors.white10),
+                        if (index < item.data!.length - 1) Divider(color: AppPalette.border),
 
                       ],
                     ),

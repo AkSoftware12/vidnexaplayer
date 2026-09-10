@@ -4,7 +4,6 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 import 'package:provider/provider.dart';
@@ -17,6 +16,9 @@ import '../../TextScroll/text_scroll.dart';
 import '../../Utils/color.dart';
 import '../../Utils/common.dart';
 import '../../ads/app_open_ad_manager.dart';
+import '../../features/equalizer/audio_effects_service.dart';
+import '../../features/equalizer/domain/eq_models.dart';
+import '../../features/equalizer/presentation/equalizer_sheet.dart';
 import '../AUDIOCONTROLLER/global_audio_controller.dart';
 
 class PositionData {
@@ -230,8 +232,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 15),
                   child: TextScroll(
                     mediaItem.title,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
+                    style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
                       fontWeight: FontWeight.bold,
                       fontSize: 24,
                     ),
@@ -240,7 +241,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                 ),
                 Text(
                   mediaItem.artist ?? MusicStrings.t(lang, 'music_unknown_artist'),
-                  style: GoogleFonts.poppins(color: Colors.white70, fontSize: 14),
+                  style: TextStyle(fontFamily: 'Poppins', color: Colors.white70, fontSize: 14),
                   textAlign: TextAlign.center,
                 ),
                 SizedBox(height: 50.sp),
@@ -278,8 +279,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                       ),
                                       child: Text(
                                         _formatBadge(remaining),
-                                        style: GoogleFonts.poppins(
-                                          color: Colors.white,
+                                        style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
                                           fontSize: 10,
                                           fontWeight: FontWeight.w600,
                                         ),
@@ -307,6 +307,30 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           );
                         },
                         child: const Icon(Icons.volume_up, color: Colors.white, size: 30),
+                      ),
+
+                      // Quick access to the SAME equalizer the video player
+                      // uses; only the saved settings differ per media type.
+                      //
+                      // Watched, not read: the icon turns green while the MUSIC
+                      // equalizer is on, so the state is visible without opening
+                      // the sheet, and it updates the moment it is toggled.
+                      Consumer<AudioEffectsService>(
+                        builder: (context, effects, _) {
+                          final on =
+                              effects.settingsFor(MediaType.music).enabled;
+                          return GestureDetector(
+                            onTap: () => showEqualizerSheet(
+                              context,
+                              mediaType: MediaType.music,
+                            ),
+                            child: Icon(
+                              Icons.graphic_eq,
+                              color: on ? Colors.greenAccent : Colors.white,
+                              size: 30,
+                            ),
+                          );
+                        },
                       ),
 
                       GestureDetector(
@@ -506,10 +530,14 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
               ListTile(
                 leading: const Icon(Icons.timer_off, color: Colors.white70),
-                title: Text(MusicStrings.t(lang, 'music_turn_off'), style: GoogleFonts.poppins(color: Colors.white)),
+                title: Text(MusicStrings.t(lang, 'music_turn_off'), style: TextStyle(fontFamily: 'Poppins', color: Colors.white)),
                 onTap: () async {
                   setState(() => selectedTimer = null);
                   await audio.cancelSleepTimer();
+                  // The timer call crosses a platform channel; the sheet can
+                  // be dismissed before it returns, and popping a dead route
+                  // throws.
+                  if (!context.mounted) return;
                   Navigator.pop(context);
                 },
               ),
@@ -522,6 +550,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                   onTap: () async {
                     setState(() => selectedTimer = duration);
                     await audio.setSleepTimer(duration);
+                    if (!context.mounted) return;
                     Navigator.pop(context);
                   },
                   child: AnimatedContainer(
@@ -610,8 +639,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                       /// 🔹 Header
                       Text(
                         MusicStrings.t(lang, 'music_now_playing_queue'),
-                        style: GoogleFonts.poppins(
-                          color: Colors.white,
+                        style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
                           letterSpacing: 0.3,
@@ -703,8 +731,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                             overflow:
                                             TextOverflow.ellipsis,
                                             style:
-                                            GoogleFonts.poppins(
-                                              color: isPlaying
+                                            TextStyle(fontFamily: 'Poppins', color: isPlaying
                                                   ? const Color(
                                                   0xFF2EDFB4)
                                                   : Colors.white,
@@ -721,8 +748,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                                             overflow:
                                             TextOverflow.ellipsis,
                                             style:
-                                            GoogleFonts.poppins(
-                                              color: Colors.white54,
+                                            TextStyle(fontFamily: 'Poppins', color: Colors.white54,
                                               fontSize: 12,
                                             ),
                                           ),
@@ -848,8 +874,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                             song.title,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              color: Colors.white,
+                            style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
                               fontSize: 14,
                               fontWeight: FontWeight.w600,
                             ),
@@ -859,8 +884,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                             song.artist ?? MusicStrings.t(lang, 'music_unknown_artist'),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
-                            style: GoogleFonts.poppins(
-                              color: Colors.white54,
+                            style: TextStyle(fontFamily: 'Poppins', color: Colors.white54,
                               fontSize: 12,
                             ),
                           ),
@@ -879,8 +903,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                         ),
                         child: Text(
                           MusicStrings.t(lang, 'music_playing_badge'),
-                          style: GoogleFonts.poppins(
-                            color: const Color(0xFF2EDFB4),
+                          style: TextStyle(fontFamily: 'Poppins', color: const Color(0xFF2EDFB4),
                             fontSize: 10,
                             fontWeight: FontWeight.w700,
                             letterSpacing: 0.6,
@@ -1022,8 +1045,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                 children: [
                   Text(
                     title,
-                    style: GoogleFonts.poppins(
-                      color: Colors.white,
+                    style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
                       fontSize: 13.5,
                       fontWeight: FontWeight.w600,
                     ),
@@ -1032,8 +1054,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: GoogleFonts.poppins(
-                        color: Colors.white54,
+                      style: TextStyle(fontFamily: 'Poppins', color: Colors.white54,
                         fontSize: 11.5,
                         fontWeight: FontWeight.w400,
                       ),
@@ -1063,20 +1084,20 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
           title: Text(
             MusicStrings.t(lang, 'music_delete_song_confirm_title'),
-            style: GoogleFonts.poppins(color: Colors.white, fontWeight: FontWeight.w600),
+            style: TextStyle(fontFamily: 'Poppins', color: Colors.white, fontWeight: FontWeight.w600),
           ),
           content: Text(
             MusicStrings.t(lang, 'music_delete_song_confirm_content'),
-            style: GoogleFonts.poppins(color: Colors.white70, fontSize: 13),
+            style: TextStyle(fontFamily: 'Poppins', color: Colors.white70, fontSize: 13),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(ctx, false),
-              child: Text(MusicStrings.t(lang, 'music_cancel'), style: GoogleFonts.poppins(color: Colors.white70)),
+              child: Text(MusicStrings.t(lang, 'music_cancel'), style: TextStyle(fontFamily: 'Poppins', color: Colors.white70)),
             ),
             TextButton(
               onPressed: () => Navigator.pop(ctx, true),
-              child: Text(MusicStrings.t(lang, 'music_delete'), style: GoogleFonts.poppins(color: Colors.redAccent)),
+              child: Text(MusicStrings.t(lang, 'music_delete'), style: TextStyle(fontFamily: 'Poppins', color: Colors.redAccent)),
             ),
           ],
         );
@@ -1116,7 +1137,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
           SnackBar(
             content: Text(
                 "${MusicStrings.t(lang, 'music_deleted_prefix')}${song.title}",
-                style: GoogleFonts.poppins()),
+                style: TextStyle(fontFamily: 'Poppins')),
             backgroundColor: const Color(0xFF1E1E1E),
           ),
         );
@@ -1125,7 +1146,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(MusicStrings.t(lang, 'music_delete_failed'), style: GoogleFonts.poppins()),
+            content: Text(MusicStrings.t(lang, 'music_delete_failed'), style: TextStyle(fontFamily: 'Poppins')),
             backgroundColor: Colors.redAccent,
           ),
         );

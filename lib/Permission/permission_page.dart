@@ -4,7 +4,6 @@ import 'package:animate_do/animate_do.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:lottie/lottie.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
 import 'package:videoplayer/Utils/color.dart';
@@ -144,6 +143,8 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
       context,
       MaterialPageRoute(
         builder: (_) => const HomeBottomNavigation(bottomIndex: 0),
+        settings: const RouteSettings(name: 'HomeScreen'),
+
       ),
     );
   }
@@ -227,8 +228,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                     Text(
                       t('perm_grant_permissions_title'),
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.openSans(
-                        fontSize: 18.sp,
+                      style: TextStyle(fontFamily: 'OpenSans', fontSize: 18.sp,
                         fontWeight: FontWeight.w700,
                         color: Colors.white,
                         letterSpacing: 0.5,
@@ -240,8 +240,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                     Text(
                       t('perm_grant_permissions_sub'),
                       textAlign: TextAlign.center,
-                      style: GoogleFonts.openSans(
-                        fontSize: 12.sp,
+                      style: TextStyle(fontFamily: 'OpenSans', fontSize: 12.sp,
                         fontWeight: FontWeight.w400,
                         color: Colors.white70,
                         height: 1.4,
@@ -300,8 +299,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                                 SizedBox(width: 8.sp),
                                 Text(
                                   t('perm_grant_all_button'),
-                                  style: GoogleFonts.openSans(
-                                    fontSize: 15.sp,
+                                  style: TextStyle(fontFamily: 'OpenSans', fontSize: 15.sp,
                                     fontWeight: FontWeight.w600,
                                   ),
                                 ),
@@ -324,8 +322,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                       onTap: _continueToApp,
                       child: Text(
                         t('perm_skip_for_now'),
-                        style: GoogleFonts.openSans(
-                          fontSize: 13.sp,
+                        style: TextStyle(fontFamily: 'OpenSans', fontSize: 13.sp,
                           fontWeight: FontWeight.w500,
                           color: ColorSelect.subtextColor,
                           decoration: TextDecoration.underline,
@@ -384,16 +381,14 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
               children: [
                 Text(
                   title,
-                  style: GoogleFonts.openSans(
-                    fontSize: 13.sp,
+                  style: TextStyle(fontFamily: 'OpenSans', fontSize: 13.sp,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
                 ),
                 Text(
                   subtitle,
-                  style: GoogleFonts.openSans(
-                    fontSize: 10.sp,
+                  style: TextStyle(fontFamily: 'OpenSans', fontSize: 10.sp,
                     fontWeight: FontWeight.w400,
                     color: Colors.white60,
                   ),

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'package:firebase_crashlytics/firebase_crashlytics.dart';
 import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
@@ -19,7 +20,14 @@ import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../NotifyListeners/LanguageProvider/video_strings.dart';
 import '../../NotifyListeners/PlayPauseSync/play_pause.dart';
 import '../../ads/app_open_ad_manager.dart';
+import '../../NotifyListeners/LanguageProvider/equalizer_strings.dart';
+import '../../features/equalizer/audio_effects_service.dart';
+import '../../features/playback/playback_coordinator.dart';
+import '../../features/equalizer/domain/eq_models.dart';
+import '../../features/equalizer/presentation/equalizer_sheet.dart';
 import '../custom_video_appBar.dart';
+import '../Resume/playback_position_store.dart';
+import '../safe_player_dispose.dart';
 import 'FlotingVideo/floting_video.dart';
 import 'HDR/hdr.dart';
 import 'PopupPlayer/Speed/speed.dart';
@@ -95,13 +103,7 @@ class _FullScreenVideoPlayerSystemVolumeState
   Timer? _systemUiTimer;
   bool _isSeeking = false;
 
-  // Equalizer sliders (dB)
-  double bassGain = 0.0;
-  double midGain = 0.0;
-  double trebleGain = 0.0;
-
   bool _isLocked = false;
-  final bool _equalizerVisible = false;
   bool _audioOnly = false;
   double _playbackRate = 1.0;
 
@@ -126,7 +128,30 @@ class _FullScreenVideoPlayerSystemVolumeState
   StreamSubscription<Duration>? _positionSub;
   StreamSubscription<Duration>? _durationSub;
   StreamSubscription<bool>? _playingSub;
+
+  /// Identifies this page to the PlaybackCoordinator, so handing the player to
+  /// the floating window does not unregister the window that just took over.
+  int? _coordinatorToken;
   StreamSubscription<bool>? _completedSub; // ✅ store to cancel later
+
+  // ---------------------------------------------------------------
+  // Resume support: remember where the user left each video and offer
+  // to continue from there the next time it is opened.
+  // ---------------------------------------------------------------
+
+  /// Key of the media currently open — `AssetEntity.id` for a local file,
+  /// the link itself for a stream. Null while nothing is open.
+  String? _resumeKey;
+
+  /// Last position actually written to disk, used to throttle the writes to
+  /// one every few seconds instead of one per position tick.
+  Duration _lastPersistedPosition = Duration.zero;
+
+  /// True while the resume dialog is on screen, so the auto-hide timer and a
+  /// stray tap can't start playback behind it.
+  bool _resumePromptOpen = false;
+
+  static const Duration _resumeSaveInterval = Duration(seconds: 5);
 
   // =========================================================
   // ✅ MX PLAYER PAN ENGINE + SEEK OVERLAY + BUBBLE + HAPTIC
@@ -214,17 +239,14 @@ class _FullScreenVideoPlayerSystemVolumeState
     }
   }
 
-  /// The single place the player's gain is set: boost × equalizer.
+  /// The single place the player's gain is set.
   ///
-  /// Previously the equalizer and the volume dialog each called `setVolume()`
-  /// independently, so whichever ran last silently wiped the other one out.
+  /// This used to also fold in a fake 3-band "equalizer" by scaling the master
+  /// volume, which changed loudness rather than tone. The real equalizer now
+  /// runs as a filter chain (see [AudioEffectsService]), so this is purely the
+  /// boost.
   Future<void> _applyPlayerVolume() async {
-    final weightedGain =
-        (bassGain * 0.6 + midGain * 0.3 + trebleGain * 0.1) / 15.0;
-    final eqFactor = (1.0 + weightedGain).clamp(0.5, 1.5);
-
-    final target =
-    (_volumeBoost * eqFactor).clamp(0.0, _boostReady ? _maxBoost : 100.0);
+    final target = _volumeBoost.clamp(0.0, _boostReady ? _maxBoost : 100.0);
 
     try {
       await _player.setVolume(target);
@@ -243,16 +265,19 @@ class _FullScreenVideoPlayerSystemVolumeState
   /// Above 100% samples clip and the audio turns harsh; the limiter keeps it
   /// clean.
   ///
-  /// Only toggled on a boundary crossing: setting `af` rebuilds the whole audio
-  /// filter chain (a small audible hiccup), so it must never run on every drag
-  /// frame.
+  /// Only toggled on a boundary crossing: rebuilding the audio filter chain
+  /// costs a small audible hiccup, so it must never run on every drag frame.
+  ///
+  /// The limiter no longer writes `af` itself. mpv has one filter property and
+  /// the equalizer needs it too, so the limiter is registered with the shared
+  /// audio-effects service, which composes both into a single chain.
   Future<void> _applyLimiter(bool on) async {
     if (on == _limiterOn) return;
-    final p = _player.platform;
-    if (p is! NativePlayer) return;
+    _limiterOn = on;
     try {
-      await p.setProperty('af', on ? 'lavfi=[alimiter=limit=0.92]' : '');
-      _limiterOn = on;
+      await AudioEffectsService.instance.setVideoExtraFilters(
+        on ? const ['alimiter=limit=0.92'] : const [],
+      );
     } catch (_) {}
   }
 
@@ -414,6 +439,7 @@ class _FullScreenVideoPlayerSystemVolumeState
       await Future.delayed(const Duration(milliseconds: 300));
       if (!mounted) return;
       await _initVolumeBoost();
+      await _bindEqualizer();
     });
 
     // Initialise brightness.
@@ -458,6 +484,8 @@ class _FullScreenVideoPlayerSystemVolumeState
       setState(() {
         _currentPosition = position;
       });
+      // Keep the resume point fresh (throttled inside).
+      _persistPosition();
     });
 
     // ✅ Listen to duration changes (with safe fallback)
@@ -483,6 +511,13 @@ class _FullScreenVideoPlayerSystemVolumeState
     // Completed listener (only for local list)
     _completedSub = _player.stream.completed.listen((completed) async {
       if (!completed) return;
+
+      // A finished video must not ask to resume next time.
+      final finishedKey = _resumeKey;
+      if (finishedKey != null) {
+        _lastPersistedPosition = Duration.zero;
+        await PlaybackPositionStore.clear(finishedKey);
+      }
 
       if (!_hasLocalList) {
         // URL mode: do nothing on completed (or you can loop)
@@ -514,8 +549,34 @@ class _FullScreenVideoPlayerSystemVolumeState
       DeviceOrientation.portraitDown,
     ]);
 
+    // The music player and this one are separate engines; mpv's OpenSL ES
+    // output never requests audio focus, so without this hand-off both would
+    // simply play at once.
+    _coordinatorToken = PlaybackCoordinator.instance.attachVideo(
+      pauseVideo: () async {
+        try {
+          await _player.pause();
+        } catch (_) {}
+      },
+      isVideoPlaying: () {
+        try {
+          return _player.state.playing;
+        } catch (_) {
+          return false;
+        }
+      },
+    );
+
     // Playing state sync (global play/pause)
     _playingSub = _player.stream.playing.listen((playing) {
+      // Fires before the mounted check on purpose: the hand-off has to happen
+      // even if this frame's widget is mid-teardown.
+      if (playing) {
+        unawaited(PlaybackCoordinator.instance.onVideoPlaying());
+      } else {
+        PlaybackCoordinator.instance.onVideoPaused();
+      }
+
       if (!mounted) return;
       globalPlayPause.update(playing);
       // `globalPlayPause` is not listened to by this widget, so without an
@@ -535,6 +596,15 @@ class _FullScreenVideoPlayerSystemVolumeState
     } else {
       await _applyPlayerVolume();
     }
+
+    // Every `open()` rebuilds mpv's filter chain, so the EQ has to be pushed
+    // again — otherwise it applies to the first video of a session only.
+    if (_ownsPlayer) {
+      try {
+        await AudioEffectsService.instance.reapply(MediaType.video);
+        await _reportAudioCodec();
+      } catch (_) {}
+    }
   }
 
   Future<void> _playFromUrl(String url) async {
@@ -545,8 +615,15 @@ class _FullScreenVideoPlayerSystemVolumeState
         _videoOffset = Offset.zero;
       });
 
-      await _player.open(Media(url), play: true);
+      _resumeKey = url;
+      _lastPersistedPosition = Duration.zero;
+
+      await _player.open(Media(url), play: false);
       await _restoreGainAfterOpen();
+      // Same as the local path: decide first, then start.
+      await _offerResumeIfAny();
+      if (!mounted) return;
+      await _player.play();
 
       _syncFromPlayerState();
     } catch (e) {
@@ -586,7 +663,7 @@ class _FullScreenVideoPlayerSystemVolumeState
   }
 
   void _onScreenTap() {
-    if (_isLocked) return;
+    if (_isLocked || _resumePromptOpen) return;
 
     setState(() => _controlsVisible = !_controlsVisible);
 
@@ -618,6 +695,9 @@ class _FullScreenVideoPlayerSystemVolumeState
       ).addToRecentlyPlayed(id);
     } catch (_) {}
 
+    _resumeKey = widget.videos[_currentIndex].id;
+    _lastPersistedPosition = Duration.zero;
+
     final file = await widget.videos[_currentIndex].file;
 
     // The file lookup above can take a while (MediaStore/cloud-backed
@@ -631,6 +711,10 @@ class _FullScreenVideoPlayerSystemVolumeState
         await _player.open(Media(file.path), play: false);
         await _restoreGainAfterOpen();
         await Future.delayed(const Duration(milliseconds: 100));
+        // Ask before playing, so the video doesn't start from 0:00 behind the
+        // dialog and then jump.
+        await _offerResumeIfAny();
+        if (!mounted) return;
         await _player.play();
       } catch (e) {
         if (mounted) {
@@ -654,15 +738,216 @@ class _FullScreenVideoPlayerSystemVolumeState
     if (mounted) setState(() => _isLoading = false);
   }
 
-  Future<void> _applyEqualizer() async {
-    // Gain now flows through exactly one path (boost × equalizer).
-    await _applyPlayerVolume();
+  // =========================================================
+  // ✅ RESUME PLAYBACK
+  // =========================================================
+
+  /// Writes the current position for the open media.
+  ///
+  /// Called from the position ticker, so it only touches disk once every
+  /// [_resumeSaveInterval] unless [force] is set (media change / leaving the
+  /// screen), where the newest value matters more than the write count.
+  Future<void> _persistPosition({bool force = false}) async {
+    final key = _resumeKey;
+    if (key == null) return;
+
+    final Duration position;
+    final Duration duration;
+    try {
+      position = _player.state.position;
+      duration = _player.state.duration;
+    } catch (_) {
+      return; // Player already gone.
+    }
+
+    if (!force) {
+      final delta = position - _lastPersistedPosition;
+      final elapsed = delta.isNegative ? -delta : delta;
+      if (elapsed < _resumeSaveInterval) return;
+    }
+
+    _lastPersistedPosition = position;
+    await PlaybackPositionStore.save(
+      id: key,
+      position: position,
+      duration: duration,
+    );
+  }
+
+  /// Shows the resume prompt when the open media has a stored position.
+  ///
+  /// Awaited before playback starts; returns as soon as the user decides (or
+  /// immediately when there is nothing to resume).
+  Future<void> _offerResumeIfAny() async {
+    final key = _resumeKey;
+    if (key == null || !mounted) return;
+
+    final saved = await PlaybackPositionStore.get(key);
+    if (saved == null || !mounted) return;
+
+    // A stored point past the end of this file (renamed/replaced media) is
+    // useless — drop it rather than seeking into nothing.
+    final duration = _player.state.duration;
+    if (duration > Duration.zero &&
+        saved >= duration - PlaybackPositionStore.endThreshold) {
+      await PlaybackPositionStore.clear(key);
+      return;
+    }
+
+    final resume = await _showResumeDialog(saved, duration);
+    if (!mounted) return;
+
+    if (resume == true) {
+      try {
+        await _player.seek(saved);
+      } catch (_) {
+        // Seek before the demuxer is ready — playback just starts at 0.
+      }
+    } else {
+      await PlaybackPositionStore.clear(key);
+      _lastPersistedPosition = Duration.zero;
+    }
+  }
+
+  Future<bool?> _showResumeDialog(Duration saved, Duration duration) async {
+    setState(() => _resumePromptOpen = true);
+    _hideTimer?.cancel();
+
+    final progress = duration > Duration.zero
+        ? (saved.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
+        : 0.0;
+
+    final result = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF11131A),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Row(
+          children: [
+            const Icon(Icons.history_rounded, color: Color(0xFFFF8A00)),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                _t('resume_title'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              _t('resume_message'),
+              style: const TextStyle(color: Colors.white54, fontSize: 12),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              duration > Duration.zero
+                  ? '${_formatDuration(saved)} / ${_formatDuration(duration)}'
+                  : _formatDuration(saved),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 26,
+                fontWeight: FontWeight.w900,
+              ),
+            ),
+            if (duration > Duration.zero) ...[
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 5,
+                  backgroundColor: Colors.white24,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    Color(0xFFFF8A00),
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: Text(
+              _t('resume_start_over'),
+              style: const TextStyle(color: Colors.white54),
+            ),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: Text(
+              _t('resume_action'),
+              style: const TextStyle(
+                color: Color(0xFFFF8A00),
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+
+    if (mounted) {
+      setState(() => _resumePromptOpen = false);
+      _startHideTimer();
+    }
+    return result;
+  }
+
+  /// Attaches the shared audio-effects engine to this player and restores the
+  /// user's saved video EQ.
+  ///
+  /// Only bound when we own the player: an externally supplied controller (PiP
+  /// hand-off) is already bound by whoever created it, and re-binding would
+  /// tear its filter chain down mid-playback.
+  Future<void> _bindEqualizer() async {
+    if (!_ownsPlayer) return;
+    try {
+      await AudioEffectsService.instance.bindVideoPlayer(_player);
+      await _reportAudioCodec();
+    } catch (e) {
+      // The equalizer is never allowed to take playback down with it.
+      debugPrint('equalizer bind failed: $e');
+    }
+  }
+
+  /// AC3 / E-AC3 tracks are mastered ~10 dB quieter than stereo AAC, which is
+  /// why "the sound is too low on this movie" is such a common complaint. Tell
+  /// the service so it can compensate for the current track only.
+  Future<void> _reportAudioCodec() async {
+    try {
+      final codec = _player.state.track.audio.codec ??
+          _player.state.track.audio.title;
+      await AudioEffectsService.instance
+          .applyCodecHint(codec, type: MediaType.video);
+    } catch (_) {
+      // Track info not populated yet — the next _loadVideo call retries.
+    }
+  }
+
+  /// Opens the shared equalizer over the video. Playback keeps running and the
+  /// sheet is dismissible by tapping the video behind it.
+  Future<void> _openEqualizer() async {
+    _hideTimer?.cancel();
+    await showEqualizerSheet(context, mediaType: MediaType.video);
+    if (mounted) _startHideTimer();
   }
 
   Future<void> _playNext() async {
     if (!_hasLocalList) return;
 
     if (_currentIndex < widget.videos.length - 1) {
+      // Save where we are before the position stream resets to 0.
+      await _persistPosition(force: true);
       _currentIndex++;
       await _player.stop();
       await _loadVideo();
@@ -673,6 +958,7 @@ class _FullScreenVideoPlayerSystemVolumeState
     if (!_hasLocalList) return;
 
     if (_currentIndex > 0) {
+      await _persistPosition(force: true);
       _currentIndex--;
       await _player.stop();
       await _loadVideo();
@@ -961,38 +1247,6 @@ class _FullScreenVideoPlayerSystemVolumeState
     ];
   }
 
-  Widget _buildSlider(
-      String label,
-      double value,
-      ValueChanged<double> onChanged,
-      ) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        Slider(
-          value: value,
-          min: -15,
-          max: 15,
-          divisions: 30,
-          activeColor: Colors.deepPurpleAccent,
-          inactiveColor: Colors.white24,
-          label: '${value.toStringAsFixed(1)} dB',
-          onChanged: (v) {
-            onChanged(v);
-            _applyEqualizer();
-          },
-        ),
-      ],
-    );
-  }
-
   void _toggleLock() {
     setState(() => _isLocked = !_isLocked);
   }
@@ -1051,12 +1305,20 @@ class _FullScreenVideoPlayerSystemVolumeState
           fontSize: 14,
         );
       }
-    } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(SnackBar(content: Text('${_t('player_screenshot_failed_prefix')} $e')));
-      }
+    } catch (e, s) {
+      // Screenshot capture reaches into the platform view and PhotoManager;
+      // both can fail for reasons outside this screen's control (secure
+      // surface, revoked permission, full storage). Report, don't crash.
+      unawaited(FirebaseCrashlytics.instance.recordError(
+        e,
+        s,
+        reason: 'player screenshot failed',
+        fatal: false,
+      ));
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${_t('player_screenshot_failed_prefix')} $e')),
+      );
     }
   }
 
@@ -1653,6 +1915,23 @@ class _FullScreenVideoPlayerSystemVolumeState
 
   @override
   void dispose() {
+    // Record the resume point while the native player is still alive. The
+    // write itself is async and deliberately not awaited — dispose() can't be.
+    final resumeKey = _resumeKey;
+    if (resumeKey != null) {
+      try {
+        final position = _player.state.position;
+        final duration = _player.state.duration;
+        unawaited(PlaybackPositionStore.save(
+          id: resumeKey,
+          position: position,
+          duration: duration,
+        ));
+      } catch (_) {
+        // Player already disposed elsewhere — nothing to record.
+      }
+    }
+
     // ⚠️ Order matters: cancel every subscription/timer BEFORE tearing the
     // player down. The old code disposed the player first, so in-flight
     // position/duration events still called setState() on a dead State.
@@ -1677,14 +1956,32 @@ class _FullScreenVideoPlayerSystemVolumeState
     _activeToast?.remove();
     _activeToast = null;
 
+    // Detach the equalizer BEFORE the player goes away, so its filter chain is
+    // unwound on a live mpv context instead of a dead one.
+    if (_ownsPlayer) {
+      unawaited(AudioEffectsService.instance.unbind(MediaType.video));
+    }
+
+    // Closing the video hands playback back: music the video interrupted
+    // resumes here. `resumeMusic` is false when the player is handed to the
+    // floating window, because the video keeps playing there.
+    unawaited(
+      PlaybackCoordinator.instance.detachVideo(
+        token: _coordinatorToken,
+        resumeMusic: _ownsPlayer,
+      ),
+    );
+
     // Dispose only what we still own. `_ownsPlayer` is set to false the moment
     // the player is handed to the floating window.
+    //
+    // Deferred, not immediate: popping this route destroys the video platform
+    // view, which fires media_kit's widListener, which ends in a `seek()` on
+    // this player with no disposed-check. Releasing it here on the same frame
+    // is what produced the `Assertion failed: "[Player] has been disposed"`
+    // fatals in Crashlytics. See [disposePlayerSafely].
     if (_ownsPlayer) {
-      try {
-        _player.dispose();
-      } catch (_) {
-        // Already disposed by whoever else held it.
-      }
+      disposePlayerSafely(_player);
     }
 
     // Always restore the system brightness, otherwise the screen stays stuck
@@ -1826,6 +2123,19 @@ class _FullScreenVideoPlayerSystemVolumeState
                                 onTap: () async {
                                   Navigator.pop(context);
                                   await _toggleAudioOnly();
+                                },
+                              ),
+                              _controlItem(
+                                icon: Icons.graphic_eq,
+                                label: EqStrings.t(_lang, 'eq_title'),
+                                // Green when the VIDEO equalizer is switched
+                                // on — music has its own, independent switch.
+                                active: AudioEffectsService.instance
+                                    .settingsFor(MediaType.video)
+                                    .enabled,
+                                onTap: () async {
+                                  Navigator.pop(context);
+                                  await _openEqualizer();
                                 },
                               ),
                               _controlItem(
@@ -2098,6 +2408,17 @@ class _FullScreenVideoPlayerSystemVolumeState
                             onTap: () async {
                               Navigator.pop(context);
                               await _toggleAudioOnly();
+                            },
+                          ),
+                          _controlItem(
+                            icon: Icons.graphic_eq,
+                            label: EqStrings.t(_lang, 'eq_title'),
+                            active: AudioEffectsService.instance
+                                .settingsFor(MediaType.video)
+                                .enabled,
+                            onTap: () async {
+                              Navigator.pop(context);
+                              await _openEqualizer();
                             },
                           ),
                           _controlItem(
@@ -2622,7 +2943,6 @@ class _FullScreenVideoPlayerSystemVolumeState
     final bool isLandscape =
         MediaQuery.of(context).orientation == Orientation.landscape;
 
-    final double equalizerBottom = isLandscape ? 70 : 130;
     final playSize = isLandscape ? 22.sp : 45.sp;
     final sideSize = isLandscape ? 15.sp : 28.sp;
     final bottomPadding = isLandscape ? 0.sp : 40.sp;
@@ -2998,40 +3318,10 @@ class _FullScreenVideoPlayerSystemVolumeState
                   ),
                 ),
 
-              // equalizer (same)
-              if (!_isLocked && _equalizerVisible)
-                Positioned(
-                  bottom: equalizerBottom.toDouble(),
-                  left: 10,
-                  child: Container(
-                    width: 200,
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.black.withValues(alpha:0.5),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        _buildSlider(
-                          'Bass (60Hz)',
-                          bassGain,
-                              (v) => setState(() => bassGain = v),
-                        ),
-                        _buildSlider(
-                          'Mid (1kHz)',
-                          midGain,
-                              (v) => setState(() => midGain = v),
-                        ),
-                        _buildSlider(
-                          'Treble (10kHz)',
-                          trebleGain,
-                              (v) => setState(() => trebleGain = v),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
+              // The old overlay here was a 3-slider "equalizer" that only
+              // scaled master volume, and it was permanently hidden behind a
+              // `final bool = false`. The real one is the shared equalizer
+              // sheet, opened from the controls bar.
 
               // ✅ controls
               if (!_isLocked && _controlsVisible)

@@ -119,6 +119,12 @@ class VideoStrings {
       'player_hdr_turning_on': 'Turning HDR ON',
       'player_streaming_title': 'Streaming',
 
+      // Resume-playback prompt shown when a video is reopened part-way through.
+      'resume_title': 'Resume playback?',
+      'resume_message': 'You stopped watching at',
+      'resume_action': 'Resume',
+      'resume_start_over': 'Start over',
+
       // Custom video app bar / playlist panel.
       'appbar_tooltip_back': 'Back',
       'appbar_tooltip_playlist': 'Playlist',
@@ -230,6 +236,11 @@ class VideoStrings {
       'player_hdr_turning_off': 'HDR बंद हो रहा है',
       'player_hdr_turning_on': 'HDR चालू हो रहा है',
       'player_streaming_title': 'स्ट्रीमिंग',
+
+      'resume_title': 'वीडियो आगे से चलाएं?',
+      'resume_message': 'आपने यहां तक देखा था',
+      'resume_action': 'आगे से चलाएं',
+      'resume_start_over': 'शुरू से चलाएं',
 
       'appbar_tooltip_back': 'वापस',
       'appbar_tooltip_playlist': 'प्लेलिस्ट',
