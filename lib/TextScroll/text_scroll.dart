@@ -2,7 +2,7 @@ library text_scroll;
 
 import 'dart:async';
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// TextScroll widget automatically scrolls provided [text] according
 /// to custom settings, in order to achieve 'marquee' text effect.

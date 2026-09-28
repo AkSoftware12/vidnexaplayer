@@ -68,7 +68,7 @@ class SafeStorage {
         // Desktop/iOS: the documents directory's parent is the closest thing
         // to a browsable root, and there is no permission model to consult.
         final docs = await getApplicationDocumentsDirectory();
-        return _keepListable([docs.parent]);
+        return await _keepListable([docs.parent]);
       }
 
       if (!await hasStoragePermission()) return <Directory>[];
@@ -102,7 +102,7 @@ class SafeStorage {
         ]);
       }
 
-      return _keepListable(candidates.map(Directory.new).toList());
+      return await _keepListable(candidates.map(Directory.new).toList());
     } catch (e, s) {
       // Nothing about browsing folders is worth a crash — an empty list makes
       // the screen show its "no storage" state instead.

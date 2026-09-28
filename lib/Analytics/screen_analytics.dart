@@ -4,7 +4,7 @@ import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:flutter/foundation.dart';
 // material.dart (widgets.dart nahi) — TabController aur DefaultTabController
 // dono material me hain, jo [TabScreenReporter] ko chahiye.
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// Analytics kabhi UI ko na giraaye — plugin/platform error sirf log ho,
 /// throw kabhi na ho. Har analytics call isi ke through jaati hai.

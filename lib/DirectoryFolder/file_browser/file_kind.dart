@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// How a file is presented in the browser: which icon, which accent, and which
 /// bucket the Documents tab filters on.

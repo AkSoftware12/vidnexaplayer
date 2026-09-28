@@ -81,7 +81,7 @@ class FileOps {
         'name': trimmed,
       });
       if (uri == null) return null;
-      return DocumentFile(uri: uri).get();
+      return await DocumentFile(uri: uri).get();
     } on PlatformException catch (e) {
       debugPrint('FileOps.rename failed: $e');
       return null;

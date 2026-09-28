@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// MaterialApp ka navigator key — context ke bina navigate/dialog ke liye
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();

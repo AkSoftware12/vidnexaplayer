@@ -1,5 +1,5 @@
 import 'package:disk_space_plus/disk_space_plus.dart';
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:provider/provider.dart';
 import '../DirectoryFolder/media_store/duplicates_page.dart';
 import '../DirectoryFolder/media_store/folder_list_page.dart';

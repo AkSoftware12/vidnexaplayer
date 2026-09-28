@@ -4,7 +4,7 @@
 // test" template — it looked for an `Icons.add` button this app has never had,
 // and pumped `MyApp()` without its Providers, so it could only ever fail.
 
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 

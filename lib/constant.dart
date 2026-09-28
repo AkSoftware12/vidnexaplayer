@@ -1,4 +1,4 @@
-import 'package:flutter/cupertino.dart';
+import 'package:cupertino_ui/cupertino_ui.dart';
 
 Color lightgreenshede = const Color(0xFFF0FAF6);
 Color lightgreenshede1 = const Color(0xFFB2D9CC);
