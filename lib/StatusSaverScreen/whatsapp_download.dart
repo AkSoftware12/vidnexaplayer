@@ -14,6 +14,9 @@ import 'package:videoplayer/Utils/color.dart';
 
 import '../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../ads/app_open_ad_manager.dart';
+import '../ads/rewarded_unlock.dart';
+import '../ads/rewarded_unlock_prompt.dart';
 import '../Utils/animated_progress_indicator.dart';
 import '../Utils/app_palette.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
@@ -21,6 +24,24 @@ import '../VideoPLayer/4kPlayer/4k_player.dart';
 const _prefsTreeUriKey = 'whatsapp_tree_uri';
 const _prefsDownloadsKey = 'downloaded_statuses_v1';
 const _galleryAlbumName = 'Status Saver';
+
+/// Document URI for WhatsApp's status folder on primary storage.
+///
+/// Handed to the folder picker as its starting point. The path is the modern
+/// scoped-storage location — WhatsApp moved out of `/WhatsApp/Media` years ago
+/// — and `%3A` / `%2F` are the encoded `:` and `/` that the external-storage
+/// provider expects in a document id.
+const _whatsAppStatusesTreeUri =
+    'content://com.android.externalstorage.documents/document/'
+    'primary%3AAndroid%2Fmedia%2Fcom.whatsapp%2FWhatsApp%2FMedia%2F.Statuses';
+
+/// The one accent this screen leans on: selected tab, connected-folder state,
+/// primary buttons. It was previously retyped as a literal in a half-dozen
+/// places, which is how three of them ended up slightly different teals.
+const _kAccent = Color(0xFF0F766E);
+
+/// Saved / downloaded green — the only other colour with a meaning attached.
+const _kSaved = Color(0xFF16A34A);
 
 class StatusItem {
   const StatusItem({
@@ -380,7 +401,14 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
 
       try {
         files.addAll(await dir.list().toList());
-      } catch (_) {}
+      } catch (error) {
+        // Logged, not swallowed. This is where Android's scoped-storage block
+        // actually surfaces, and an empty `catch` here is what made the screen
+        // look like "WhatsApp has no statuses" rather than "this path is not
+        // readable on your Android version" — which sent the diagnosis in
+        // entirely the wrong direction.
+        debugPrint('StatusSaver: cannot list $dirPath — $error');
+      }
     }
 
     final statuses = files
@@ -470,8 +498,15 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     });
 
     try {
+      // Open the picker already standing in WhatsApp's `.Statuses` folder, so
+      // the user taps Allow once instead of walking down five nested
+      // directories to a hidden one they cannot see by default.
+      //
+      // `initDir` becomes `DocumentsContract.EXTRA_INITIAL_URI`. It is a hint,
+      // not a guarantee — the system may ignore it — but the fallback is the
+      // ordinary picker, which is exactly where the user was starting before.
       final picked = await DocMan.pick.directory(
-        initDir: _selectedDirectory?.uri,
+        initDir: _selectedDirectory?.uri ?? _whatsAppStatusesTreeUri,
       );
 
       if (picked == null) {
@@ -722,6 +757,21 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       DeviceStrings.t(lang, isVideo ? 'wa_type_video' : 'wa_type_image');
 
   Future<void> _saveStatus(StatusItem item) async {
+    // Saving is the one thing here that costs anything — it copies the file
+    // out of WhatsApp's folder and into the gallery — so it is what the
+    // rewarded ad buys. One ad opens a 30-minute window for *all* saves, not
+    // one ad per status: charging per file would mean four ads to save four
+    // statuses, which is the kind of pacing that gets an app uninstalled.
+    //
+    // Premium skips this entirely (see ensureRewardedUnlock).
+    final unlocked = await ensureRewardedUnlock(
+      context,
+      feature: RewardedUnlock.statusSaver,
+      titleKey: 'rewarded_status_saver_title',
+      bodyKey: 'rewarded_status_saver_body',
+    );
+    if (!unlocked || !mounted) return;
+
     try {
       final file = await item.cacheFile();
       if (file == null) throw DeviceStrings.t(_langCode, 'wa_file_unavailable');
@@ -845,6 +895,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     final videoCount = _videoStatuses.length;
 
     return Scaffold(
+      backgroundColor: AppPalette.surface,
       appBar: AppBar(
         backgroundColor: ColorSelect.maineColor2,
         elevation: 0,
@@ -905,20 +956,31 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
           ),
         ],
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(40),
+          preferredSize: const Size.fromHeight(52),
           child: Container(
             alignment: Alignment.centerLeft,
-            color: Colors.white,
+            color: AppPalette.card,
+            padding: const EdgeInsets.fromLTRB(8, 2, 8, 8),
             child: TabBar(
               controller: _tabController,
               isScrollable: true,
               padding: EdgeInsets.zero,
               tabAlignment: TabAlignment.start,
-              labelColor: const Color(0xFF0F172A),
-              unselectedLabelColor: const Color(0xFF64748B),
-              indicatorColor: const Color(0xFF0F766E),
-              indicatorSize: TabBarIndicatorSize.label,
-              labelPadding: const EdgeInsets.symmetric(horizontal: 12),
+              dividerColor: Colors.transparent,
+              labelColor: Colors.white,
+              unselectedLabelColor: AppPalette.textS,
+
+              // A filled pill says "you are here" at a glance. The 2px
+              // underline it replaces sat under a scrollable strip of four
+              // similar-looking labels and was easy to miss entirely.
+              indicator: BoxDecoration(
+                color: _kAccent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+              indicatorSize: TabBarIndicatorSize.tab,
+              overlayColor: WidgetStateProperty.all(Colors.transparent),
+              splashBorderRadius: BorderRadius.circular(999),
+              labelPadding: const EdgeInsets.only(right: 6),
               tabs: [
                 _tab(DeviceStrings.t(lang, 'wa_tab_all'), _allStatuses.length),
                 _tab(DeviceStrings.t(lang, 'wa_tab_images'), imageCount),
@@ -946,7 +1008,44 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
   }
 
   Tab _tab(String label, int count) {
-    return Tab(text: '$label ($count)');
+    return Tab(
+      height: 36,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(width: 7),
+
+            // The count rides in its own translucent chip rather than in
+            // "(12)" brackets, so it stays legible both on the teal pill and
+            // on the card behind it — the tint is drawn from the label colour
+            // the TabBar already hands down for the current state.
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+              decoration: BoxDecoration(
+                color: const Color(0xFF808A99).withValues(alpha: 0.22),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                '$count',
+                style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Widget _buildBody(List<StatusItem> statuses) {
@@ -969,16 +1068,40 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     }
 
     if (_stage == HomeStage.waiting) {
+      // On Android 13+ direct file access to another app's
+      // `Android/media/.../.Statuses` does not work at all: READ_MEDIA_* grants
+      // MediaStore access, not filesystem access, and WhatsApp deliberately
+      // keeps that hidden folder out of MediaStore. Picking the folder through
+      // SAF is the only route that works — verified on a device holding six
+      // statuses that direct access reported as zero.
+      //
+      // So once a direct scan has come back empty, Pick Folder becomes the
+      // primary action. Leading with Refresh sent the user round a loop that
+      // could never succeed, and the old copy blamed WhatsApp for it.
+      final needsFolder = !_isSafMode;
+
       return _InfoState(
-        icon: Icons.visibility_rounded,
-        title: DeviceStrings.t(lang, 'wa_waiting_title'),
-        message: DeviceStrings.t(lang, 'wa_waiting_message'),
-        primaryLabel: DeviceStrings.t(lang, 'wa_refresh'),
-        onPrimary: _refresh,
-        secondaryLabel: _isSafMode
-            ? DeviceStrings.t(lang, 'wa_change_folder')
-            : DeviceStrings.t(lang, 'wa_pick_folder'),
-        onSecondary: _pickFolder,
+        icon: needsFolder
+            ? Icons.folder_open_rounded
+            : Icons.visibility_rounded,
+        title: DeviceStrings.t(
+          lang,
+          needsFolder ? 'wa_pick_folder_title' : 'wa_waiting_title',
+        ),
+        message: DeviceStrings.t(
+          lang,
+          needsFolder ? 'wa_pick_folder_message' : 'wa_waiting_message',
+        ),
+        primaryLabel: DeviceStrings.t(
+          lang,
+          needsFolder ? 'wa_pick_folder' : 'wa_refresh',
+        ),
+        onPrimary: needsFolder ? _pickFolder : _refresh,
+        secondaryLabel: DeviceStrings.t(
+          lang,
+          needsFolder ? 'wa_refresh' : 'wa_change_folder',
+        ),
+        onSecondary: needsFolder ? _refresh : _pickFolder,
       );
     }
 
@@ -995,14 +1118,23 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     return Column(
       children: [
         _buildAccessBanner(context),
+
+        // Native ad above the grid, not inside it: a grid cell is a tap target
+        // for saving a status, and an ad sitting among them would collect
+        // mis-taps that AdMob counts as clicks. It disappears on its own for
+        // premium users — NativeAdCard gates itself.
+        AppOpenAdManager().nativeCompactWidget(
+          margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        ),
+
         Expanded(
           child: GridView.builder(
-            padding: const EdgeInsets.fromLTRB(5, 5, 5, 24),
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 24),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 2,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 0.76,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.72,
             ),
             itemCount: statuses.length,
             itemBuilder: (context, index) {
@@ -1039,7 +1171,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
     // hundred saved statuses that is the java.lang.OutOfMemoryError. Index 0
     // is the access banner so it scrolls with the list as before.
     return ListView.builder(
-      padding: const EdgeInsets.fromLTRB(5, 5, 5, 10),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 24),
       itemCount: _downloads.length + 1,
       itemBuilder: (context, index) {
         if (index == 0) return _buildAccessBanner(context);
@@ -1085,76 +1217,87 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
         ? DeviceStrings.t(lang, 'wa_mode_folder')
         : DeviceStrings.t(lang, 'wa_mode_none');
 
+    // One compact status strip instead of a tall card.
+    //
+    // The old panel repeated itself — a full-width "Change Folder" button and
+    // a "Reset folder" link that do nearly the same job — and that button
+    // rendered as an empty outline, because an OutlinedButton with no explicit
+    // foreground took its colour from the app theme and came out invisible on
+    // this white surface. Both are replaced by one labelled action.
+    final connected = _statusesDirectory != null;
+    final accent =
+        connected ? _kAccent : const Color(0xFFB45309);
+
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: AppPalette.card,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha:0.04),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: accent.withValues(alpha: 0.22)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
+              Container(
+                width: 34,
+                height: 34,
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Icon(
+                  connected
+                      ? Icons.folder_special_rounded
+                      : Icons.folder_off_rounded,
+                  color: accent,
+                  size: 18,
+                ),
+              ),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
                       statusText,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
                         fontWeight: FontWeight.w700,
-                        color: const Color(0xFF0F172A),
+                        color: AppPalette.textH,
                       ),
                     ),
-                    const SizedBox(height: 6),
                     Text(
-                      modeText,
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: const Color(0xFF475569),
+                      connected
+                          ? '${DeviceStrings.t(lang, 'wa_connected_folder_prefix')}'
+                              '${_statusesDirectory!.name}'
+                          : modeText,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppPalette.textS,
                       ),
                     ),
                   ],
                 ),
               ),
+              const SizedBox(width: 8),
               _StatChip(
                 icon: Icons.check_circle_rounded,
                 label: DeviceStrings.t(lang, 'wa_saved_count')
                     .replaceAll('{count}', '${_downloads.length}'),
-                color: const Color(0xFF16A34A),
+                color: _kSaved,
               ),
             ],
           ),
-          if (_statusesDirectory != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              '${DeviceStrings.t(lang, 'wa_connected_folder_prefix')}${_statusesDirectory!.name}',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: const Color(0xFF334155),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
-          if (_folderHint != null) ...[
-            const SizedBox(height: 10),
-            Text(
-              _folderHint!,
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: const Color(0xFF0F766E),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ],
+
+          // Errors still get their own line; a hint that only repeats the
+          // folder name above does not.
           if (_error != null) ...[
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               _error!,
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
@@ -1162,8 +1305,18 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
                 fontWeight: FontWeight.w600,
               ),
             ),
+          ] else if (_folderHint != null && !connected) ...[
+            const SizedBox(height: 8),
+            Text(
+              _folderHint!,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: accent,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ],
-          const SizedBox(height: 16),
+
+          const SizedBox(height: 10),
           Row(
             children: [
               if (!_isSafMode) ...[
@@ -1171,42 +1324,57 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
                   child: FilledButton(
                     onPressed: _loading ? null : _enableDirectPermissionMode,
                     style: FilledButton.styleFrom(
-                      backgroundColor: const Color(0xFF0F766E),
+                      backgroundColor: accent,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 11),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
                     ),
                     child: Text(DeviceStrings.t(lang, 'wa_allow_access')),
                   ),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 8),
               ],
               Expanded(
                 child: OutlinedButton(
                   onPressed: _selectingFolder ? null : _pickFolder,
                   style: OutlinedButton.styleFrom(
-                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    // Explicit, not inherited — this is the bug that produced
+                    // an empty-looking button.
+                    foregroundColor: accent,
+                    side: BorderSide(color: accent.withValues(alpha: 0.5)),
+                    padding: const EdgeInsets.symmetric(vertical: 11),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                   child: Text(
                     _selectingFolder
                         ? DeviceStrings.t(lang, 'wa_opening')
                         : _isSafMode
-                        ? DeviceStrings.t(lang, 'wa_change_folder')
-                        : DeviceStrings.t(lang, 'wa_pick_folder'),
+                            ? DeviceStrings.t(lang, 'wa_change_folder')
+                            : DeviceStrings.t(lang, 'wa_pick_folder'),
                   ),
                 ),
               ),
+
+              // Forgetting the saved folder is a different thing from picking
+              // another one, and it is the only way out if the grant ever goes
+              // stale — so it stays reachable, just as an icon rather than a
+              // second full-width button competing with the one beside it.
+              if (_isSafMode) ...[
+                const SizedBox(width: 6),
+                IconButton(
+                  onPressed: _clearSavedFolder,
+                  icon: const Icon(Icons.link_off_rounded, size: 20),
+                  color: AppPalette.textS,
+                  tooltip: DeviceStrings.t(lang, 'wa_reset_folder'),
+                  visualDensity: VisualDensity.compact,
+                ),
+              ],
             ],
           ),
-          if (_isSafMode) ...[
-            const SizedBox(height: 10),
-            Align(
-              alignment: Alignment.centerRight,
-              child: TextButton(
-                onPressed: _clearSavedFolder,
-                child: Text(DeviceStrings.t(lang, 'wa_reset_folder')),
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -1235,194 +1403,232 @@ class _StatusCard extends StatelessWidget {
     AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
 
-    return Material(
-      color: AppPalette.card,
-      borderRadius: BorderRadius.circular(10),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(10),
-        onTap: onOpen,
-        child: Padding(
-          padding: EdgeInsets.zero,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    // The whole tile is the thumbnail now.
+    //
+    // The old card spent nearly half its height on a filename
+    // ("IMG-20260910-WA0007.jpg"), a date and two bordered text buttons — four
+    // rows of chrome around a postage-stamp preview, on a screen whose entire
+    // job is letting you recognise a status by looking at it. The image goes
+    // full-bleed and everything else floats over a scrim at the bottom, which
+    // roughly doubles the visible preview at the same cell size.
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(16),
+      child: Material(
+        color: AppPalette.raised,
+        child: InkWell(
+          onTap: onOpen,
+          child: Stack(
+            fit: StackFit.expand,
             children: [
-              Expanded(
-                child: Stack(
-                  children: [
-                    Positioned.fill(
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(5),
-                        child: FutureBuilder<File?>(
-                          future: previewFuture,
-                          builder: (context, snapshot) {
-                            if (snapshot.connectionState !=
-                                ConnectionState.done) {
-                              return Container(
-                                color: const Color(0xFFE2E8F0),
-                                child: const Center(
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              );
-                            }
-
-                            final file = snapshot.data;
-                            if (file == null) {
-                              return Container(
-                                color: const Color(0xFFE2E8F0),
-                                child: Icon(
-                                  item.isVideo
-                                      ? Icons.play_circle_fill_rounded
-                                      : Icons.image_rounded,
-                                  size: 44,
-                                  color: const Color(0xFF475569),
-                                ),
-                              );
-                            }
-
-                            return Image.file(file, fit: BoxFit.cover);
-                          },
-                        ),
+              FutureBuilder<File?>(
+                future: previewFuture,
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState != ConnectionState.done) {
+                    return const Center(
+                      child: SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
                       ),
-                    ),
-                    Positioned(
-                      top: 10,
-                      left: 10,
-                      child: AnimatedOpacity(
-                        opacity: isDownloaded ? 1 : 0,
-                        duration: const Duration(milliseconds: 180),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFF16A34A),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.check_rounded,
-                                size: 14,
-                                color: Colors.white,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(
-                                DeviceStrings.t(lang, 'wa_saved'),
-                                style: Theme.of(context)
-                                    .textTheme
-                                    .labelSmall
-                                    ?.copyWith(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w700,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                    );
+                  }
+
+                  final file = snapshot.data;
+                  if (file == null) {
+                    return Center(
+                      child: Icon(
+                        item.isVideo
+                            ? Icons.videocam_rounded
+                            : Icons.image_rounded,
+                        size: 40,
+                        color: AppPalette.textS,
                       ),
+                    );
+                  }
+
+                  return Image.file(file, fit: BoxFit.cover);
+                },
+              ),
+
+              // Scrim: without it, white labels vanish over a bright status.
+              Positioned(
+                left: 0,
+                right: 0,
+                bottom: 0,
+                height: 96,
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        Colors.black.withValues(alpha: 0.78),
+                        Colors.black.withValues(alpha: 0.34),
+                        Colors.transparent,
+                      ],
+                      stops: const [0, 0.55, 1],
                     ),
-                    Positioned(
-                      top: 10,
-                      right: 10,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 10,
-                          vertical: 6,
+                  ),
+                ),
+              ),
+
+              if (item.isVideo)
+                const Center(
+                  child: Icon(
+                    Icons.play_circle_fill_rounded,
+                    size: 46,
+                    color: Colors.white70,
+                  ),
+                ),
+
+              // Type marker, top-right — an icon carries it, so the word
+              // "Video" no longer competes with the preview.
+              Positioned(
+                top: 8,
+                right: 8,
+                child: Container(
+                  padding: const EdgeInsets.all(6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(alpha: 0.45),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    item.isVideo
+                        ? Icons.videocam_rounded
+                        : Icons.photo_rounded,
+                    size: 14,
+                    color: Colors.white,
+                    semanticLabel: item.isVideo
+                        ? DeviceStrings.t(lang, 'wa_type_video')
+                        : DeviceStrings.t(lang, 'wa_type_image'),
+                  ),
+                ),
+              ),
+
+              Positioned(
+                top: 8,
+                left: 8,
+                child: AnimatedScale(
+                  scale: isDownloaded ? 1 : 0,
+                  curve: Curves.easeOutBack,
+                  duration: const Duration(milliseconds: 220),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: _kSaved,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          Icons.check_rounded,
+                          size: 12,
+                          color: Colors.white,
                         ),
-                        decoration: BoxDecoration(
-                          color: Colors.black.withValues(alpha:0.6),
-                          borderRadius: BorderRadius.circular(999),
-                        ),
-                        child: Text(
-                          item.isVideo
-                              ? DeviceStrings.t(lang, 'wa_type_video')
-                              : DeviceStrings.t(lang, 'wa_type_image'),
-                          style: Theme.of(context)
-                              .textTheme
-                              .labelSmall
-                              ?.copyWith(
+                        const SizedBox(width: 3),
+                        Text(
+                          DeviceStrings.t(lang, 'wa_saved'),
+                          style: const TextStyle(
+                            fontSize: 10,
+                            height: 1.2,
                             color: Colors.white,
-                            fontWeight: FontWeight.w600,
+                            fontWeight: FontWeight.w800,
                           ),
                         ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+
+              Positioned(
+                left: 10,
+                right: 8,
+                bottom: 8,
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: Text(
+                        item.modifiedAt == null
+                            ? DeviceStrings.t(lang, 'wa_unknown_date')
+                            : _formatDate(item.modifiedAt!),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          fontSize: 11,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
+                    ),
+                    _GlassAction(
+                      icon: Icons.share_rounded,
+                      tooltip: DeviceStrings.t(lang, 'wa_share'),
+                      onTap: onShare,
+                    ),
+                    const SizedBox(width: 6),
+                    _GlassAction(
+                      icon: isDownloaded
+                          ? Icons.check_rounded
+                          : Icons.download_rounded,
+                      tooltip: isDownloaded
+                          ? DeviceStrings.t(lang, 'wa_saved')
+                          : DeviceStrings.t(lang, 'wa_save'),
+                      background: isDownloaded ? _kSaved : _kAccent,
+                      onTap: isDownloaded ? null : onSave,
                     ),
                   ],
                 ),
               ),
-              const SizedBox(height: 5),
-              Text(
-                item.name,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  fontWeight: FontWeight.w600,
-                  color: const Color(0xFF0F172A),
-                ),
-              ),
-              const SizedBox(height: 1),
-              Text(
-                item.modifiedAt == null
-                    ? DeviceStrings.t(lang, 'wa_unknown_date')
-                    : _formatDate(item.modifiedAt!),
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: const Color(0xFF64748B),
-                ),
-              ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
-                  Expanded(
-                    child: SizedBox(
-                      height: 30, // 🔥 height kam ki
-                      child: OutlinedButton.icon(
-                        onPressed: onShare,
-                        icon: Icon(Icons.share_rounded, size: 16, color: AppPalette.textH), // 🔥 icon small
-                        label: Text(
-                          DeviceStrings.t(lang, 'wa_share'),
-                          style: TextStyle(fontSize: 12, color: AppPalette.textH), // 🔥 font small
-                        ),
-                        style: OutlinedButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                          minimumSize: Size.zero, // 🔥 extra space remove
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap, // 🔥 compact touch
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 6),
-                  Expanded(
-                    child: SizedBox(
-                      height: 30,
-                      child: OutlinedButton.icon(
-                        onPressed: isDownloaded ? null : onSave,
-                        icon: Icon(
-                          isDownloaded
-                              ? Icons.check_circle_rounded
-                              : Icons.download_rounded,
-                          size: 16,
-                          color: ColorSelect.maineColor2,
-                        ),
-                        label: Text(
-                          isDownloaded
-                              ? DeviceStrings.t(lang, 'wa_saved')
-                              : DeviceStrings.t(lang, 'wa_save'),
-                          style:  TextStyle(fontSize: 12,color: ColorSelect.maineColor2),
-                        ),
-                        style: FilledButton.styleFrom(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 0),
-                          minimumSize: Size.zero,
-                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              )            ],
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+/// Round action button that sits on top of a thumbnail.
+///
+/// Kept opaque rather than genuinely translucent: a `BackdropFilter` per button
+/// would mean two extra render-to-texture passes in every one of the grid
+/// cells on screen, and this grid already scrolls decoded bitmaps.
+class _GlassAction extends StatelessWidget {
+  const _GlassAction({
+    required this.icon,
+    required this.tooltip,
+    required this.onTap,
+    this.background,
+  });
+
+  final IconData icon;
+  final String tooltip;
+  final VoidCallback? onTap;
+  final Color? background;
+
+  @override
+  Widget build(BuildContext context) {
+    final base = background ?? Colors.black;
+    final disabled = onTap == null;
+
+    return Tooltip(
+      message: tooltip,
+      child: Material(
+        color: base.withValues(
+          alpha: background == null ? 0.45 : (disabled ? 0.75 : 1),
+        ),
+        shape: const CircleBorder(),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
+          child: SizedBox(
+            width: 32,
+            height: 32,
+            child: Icon(icon, size: 16, color: Colors.white),
           ),
         ),
       ),
@@ -1443,25 +1649,31 @@ class _DownloadTile extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
 
     return Container(
+      margin: const EdgeInsets.only(bottom: 8),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(5),
+        // Was hardcoded white, which turned this list into a stack of glaring
+        // white slabs the moment the app was in dark mode.
+        color: AppPalette.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppPalette.border),
       ),
+      clipBehavior: Clip.antiAlias,
       child: ListTile(
         onTap: onTap,
 
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: 8,
-          vertical: 0,
+          horizontal: 10,
+          vertical: 6,
         ),
         leading: ClipRRect(
-          borderRadius: BorderRadius.circular(5),
+          borderRadius: BorderRadius.circular(10),
           child: SizedBox(
-            height: 56,
-            width: 56,
+            height: 52,
+            width: 52,
             child: previewFuture == null
                 ? _DownloadPlaceholder(isVideo: item.isVideo)
                 : FutureBuilder<File?>(
@@ -1477,42 +1689,52 @@ class _DownloadTile extends StatelessWidget {
             ),
           ),
         ),
+        // Not `item.name`.
+        //
+        // The gallery saver names its files by content hash, so every row's
+        // headline was 40 characters of "841927da637e42cbab8f9b2db2dd5055…"
+        // — the widest, boldest text on the screen, and unreadable. The type
+        // is the only thing about the name a user could act on; the date
+        // underneath is what actually distinguishes one row from the next.
         title: Text(
-          item.name,
+          DeviceStrings.t(
+            lang,
+            item.isVideo ? 'wa_type_video' : 'wa_type_image',
+          ),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
             fontWeight: FontWeight.w700,
-            color: const Color(0xFF0F172A),
+            color: AppPalette.textH,
           ),
         ),
         subtitle: Padding(
-          padding: const EdgeInsets.only(top: 4),
+          padding: const EdgeInsets.only(top: 3),
           child: Text(
             DeviceStrings.t(lang, 'wa_saved_on')
                 .replaceAll('{date}', _formatDate(item.savedAt)),
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: const Color(0xFF64748B),
+              color: AppPalette.textS,
             ),
           ),
         ),
+
+        // Every row in this tab is downloaded by definition, so the word was
+        // pure repetition down the whole list — a tick is enough.
         trailing: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+          height: 28,
+          width: 28,
           decoration: BoxDecoration(
-            color: const Color(0xFFDCFCE7),
-            borderRadius: BorderRadius.circular(999),
+            color: _kSaved.withValues(alpha: 0.14),
+            shape: BoxShape.circle,
           ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(
-                Icons.check_circle_rounded,
-                size: 16,
-                color: Color(0xFF16A34A),
-              ),
-              const SizedBox(width: 6),
-              Text(DeviceStrings.t(lang, 'wa_downloaded')),
-            ],
+          child: Tooltip(
+            message: DeviceStrings.t(lang, 'wa_downloaded'),
+            child: const Icon(
+              Icons.check_rounded,
+              size: 17,
+              color: _kSaved,
+            ),
           ),
         ),
       ),
@@ -1528,10 +1750,10 @@ class _DownloadPlaceholder extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      color: const Color(0xFFE2E8F0),
+      color: AppPalette.raised,
       child: Icon(
         isVideo ? Icons.videocam_rounded : Icons.image_rounded,
-        color: const Color(0xFF475569),
+        color: AppPalette.textS,
       ),
     );
   }
@@ -1551,19 +1773,19 @@ class _StatChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha:0.14),
+        color: color.withValues(alpha: 0.14),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: color),
-          const SizedBox(width: 6),
+          Icon(icon, size: 14, color: color),
+          const SizedBox(width: 5),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+            style: Theme.of(context).textTheme.labelSmall?.copyWith(
               color: color,
               fontWeight: FontWeight.w700,
             ),
@@ -1595,57 +1817,91 @@ class _InfoState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    AppPalette.sync(context);
+
+    // Every colour here used to be a light-mode literal — including a
+    // `TextStyle(color: Colors.black)` on the secondary button, which put
+    // black text on a dark background. All of it now comes from the palette.
     return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.all(28),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              height: 78,
-              width: 78,
+              height: 92,
+              width: 92,
               decoration: BoxDecoration(
-                color: const Color(0xFFCCFBF1),
-                borderRadius: BorderRadius.circular(24),
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    _kAccent.withValues(alpha: 0.20),
+                    _kAccent.withValues(alpha: 0.06),
+                  ],
+                ),
+                border: Border.all(color: _kAccent.withValues(alpha: 0.22)),
               ),
-              child: Icon(
-                icon,
-                size: 38,
-                color: const Color(0xFF0F766E),
-              ),
+              child: Icon(icon, size: 40, color: _kAccent),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 20),
             Text(
               title,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-                color: const Color(0xFF0F172A),
+                fontWeight: FontWeight.w800,
+                color: AppPalette.textH,
               ),
             ),
-            const SizedBox(height: 10),
+            const SizedBox(height: 8),
             Text(
               message,
               textAlign: TextAlign.center,
               style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: const Color(0xFF64748B),
+                color: AppPalette.textS,
+                height: 1.45,
               ),
             ),
-            const SizedBox(height: 18),
+            const SizedBox(height: 22),
             SizedBox(
-              width: 220,
+              width: 240,
+              height: 46,
               child: FilledButton(
                 onPressed: onPrimary,
+                style: FilledButton.styleFrom(
+                  backgroundColor: _kAccent,
+                  foregroundColor: Colors.white,
+                  textStyle: const TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
                 child: Text(primaryLabel),
               ),
             ),
             if (secondaryLabel != null && onSecondary != null) ...[
               const SizedBox(height: 10),
               SizedBox(
-                width: 220,
+                width: 240,
+                height: 46,
                 child: OutlinedButton(
                   onPressed: onSecondary,
-                  child: Text(secondaryLabel!,style: TextStyle(color: Colors.black),),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppPalette.textB,
+                    side: BorderSide(color: AppPalette.border),
+                    textStyle: const TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(secondaryLabel!),
                 ),
               ),
             ],
@@ -1730,14 +1986,25 @@ class _StatusPreviewPageState extends State<StatusPreviewPage> {
 
     final error = _error;
     if (error != null) {
-      return Text(error, style: const TextStyle(color: Colors.white));
+      return Padding(
+        padding: const EdgeInsets.all(28),
+        child: Text(
+          error,
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white70, height: 1.4),
+        ),
+      );
     }
 
     final file = _file;
     if (file == null) {
-      return Text(
-        DeviceStrings.t(lang, 'wa_preview_unavailable'),
-        style: const TextStyle(color: Colors.white),
+      return Padding(
+        padding: const EdgeInsets.all(28),
+        child: Text(
+          DeviceStrings.t(lang, 'wa_preview_unavailable'),
+          textAlign: TextAlign.center,
+          style: const TextStyle(color: Colors.white70, height: 1.4),
+        ),
       );
     }
 
@@ -1750,7 +2017,13 @@ class _StatusPreviewPageState extends State<StatusPreviewPage> {
       );
     }
 
-    return Image.file(file, fit: BoxFit.contain);
+    // Pinch-to-zoom: a status is often a screenshot of text, and a
+    // fit-to-screen still was not readable on a phone.
+    return InteractiveViewer(
+      minScale: 1,
+      maxScale: 4,
+      child: Image.file(file, fit: BoxFit.contain),
+    );
   }
 }
 

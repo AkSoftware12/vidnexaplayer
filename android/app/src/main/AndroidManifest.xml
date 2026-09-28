@@ -76,7 +76,7 @@
     -->
     <application
         android:label="Video Player"
-        android:name="${applicationName}"
+        android:name=".VidnexaApplication"
         android:icon="@mipmap/ic_launcher"
         android:enableOnBackInvokedCallback="true"
         android:usesCleartextTraffic="true"
@@ -87,6 +87,23 @@
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-6478840988045325~8601941258"/>
+
+        <!-- Shown by VidnexaApplication when the install has no native
+             libraries; see NativeLibsGuard for what that means.
+
+             android:process is the load-bearing part. The main process is
+             killed the moment this is launched — it is mid-way through
+             starting MainActivity and about to throw "Could not find
+             'libflutter.so'" — so this dialog has to live somewhere else to
+             survive long enough to be read.
+
+             Not exported: nothing outside the app has any reason to open it. -->
+        <activity
+            android:name=".IncompleteInstallActivity"
+            android:process=":installguard"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar"
+            android:excludeFromRecents="true"
+            android:exported="false" />
 
         <!-- Launcher + "Open with" handler.
              MainActivity extends AudioServiceActivity, so audio_service still

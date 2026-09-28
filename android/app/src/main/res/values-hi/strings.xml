@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="incomplete_install_title">ऐप अधूरा है</string>
+    <string name="incomplete_install_body">इस ऐप की कुछ फ़ाइलें मौजूद नहीं हैं, इसलिए यह शुरू नहीं हो पा रहा।\n\nऐसा तब होता है जब ऐप किसी दूसरे फ़ोन से कॉपी किया गया हो या Play Store के बाहर से इंस्टॉल किया गया हो। Google Play से इंस्टॉल करने पर यह ठीक हो जाएगा।</string>
+    <string name="incomplete_install_open_play">Play से इंस्टॉल करें</string>
+    <string name="incomplete_install_close">बंद करें</string>
+</resources>

@@ -15,9 +15,16 @@ class DeviceStrings {
   static const Map<String, Map<String, String>> _values = {
     'en': {
       // ── Device / storage screen ──
-      'device_appbar_title': 'Directory',
+      'device_appbar_title': 'File Manager',
+      'device_appbar_subtitle': 'Smart files for a smarter you',
       'device_internal_storage': 'Internal Storage',
       'device_storage_free_of': 'Free {free} GB of {total} GB',
+      'device_storage_used_of': '{used} GB of {total} GB used',
+      'device_quick_access': 'Quick Access',
+      'device_see_all': 'See All',
+      'device_storage_locations': 'Storage Locations',
+      'device_other_locations': 'SD card, USB & cloud',
+      'device_other_locations_sub': 'Browse through the system picker',
 
       // ── Photo album screens ──
       'album_permission_denied': 'Permission denied to access photos',
@@ -250,6 +257,11 @@ class DeviceStrings {
       'On first launch, allow media access. If your device still hides the status folder, use Pick Folder.',
       'wa_allow_access': 'Allow Access',
       'wa_pick_folder': 'Pick Folder',
+      'wa_pick_folder_title': 'Select the WhatsApp folder',
+      'wa_pick_folder_message':
+          'Android needs your permission to read WhatsApp’s status folder. '
+          'Tap below — the right folder opens already selected, just press '
+          'Allow. You only have to do this once.',
       'wa_waiting_title': 'No statuses found yet',
       'wa_waiting_message':
       'Open WhatsApp, watch any status, then return here and tap Refresh. New statuses will appear automatically after refresh.',
@@ -337,9 +349,16 @@ class DeviceStrings {
     },
     'hi': {
       // ── Device / storage screen ──
-      'device_appbar_title': 'डायरेक्टरी',
+      'device_appbar_title': 'फ़ाइल मैनेजर',
+      'device_appbar_subtitle': 'स्मार्ट फ़ाइलें, स्मार्ट आप',
       'device_internal_storage': 'इंटरनल स्टोरेज',
       'device_storage_free_of': 'कुल {total} GB में से {free} GB खाली',
+      'device_storage_used_of': '{total} GB में से {used} GB इस्तेमाल',
+      'device_quick_access': 'क्विक एक्सेस',
+      'device_see_all': 'सभी देखें',
+      'device_storage_locations': 'स्टोरेज लोकेशन',
+      'device_other_locations': 'SD कार्ड, USB और क्लाउड',
+      'device_other_locations_sub': 'सिस्टम पिकर से ब्राउज़ करें',
 
       // ── Photo album screens ──
       'album_permission_denied': 'फ़ोटो एक्सेस करने की अनुमति नहीं मिली',
@@ -570,6 +589,11 @@ class DeviceStrings {
       'पहली बार खोलने पर मीडिया एक्सेस की अनुमति दें। अगर आपका डिवाइस अभी भी स्टेटस फ़ोल्डर छुपाता है, तो "फ़ोल्डर चुनें" विकल्प का उपयोग करें।',
       'wa_allow_access': 'एक्सेस दें',
       'wa_pick_folder': 'फ़ोल्डर चुनें',
+      'wa_pick_folder_title': 'WhatsApp फ़ोल्डर चुनें',
+      'wa_pick_folder_message':
+          'WhatsApp का स्टेटस फ़ोल्डर पढ़ने के लिए Android को आपकी अनुमति चाहिए। '
+          'नीचे दबाएँ — सही फ़ोल्डर पहले से चुना हुआ खुलेगा, बस “Allow” दबाएँ। '
+          'यह सिर्फ़ एक बार करना है।',
       'wa_waiting_title': 'अभी तक कोई स्टेटस नहीं मिला',
       'wa_waiting_message':
       'WhatsApp खोलें, कोई भी स्टेटस देखें, फिर यहां वापस आकर रिफ्रेश पर टैप करें। रिफ्रेश करने के बाद नए स्टेटस अपने आप दिखाई देंगे।',

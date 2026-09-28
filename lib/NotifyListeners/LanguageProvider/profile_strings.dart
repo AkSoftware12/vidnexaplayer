@@ -31,7 +31,7 @@ class ProfileStrings {
       'profile_files': 'Files',
       'profile_videos': 'Videos',
       'profile_music': 'Music',
-      'profile_images': 'Images',
+      'profile_images': 'Gallery',
 
       'profile_folders': 'Folders',
       'profile_downloads': 'Downloads',
@@ -204,7 +204,7 @@ class ProfileStrings {
       'profile_files': 'फ़ाइलें',
       'profile_videos': 'वीडियो',
       'profile_music': 'संगीत',
-      'profile_images': 'फ़ोटो',
+      'profile_images': 'गैलरी',
 
       'profile_folders': 'फ़ोल्डर',
       'profile_downloads': 'डाउनलोड',

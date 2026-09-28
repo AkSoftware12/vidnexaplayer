@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Android-side strings only.
+
+  Everything the user normally reads is translated in Dart
+  (lib/NotifyListeners/LanguageProvider/). These few live here because they are
+  shown by IncompleteInstallActivity, which runs precisely when the Flutter
+  engine cannot start — so nothing in Dart is reachable.
+-->
+<resources>
+    <string name="incomplete_install_title">App is incomplete</string>
+    <string name="incomplete_install_body">Some of this app\'s files are missing, so it can\'t start.\n\nThis usually happens when the app was copied from another phone or installed from outside the Play Store. Installing it from Google Play will fix it.</string>
+    <string name="incomplete_install_open_play">Install from Play</string>
+    <string name="incomplete_install_close">Close</string>
+</resources>

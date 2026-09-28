@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
+import '../../../DeviceSpace/device_space.dart';
 import '../../../NetWork Stream/stream_video.dart';
 import '../../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../../NotifyListeners/LanguageProvider/language_provider.dart';
@@ -19,6 +20,23 @@ class PropertyTypeModel {
   final String mb;
   final int count;
 
+  /// Where this tile goes.
+  ///
+  /// Was an `if (index == 0) … else if (index == 1) …` chain in the item
+  /// builder, which meant the tile order and the navigation order were two
+  /// separate lists that had to be kept in sync by hand — inserting anything
+  /// anywhere but the end silently sent every tile after it to the wrong
+  /// screen.
+  final void Function(BuildContext context) open;
+
+  /// Paint the asset white before drawing it.
+  ///
+  /// The tiles' own artwork is already white, so it is left untinted. Assets
+  /// borrowed from elsewhere in the app are not: `files.png` is a black
+  /// outline that the drawer tints itself, and dropped straight onto this
+  /// blue-violet gradient it read as a hole.
+  final bool tintWhite;
+
   PropertyTypeModel({
     required this.imageUrl,
     required this.text,
@@ -26,6 +44,8 @@ class PropertyTypeModel {
     required this.color2,
     required this.mb,
     required this.count,
+    required this.open,
+    this.tintWhite = false,
   });
 }
 
@@ -67,6 +87,16 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
           color2: Colors.orangeAccent,
           mb: '12.4 GB',
           count: 245,
+          open: (context) => Navigator.push(
+            context,
+            MaterialPageRoute(
+              settings: const RouteSettings(name: 'AllVideosScreen'),
+              builder: (context) => VideoFolderScreen(
+                folderName: 'All Videos',
+                videos: widget.album,
+              ),
+            ),
+          ),
         ),
         PropertyTypeModel(
           imageUrl: 'assets/image.png',
@@ -75,23 +105,48 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
           color2: Colors.redAccent,
           mb: '5.6 GB',
           count: 1032,
+          open: (context) => Navigator.push(
+            context,
+            MaterialPageRoute(
+              settings: const RouteSettings(name: 'GalleryHomeScreen'),
+              builder: (context) => const GalleryHomePage(),
+            ),
+          ),
         ),
+        // Moved here off the home app bar, where it was a bare purple folder
+        // square sitting next to the drawer button with nothing naming it.
+        // It is a media category like the rest, so it belongs in the row that
+        // says so — and here it gets a label.
         PropertyTypeModel(
-          imageUrl: 'assets/musics.png',
-          text: 'home_cat_music',
-          color: Colors.deepPurple,
-          color2: Colors.purpleAccent,
-          mb: '2.2 GB',
-          count: 312,
+          imageUrl: 'assets/files.png',
+          text: 'home_cat_files',
+          tintWhite: true,
+          color: const Color(0xFF3B82F6),
+          color2: const Color(0xFF9333EA),
+          mb: '0 GB',
+          count: 0,
+          open: (context) => Navigator.push(
+            context,
+            MaterialPageRoute(
+              settings: const RouteSettings(name: 'DeviceSpaceScreen'),
+              builder: (context) => DeviceSpaceScreen(),
+            ),
+          ),
         ),
         PropertyTypeModel(
           imageUrl: 'assets/downloadlist.png',
           text: 'home_cat_status_saver',
-          color:Color(0xFF25D366),
-          color2:Color(0xFF7ED89F),
+          color: const Color(0xFF25D366),
+          color2: const Color(0xFF7ED89F),
           mb: '3.2 GB',
           count: 27,
-
+          open: (context) => Navigator.push(
+            context,
+            MaterialPageRoute(
+              settings: const RouteSettings(name: 'StatusSaverScreen'),
+              builder: (context) => const StatusSaverHomePage(),
+            ),
+          ),
         ),
         PropertyTypeModel(
           imageUrl: 'assets/link.img.png',
@@ -100,6 +155,32 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
           color2: Colors.lightBlueAccent,
           mb: '3.2 GB',
           count: 27,
+          open: (context) => Navigator.push(
+            context,
+            MaterialPageRoute(
+              settings: const RouteSettings(name: 'NetworkStreamScreen'),
+              builder: (context) => VideoPlayerStream(),
+            ),
+          ),
+        ),
+
+        // Music sits last on purpose: the bottom bar already has a Music tab,
+        // so this tile is the second way to the same screen and does not need
+        // one of the spots that are visible without scrolling.
+        PropertyTypeModel(
+          imageUrl: 'assets/musics.png',
+          text: 'home_cat_music',
+          color: Colors.deepPurple,
+          color2: Colors.purpleAccent,
+          mb: '2.2 GB',
+          count: 312,
+          open: (context) => Navigator.push(
+            context,
+            MaterialPageRoute(
+              settings: const RouteSettings(name: 'OfflineMusicScreen'),
+              builder: (context) => HomeBottomNavigation(bottomIndex: 1),
+            ),
+          ),
         ),
       ];
     });
@@ -181,53 +262,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
             itemBuilder: (context, index) {
               final item = items[index];
               return GestureDetector(
-                onTap: () {
-                  if (index == 0) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        settings: const RouteSettings(name: 'AllVideosScreen'),
-                        builder:
-                            (context) => VideoFolderScreen(
-                              folderName: 'All Videos',
-                              videos: widget.album,
-                            ),
-                      ),
-                    );
-                  }
-                  // Navigator.push( // context, // MaterialPageRoute( // builder: (context) => AllVideosScreen(icon: 'AppBar'), // ), // ); }
-                  else if (index == 1) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (context) => const GalleryHomePage(), settings: const RouteSettings(name: 'GalleryHomeScreen')),
-                    );
-                  } else if (index == 2) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        settings: const RouteSettings(name: 'OfflineMusicScreen'),
-                        builder:
-                            (context) => HomeBottomNavigation(bottomIndex: 1),
-                      ),
-                    );
-                  } else if (index == 3) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        settings: const RouteSettings(name: 'StatusSaverScreen'),
-                        builder: (context) => StatusSaverHomePage(),
-                      ),
-                    );
-                  }else if (index == 4) {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        settings: const RouteSettings(name: 'NetworkStreamScreen'),
-                        builder: (context) => VideoPlayerStream(),
-                      ),
-                    );
-                  }
-                },
+                onTap: () => item.open(context),
                 child: AnimatedContainer(
                   duration: const Duration(milliseconds: 400),
                   curve: Curves.easeOut,
@@ -277,7 +312,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                                   padding: EdgeInsets.all(6.sp),
                                   child: Image.asset(
                                     item.imageUrl,
-                                    // color: Colors.white,
+                                    color: item.tintWhite ? Colors.white : null,
                                     fit: BoxFit.contain,
                                   ),
                                 ),

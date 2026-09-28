@@ -12,7 +12,6 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:videoplayer/Analytics/screen_analytics.dart';
-import 'package:videoplayer/HexColorCode/HexColor.dart';
 import '../../features/gallery/presentation/pages/gallery_home_page.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:videoplayer/Utils/internet_banner.dart';
@@ -470,56 +469,64 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
             children: [
               Row(
                 children: [
-                  GestureDetector(
-                    onTap: () {
-                      _scaffoldKey.currentState?.openDrawer(); // Open the drawer
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade200,
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      padding: const EdgeInsets.all(8),
-                      child: Icon(Icons.apps, color: Colors.black),
-                    ),
-                  ),
-
-                  const SizedBox(width: 8),
-
-                  // Folder icon button with purple background
-                  GestureDetector(
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          settings: const RouteSettings(name: 'DeviceSpaceScreen'),
-                          builder: (context) => DeviceSpaceScreen(),
-                        ),
-                      );
-                    },
-                    child: Container(
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(12),
-                        gradient: LinearGradient(
-                          colors: [
-                            HexColor('#3b82f6'), // Purple
-                            Colors.purple,
+                  // The purple folder button that used to sit beside this one —
+                  // an unlabelled square shortcut to DeviceSpaceScreen — now
+                  // lives in the Media Categories row as a "Files" tile, where
+                  // it has a name next to it. The drawer's File Manager entry
+                  // is unchanged.
+                  //
+                  // With it gone, the menu button stands alone, so it takes
+                  // over the gradient that pair used to share: a flat
+                  // `grey.shade200` square with a black glyph looked like a
+                  // disabled control next to the coloured logo, and — being
+                  // hardcoded — stayed pale grey with a black icon in dark
+                  // mode too.
+                  Material(
+                    color: Colors.transparent,
+                    borderRadius: BorderRadius.circular(14),
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                      child: Ink(
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(14),
+                          gradient: const LinearGradient(
+                            colors: [Color(0xFF3B82F6), Color(0xFF9333EA)],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF6D28D9)
+                                  .withValues(alpha: 0.28),
+                              blurRadius: 10,
+                              offset: const Offset(0, 3),
+                            ),
                           ],
-                          begin: Alignment.topLeft,
-                          end: Alignment.bottomRight,
+                        ),
+                        padding: const EdgeInsets.all(9),
+                        child: const Icon(
+                          Icons.grid_view_rounded,
+                          size: 20,
+                          color: Colors.white,
                         ),
                       ),
-                      padding: const EdgeInsets.all(8),
-                      child: const Icon(Icons.folder, color: Colors.white),
                     ),
                   ),
                 ],
               ),
-              // Grid icon
-              SizedBox(
-                height: 35.sp,
+              // Flexible, not a bare SizedBox: the wordmark has no width
+              // constraint of its own, so once the PRO button grew a label the
+              // three fixed-width clusters could add up to more than the app
+              // bar on a narrow screen. Letting the logo give way is the right
+              // thing to squeeze — it is the one element here that reads fine
+              // slightly smaller.
+              Flexible(
+                child: SizedBox(
+                  height: 35.sp,
                   child: Image.network(
                     'https://cdn.vidnexaplayer.com/images/logo_text.webp',
+                    fit: BoxFit.contain,
                     // Offline (or CDN down) an Image.network with no
                     // errorBuilder rethrows its SocketException through
                     // FlutterError.onError, and Crashlytics logs that as a
@@ -527,7 +534,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                     // it is invisible to the user and cannot fail.
                     errorBuilder: (_, __, ___) =>
                         Image.asset('assets/logo_blue_text.png'),
-                  )),
+                  ),
+                ),
+              ),
 
               Row(
                 children: [
@@ -555,10 +564,32 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                             ),
                           ],
                         ),
-                        padding: const EdgeInsets.all(8),
-                        child: const Icon(
-                          Icons.workspace_premium_rounded,
-                          color: Colors.white,
+                        // The medal on its own said "something premium" but
+                        // never which word to look for, and it sat next to
+                        // three other icon-only squares. The label is what
+                        // makes it read as the upgrade button.
+                        padding: const EdgeInsets.fromLTRB(8, 9, 10, 9),
+                        child: const Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              Icons.workspace_premium_rounded,
+                              size: 18,
+                              color: Colors.white,
+                            ),
+                            SizedBox(width: 3),
+                            Text(
+                              'PRO',
+                              style: TextStyle(
+                                fontFamily: 'Poppins',
+                                fontSize: 12,
+                                height: 1.1,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.4,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

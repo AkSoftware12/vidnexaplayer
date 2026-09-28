@@ -66,6 +66,14 @@ class MainActivity : AudioServiceActivity() {
     /// [MediaSizePlugin] for why the plugin's own file API cannot be used.
     private var mediaSize: MediaSizePlugin? = null
 
+    /// Storage Access Framework calls the docman plugin does not expose
+    /// (rename, and a cheap name-collision check). See [SafOpsPlugin].
+    private var safOps: SafOpsPlugin? = null
+
+    /// Device-wide file index read straight from MediaStore, which is what
+    /// replaced the file browser's folder picker. See [MediaStorePlugin].
+    private var mediaStore: MediaStorePlugin? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         handleIntent(intent)
@@ -136,6 +144,16 @@ class MainActivity : AudioServiceActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
         )
 
+        safOps = SafOpsPlugin(
+            applicationContext,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
+
+        mediaStore = MediaStorePlugin(
+            applicationContext,
+            flutterEngine.dartExecutor.binaryMessenger,
+        )
+
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .apply {
                 setMethodCallHandler { call, result ->
@@ -170,6 +188,10 @@ class MainActivity : AudioServiceActivity() {
         audioEffects = null
         mediaSize?.dispose()
         mediaSize = null
+        safOps?.dispose()
+        safOps = null
+        mediaStore?.dispose()
+        mediaStore = null
         channel?.setMethodCallHandler(null)
         channel = null
         super.cleanUpFlutterEngine(flutterEngine)

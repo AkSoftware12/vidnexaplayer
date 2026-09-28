@@ -54,6 +54,10 @@ class MiscStrings {
       'rewarded_watch': 'Watch ad',
       'rewarded_not_now': 'Not now',
       'rewarded_unlocked': 'Unlocked for the next {minutes} minutes',
+      'rewarded_status_saver_title': 'Save this status',
+      'rewarded_status_saver_body':
+          'Watch a short video ad to unlock saving for the next 30 minutes — '
+          'save as many statuses as you like in that time.',
       'rewarded_incomplete': 'The ad was not finished, so nothing was unlocked.',
       'rewarded_enhance_title': 'Unlock Enhance to 4K',
       'rewarded_enhance_body':
@@ -137,6 +141,10 @@ class MiscStrings {
       'rewarded_watch': 'विज्ञापन देखें',
       'rewarded_not_now': 'अभी नहीं',
       'rewarded_unlocked': 'अगले {minutes} मिनट के लिए अनलॉक हो गया',
+      'rewarded_status_saver_title': 'यह स्टेटस सेव करें',
+      'rewarded_status_saver_body':
+          'अगले 30 मिनट तक सेव करना अनलॉक करने के लिए एक छोटा वीडियो विज्ञापन '
+          'देखें — उतनी देर में जितने चाहें उतने स्टेटस सेव करें।',
       'rewarded_incomplete': 'विज्ञापन पूरा नहीं हुआ, इसलिए कुछ अनलॉक नहीं हुआ।',
       'rewarded_enhance_title': '4K एन्हांस अनलॉक करें',
       'rewarded_enhance_body':

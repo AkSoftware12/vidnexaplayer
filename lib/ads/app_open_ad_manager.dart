@@ -945,7 +945,15 @@ class _NativeAdCardState extends State<NativeAdCard> {
   ///
   /// [TemplateType.small] has an icon rather than a media view, so its height
   /// barely varies with the creative. That is why it is what this app uses.
-  double get _height => widget.template == TemplateType.small ? 200 : 600;
+  ///
+  /// Its 200 was picked as "comfortably more than enough" and was — measured
+  /// on device, the template draws about 96 logical pixels, so a little over
+  /// half the slot was transparent and the page background showed through as
+  /// a band of empty space under every native ad. 150 still leaves ~50% over
+  /// the tallest the layout gets (icon row + a two-line body + the call to
+  /// action), which is the headroom this comment is about; it is deliberately
+  /// not trimmed to the measured 96.
+  double get _height => widget.template == TemplateType.small ? 150 : 600;
 
   @override
   void initState() {

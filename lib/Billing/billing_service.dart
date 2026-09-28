@@ -1,7 +1,8 @@
 import 'dart:async';
 import 'dart:io' show Platform;
 
-import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart' show kDebugMode;
+import 'package:flutter/widgets.dart';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:in_app_purchase_android/billing_client_wrappers.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
@@ -22,7 +23,7 @@ import 'package:url_launcher/url_launcher.dart';
 /// Runs on Play Billing Library 8.0.0, which is what `in_app_purchase_android`
 /// 0.5.0 bundles. Google requires v8 or later for new apps and updates from
 /// 31 Aug 2026.
-class BillingService extends ChangeNotifier {
+class BillingService extends ChangeNotifier with WidgetsBindingObserver {
   BillingService._();
 
   static final BillingService instance = BillingService._();
@@ -166,6 +167,24 @@ class BillingService extends ChangeNotifier {
   DateTime? _subscriptionPurchasedAt;
   bool _subscriptionAutoRenewing = false;
 
+  /// When Play last actually answered [_verifyEntitlement].
+  DateTime? _lastVerifiedAt;
+
+  /// How stale the entitlement may get before a resume re-checks it.
+  ///
+  /// A subscription can lapse at any moment and **Play tells the client
+  /// nothing when it does** — `purchaseStream` only fires for purchases, never
+  /// for an expiry. Without a periodic re-check the only thing that corrects a
+  /// stale `true` is a fresh process, and this app's process is very hard to
+  /// kill: `MainActivity` extends `AudioServiceActivity`, which deliberately
+  /// keeps the engine and isolate alive so music survives the app being swiped
+  /// away. An expired subscriber could therefore keep premium for days.
+  ///
+  /// Half an hour is the compromise: short enough that a lapse is noticed
+  /// within one sitting, long enough that flipping between apps does not fire
+  /// a Play query every time.
+  static const Duration _reverifyAfter = Duration(minutes: 30);
+
   /// True when premium came from the one-time unlock, which never expires.
   bool get ownsLifetime => _ownsLifetime;
 
@@ -234,6 +253,9 @@ class BillingService extends ChangeNotifier {
     // platform addition used by [_verifyEntitlement].
     if (!Platform.isAndroid) return;
 
+    // Resume re-checks (see [didChangeAppLifecycleState]).
+    WidgetsBinding.instance.addObserver(this);
+
     // Subscribe BEFORE anything can produce an event. Play replays purchases
     // that completed while the app was dead (a UPI payment that settled
     // overnight, a purchase made on another device) as soon as the connection
@@ -268,11 +290,39 @@ class BillingService extends ChangeNotifier {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _purchaseSub?.cancel();
     _purchaseSub = null;
     _flightWatchdog?.cancel();
     _flightWatchdog = null;
     super.dispose();
+  }
+
+  /// Re-checks the entitlement when the user comes back to the app.
+  ///
+  /// [init] runs once per process and this process can live for days, so
+  /// without this the answer Play gave at the very first launch was the only
+  /// answer the app ever had. See [_reverifyAfter] for why that matters and
+  /// how often this actually reaches Play.
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    if (state != AppLifecycleState.resumed) return;
+
+    // Nothing to re-check before the first verification has even run, or on a
+    // device where Play never answered.
+    if (!_initialised || !_storeAvailable) return;
+
+    // A billing flow is open. Play is about to tell us the outcome through
+    // `purchaseStream`; querying underneath it would race that.
+    if (_purchaseInFlight) return;
+
+    final DateTime? last = _lastVerifiedAt;
+    if (last != null && DateTime.now().difference(last) < _reverifyAfter) {
+      return;
+    }
+
+    unawaited(_verifyEntitlement());
   }
 
   /// Marks the billing flow as finished, however it finished.
@@ -601,6 +651,7 @@ class BillingService extends ChangeNotifier {
       _ownsLifetime = ownsLifetime;
       _subscriptionPurchasedAt = subTime;
       _subscriptionAutoRenewing = subRenewing;
+      _lastVerifiedAt = DateTime.now();
       await _setPremium(entitled);
     } catch (error) {
       debugPrint('BillingService: verify failed: $error');

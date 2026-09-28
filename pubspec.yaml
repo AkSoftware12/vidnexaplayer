@@ -128,6 +128,16 @@ dependencies:
   docman: ^1.2.0
   gal: ^1.9.1
 
+  # ✅ File manager
+  #    `archive` is pure Dart, so ZIP create/extract works on the bytes SAF
+  #    hands back without a real filesystem path — which is the only kind of
+  #    handle this app ever has to a user's file.
+  archive: ^4.0.9
+  #    Local HTTP server for wireless transfer (phone -> PC over Wi-Fi).
+  #    The device's own IP comes from dart:io's NetworkInterface, so no
+  #    network-info plugin is needed alongside it.
+  shelf: ^1.4.1
+
   # ✅ Voice command video search (offline-first local index)
   speech_to_text: ^7.0.0
   sqflite: ^2.4.1
