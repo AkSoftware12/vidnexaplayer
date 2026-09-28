@@ -82,7 +82,7 @@ class VoiceSearchResultTile extends StatelessWidget {
                       video.fileName,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(fontFamily: 'Poppins', fontSize: 12.5,
+                      style: const TextStyle(fontFamily: 'Poppins', fontSize: 12.5,
                         fontWeight: FontWeight.w600,
                       ),
                     ),

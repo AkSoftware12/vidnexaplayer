@@ -12,11 +12,11 @@ class ArtistPage extends StatefulWidget {
   final Color colortext;
 
   const ArtistPage({
-    Key? key,
+    super.key,
     required this.artist,
     required this.color,
     required this.colortext,
-  }) : super(key: key);
+  });
 
   @override
   State<ArtistPage> createState() => _ArtistPageState();

@@ -53,3 +53,6 @@ ios/Runner/GoogleService-Info.plist
 lib/firebase_options.dart
 .env
 .env.*
+
+# FVM Version Cache
+.fvm/

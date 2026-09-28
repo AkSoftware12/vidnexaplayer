@@ -62,8 +62,9 @@ class NotificationStore {
       if (existing.any((item) => item.id == entry.id)) return;
 
       final updated = [entry, ...existing];
-      if (updated.length > _maxStored)
+      if (updated.length > _maxStored) {
         updated.removeRange(_maxStored, updated.length);
+      }
 
       await prefs.setStringList(
         _key,

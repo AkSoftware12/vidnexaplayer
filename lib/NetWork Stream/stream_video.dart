@@ -73,7 +73,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
         backgroundColor: Colors.black87,
         content: Text(
           message,
-          style: TextStyle(fontFamily: 'Poppins', color: Colors.redAccent, fontSize: 14),
+          style: const TextStyle(fontFamily: 'Poppins', color: Colors.redAccent, fontSize: 14),
         ),
         behavior: SnackBarBehavior.floating,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -94,7 +94,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
         ),
         title: Text(
           VideoStrings.t(lang, 'stream_appbar_title'),
-          style: TextStyle(fontFamily: 'Poppins', color: Colors.white,
+          style: const TextStyle(fontFamily: 'Poppins', color: Colors.white,
             fontSize: 20,
             fontWeight: FontWeight.w600,
           ),
@@ -150,7 +150,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
                       ),
                     ),
                     keyboardType: TextInputType.url,
-                    style: TextStyle(fontFamily: 'Poppins', fontSize: 16),
+                    style: const TextStyle(fontFamily: 'Poppins', fontSize: 16),
                     enabled: !_isLoading,
                   ),
                   const SizedBox(height: 24),
@@ -172,7 +172,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
                         _isLoading
                             ? VideoStrings.t(lang, 'common_loading')
                             : VideoStrings.t(lang, 'stream_play_now'),
-                        style: TextStyle(fontFamily: 'Poppins', fontSize: 18,
+                        style: const TextStyle(fontFamily: 'Poppins', fontSize: 18,
                           fontWeight: FontWeight.w600,
                         ),
                       ),

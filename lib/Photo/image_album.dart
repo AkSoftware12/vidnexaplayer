@@ -32,6 +32,8 @@ import '../Utils/video_thumb.dart';
 import '../ads/app_open_ad_manager.dart';
 
 class AlbumScreen extends StatefulWidget {
+  const AlbumScreen({super.key});
+
   @override
   _AlbumScreenState createState() => _AlbumScreenState();
 }
@@ -50,7 +52,7 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
     super.initState();
 
     _controller = AnimationController(
-      duration: Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
@@ -83,9 +85,9 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
       final lang = context.read<LocaleProvider>().locale.languageCode;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(DeviceStrings.t(lang, 'album_permission_denied'), style: TextStyle(color: Colors.white)),
+          content: Text(DeviceStrings.t(lang, 'album_permission_denied'), style: const TextStyle(color: Colors.white)),
           backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
+          duration: const Duration(seconds: 3),
         ),
       );
     }
@@ -97,7 +99,7 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
 
     return Scaffold(
       appBar: AppBar(
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         title:Text(
           DeviceStrings.t(lang, 'album_title'),
           style: TextStyle(fontFamily: 'OpenSans', color: Colors.white,
@@ -109,7 +111,7 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
         backgroundColor: ColorSelect.maineColor,
       ),
       body: _isLoading
-          ? Center(child: AnimatedProgressIndicator())
+          ? const Center(child: AnimatedProgressIndicator())
           : _albums.isEmpty
           ? Center(child: Text(DeviceStrings.t(lang, 'album_no_albums'), style: Theme.of(context).textTheme.bodyMedium))
           : FadeTransition(
@@ -136,6 +138,8 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
 }
 
 class AnimatedProgressIndicator extends StatefulWidget {
+  const AnimatedProgressIndicator({super.key});
+
   @override
   _AnimatedProgressIndicatorState createState() => _AnimatedProgressIndicatorState();
 }
@@ -147,7 +151,7 @@ class _AnimatedProgressIndicatorState extends State<AnimatedProgressIndicator> w
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: Duration(seconds: 1),
+      duration: const Duration(seconds: 1),
       vsync: this,
     )..repeat();
   }
@@ -174,7 +178,7 @@ class _AnimatedProgressIndicatorState extends State<AnimatedProgressIndicator> w
 class AlbumTile extends StatelessWidget {
   final AssetPathEntity album;
 
-  AlbumTile({required this.album});
+  const AlbumTile({super.key, required this.album});
 
   @override
   Widget build(BuildContext context) {
@@ -201,7 +205,7 @@ class AlbumTile extends StatelessWidget {
             );
           },
           child: AnimatedScale(
-            duration: Duration(milliseconds: 500),
+            duration: const Duration(milliseconds: 500),
             scale: snapshot.hasData ? 1.0 : 1,
             child: Card(
               elevation: 6,
@@ -212,7 +216,7 @@ class AlbumTile extends StatelessWidget {
                 children: [
                   Expanded(
                     child: ClipRRect(
-                      borderRadius: BorderRadius.vertical(top: Radius.circular(5)),
+                      borderRadius: const BorderRadius.vertical(top: Radius.circular(5)),
                       child: FutureBuilder<List<AssetEntity>>(
                         future: album.getAssetListRange(start: 0, end: 1),
                         builder: (context, snapshot) {
@@ -270,7 +274,7 @@ class AlbumTile extends StatelessWidget {
 class PhotosScreen extends StatefulWidget {
   final AssetPathEntity album;
 
-  PhotosScreen({required this.album});
+  const PhotosScreen({super.key, required this.album});
 
   @override
   _PhotosScreenState createState() => _PhotosScreenState();
@@ -286,7 +290,7 @@ class _PhotosScreenState extends State<PhotosScreen> with SingleTickerProviderSt
   void initState() {
     super.initState();
     _controller = AnimationController(
-      duration: Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 800),
       vsync: this,
     );
     _fadeAnimation = CurvedAnimation(parent: _controller, curve: Curves.easeIn);
@@ -319,7 +323,7 @@ class _PhotosScreenState extends State<PhotosScreen> with SingleTickerProviderSt
 
     return Scaffold(
       appBar: AppBar(
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         title:Text(
           widget.album.name,
           style: TextStyle(fontFamily: 'OpenSans', color: Colors.white,
@@ -333,11 +337,11 @@ class _PhotosScreenState extends State<PhotosScreen> with SingleTickerProviderSt
 
       floatingActionButton: FloatingActionButton(
         onPressed: _loadPhotos,
-        child: Icon(Icons.refresh,color: Colors.white,),
         backgroundColor: ColorSelect.maineColor,
+        child: const Icon(Icons.refresh,color: Colors.white,),
       ),
       body: _isLoading
-          ? Center(child: AnimatedProgressIndicator())
+          ? const Center(child: AnimatedProgressIndicator())
           : _photos.isEmpty
           ? Center(child: Text(DeviceStrings.t(lang, 'album_no_photos_in_album'), style: Theme.of(context).textTheme.bodyMedium))
           : FadeTransition(
@@ -371,7 +375,7 @@ class PhotoTile extends StatelessWidget {
   final int initialIndex;
   final VoidCallback onDelete;
 
-  PhotoTile({required this.photo, required this.photos, required this.initialIndex, required this.onDelete});
+  const PhotoTile({super.key, required this.photo, required this.photos, required this.initialIndex, required this.onDelete});
 
   @override
   Widget build(BuildContext context) {
@@ -397,7 +401,7 @@ class PhotoTile extends StatelessWidget {
         );
       },
       child: AnimatedScale(
-        duration: Duration(milliseconds: 500),
+        duration: const Duration(milliseconds: 500),
         scale: 1.0,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(5),
@@ -417,7 +421,7 @@ class FullScreenPhoto extends StatefulWidget {
   final int initialIndex;
   final VoidCallback onDelete;
 
-  FullScreenPhoto({required this.photos, required this.initialIndex, required this.onDelete});
+  const FullScreenPhoto({super.key, required this.photos, required this.initialIndex, required this.onDelete});
 
   @override
   _FullScreenPhotoState createState() => _FullScreenPhotoState();
@@ -427,7 +431,7 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
   late PageController _pageController;
   late int _currentIndex;
   late List<AssetEntity> _photos;
-  Color _backgroundColor = Colors.black;
+  final Color _backgroundColor = Colors.black;
 
   @override
   void initState() {
@@ -454,11 +458,11 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
-            child: Text(DeviceStrings.t(lang, 'album_cancel'), style: TextStyle(color: Colors.teal)),
+            child: Text(DeviceStrings.t(lang, 'album_cancel'), style: const TextStyle(color: Colors.teal)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: Text(DeviceStrings.t(lang, 'album_delete'), style: TextStyle(color: Colors.red)),
+            child: Text(DeviceStrings.t(lang, 'album_delete'), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -493,18 +497,18 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
           });
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(DeviceStrings.t(lang, 'album_delete_success'), style: TextStyle(color: Colors.white)),
+              content: Text(DeviceStrings.t(lang, 'album_delete_success'), style: const TextStyle(color: Colors.white)),
               backgroundColor: Colors.green,
-              duration: Duration(seconds: 2),
+              duration: const Duration(seconds: 2),
             ),
           );
           widget.onDelete();
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
-              content: Text(DeviceStrings.t(lang, 'album_delete_failed'), style: TextStyle(color: Colors.white)),
+              content: Text(DeviceStrings.t(lang, 'album_delete_failed'), style: const TextStyle(color: Colors.white)),
               backgroundColor: Colors.red,
-              duration: Duration(seconds: 2),
+              duration: const Duration(seconds: 2),
             ),
           );
         }
@@ -520,9 +524,9 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
         if (!context.mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${DeviceStrings.t(lang, 'album_delete_error_prefix')}$e', style: TextStyle(color: Colors.white)),
+            content: Text('${DeviceStrings.t(lang, 'album_delete_error_prefix')}$e', style: const TextStyle(color: Colors.white)),
             backgroundColor: Colors.red,
-            duration: Duration(seconds: 3),
+            duration: const Duration(seconds: 3),
           ),
         );
       }
@@ -535,7 +539,7 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
 
     return Scaffold(
       appBar: AppBar(
-        iconTheme: IconThemeData(color: Colors.white),
+        iconTheme: const IconThemeData(color: Colors.white),
         title:Text(
           _photos.isEmpty ? '0/0' : '${_currentIndex + 1}/${_photos.length}',
           style: TextStyle(fontFamily: 'OpenSans', color: Colors.white,
@@ -545,7 +549,7 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
         ),
         actions: [
           IconButton(
-            icon: Icon(Icons.delete, color: Colors.white),
+            icon: const Icon(Icons.delete, color: Colors.white),
             onPressed: _photos.isEmpty ? null : () => _deletePhoto(context),
           ),
         ],
@@ -616,7 +620,7 @@ class _FullPhotoState extends State<_FullPhoto> {
       future: _file,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
-          return AnimatedProgressIndicator();
+          return const AnimatedProgressIndicator();
         }
 
         final file = snapshot.data;
@@ -655,7 +659,7 @@ class AnimatedScale extends StatefulWidget {
   final Duration duration;
   final double scale;
 
-  AnimatedScale({required this.child, required this.duration, required this.scale});
+  const AnimatedScale({super.key, required this.child, required this.duration, required this.scale});
 
   @override
   _AnimatedScaleState createState() => _AnimatedScaleState();

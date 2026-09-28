@@ -32,10 +32,10 @@ class FolderBottomSheet {
       builder: (BuildContext context) {
         return Container(
           padding: const EdgeInsets.all(16.0),
-          decoration: BoxDecoration(
-            color: const Color(0xFFF5F5F5),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(30.0)),
-            boxShadow: const [
+          decoration: const BoxDecoration(
+            color: Color(0xFFF5F5F5),
+            borderRadius: BorderRadius.vertical(top: Radius.circular(30.0)),
+            boxShadow: [
               BoxShadow(color: Colors.black12, blurRadius: 15, spreadRadius: 5),
             ],
           ),
@@ -104,7 +104,7 @@ class FolderBottomSheet {
               // --- Divider ---
               Container(
                 height: 4,
-                margin: EdgeInsets.only(bottom: 16.0),
+                margin: const EdgeInsets.only(bottom: 16.0),
                 decoration: BoxDecoration(
                   color: Colors.blue.withValues(alpha:0.2),
                   borderRadius: BorderRadius.circular(8.0),

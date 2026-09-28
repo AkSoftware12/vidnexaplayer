@@ -949,7 +949,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
           ),
           IconButton(
             onPressed: (){
-              Navigator.push(context, MaterialPageRoute(builder: (context) => StatusSaverScreen(), settings: const RouteSettings(name: 'StatusSaverGuideScreen')));
+              Navigator.push(context, MaterialPageRoute(builder: (context) => const StatusSaverScreen(), settings: const RouteSettings(name: 'StatusSaverGuideScreen')));
 
             },
             icon:  const Icon(Icons.info, color: Colors.white),
@@ -1050,7 +1050,7 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
 
   Widget _buildBody(List<StatusItem> statuses) {
     if (_loading) {
-      return Center(child: AnimatedProgressIndicator());
+      return const Center(child: AnimatedProgressIndicator());
     }
 
     final lang = _langCode;

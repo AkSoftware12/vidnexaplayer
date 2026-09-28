@@ -184,11 +184,11 @@ class CustomUpgradeDialog extends StatelessWidget {
   final List<String> releaseNotes; // Release notes
 
   const CustomUpgradeDialog({
-    Key? key,
+    super.key,
     required this.currentVersion,
     required this.newVersion,
     required this.releaseNotes,
-  }) : super(key: key);
+  });
 
   /// Opens the correct store listing.
   ///
@@ -222,7 +222,7 @@ class CustomUpgradeDialog extends StatelessWidget {
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(25.sp)),
       elevation: 12,
       child: Container(
-        constraints: BoxConstraints(maxWidth: 420),
+        constraints: const BoxConstraints(maxWidth: 420),
         padding: EdgeInsets.all(25.sp),
         decoration: BoxDecoration(
           gradient: LinearGradient(
@@ -247,7 +247,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                     radius: 0.55,
                     center: Alignment.center,
                   ),
-                  boxShadow: [
+                  boxShadow: const [
                     BoxShadow(
                       color: Colors.white60,
                       blurRadius: 30,
@@ -272,7 +272,7 @@ class CustomUpgradeDialog extends StatelessWidget {
                   shadows: [
                     Shadow(
                       color: Colors.black.withValues(alpha:0.4),
-                      offset: Offset(1, 1),
+                      offset: const Offset(1, 1),
                       blurRadius: 3,
                     ),
                   ],

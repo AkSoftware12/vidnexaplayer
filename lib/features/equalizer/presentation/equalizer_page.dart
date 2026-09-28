@@ -124,7 +124,7 @@ class EqSwitch extends StatelessWidget {
     return Switch(
       value: value,
       onChanged: onChanged,
-      activeColor: Colors.white,
+      activeThumbColor: Colors.white,
       activeTrackColor: colors.accent,
       inactiveThumbColor: offThumb,
       inactiveTrackColor: offTrack,
@@ -844,7 +844,7 @@ class _ActionRow extends StatelessWidget {
               onPressed: enabled ? () => _saveProfile(context, service) : null,
               icon: const Icon(Icons.bookmark_add_rounded, size: 16),
               label: Text(eqT(context, 'eq_save_profile'),
-                  style: TextStyle(fontSize: 12)),
+                  style: const TextStyle(fontSize: 12)),
               style: FilledButton.styleFrom(
                 backgroundColor: colors.accent,
                 // Explicit: without it the label takes the theme's onSurface

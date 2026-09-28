@@ -14,11 +14,11 @@ class AlbumPage extends StatefulWidget {
   final Color colortext;
 
   const AlbumPage({
-    Key? key,
+    super.key,
     required this.album,
     required this.color,
     required this.colortext,
-  }) : super(key: key);
+  });
 
   @override
   State<AlbumPage> createState() => _AlbumPageState();
@@ -87,7 +87,7 @@ class _AlbumPageState extends State<AlbumPage> {
                   onTap: () => Navigator.of(context).pop(),
                 ),
               ),
-              actions: [
+              actions: const [
                 // Padding(
                 //   padding: const EdgeInsets.only(right: 12),
                 //   child: _glassIconButton(

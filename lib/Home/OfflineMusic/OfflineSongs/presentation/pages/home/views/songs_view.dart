@@ -56,7 +56,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
           shrinkWrap: true,
           children: [
             ListTile(
-              leading: Icon(Icons.play_arrow),
+              leading: const Icon(Icons.play_arrow),
               title: Text(MusicStrings.t(lang, 'music_play')),
               onTap: () {
                 Navigator.pop(context);
@@ -64,7 +64,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               },
             ),
             ListTile(
-              leading: Icon(Icons.playlist_play),
+              leading: const Icon(Icons.playlist_play),
               title: Text(MusicStrings.t(lang, 'music_play_next')),
               onTap: () {
                 Navigator.pop(context);
@@ -72,7 +72,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               },
             ),
             ListTile(
-              leading: Icon(Icons.library_music),
+              leading: const Icon(Icons.library_music),
               title: Text(MusicStrings.t(lang, 'music_lyrics')),
               onTap: () {
                 Navigator.pop(context);
@@ -80,16 +80,16 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               },
             ),
             ListTile(
-              leading: Icon(Icons.cut),
+              leading: const Icon(Icons.cut),
               title: Text(MusicStrings.t(lang, 'music_ringtone_maker')),
-              trailing: Icon(Icons.circle, color: Colors.red, size: 10),
+              trailing: const Icon(Icons.circle, color: Colors.red, size: 10),
               onTap: () {
                 Navigator.pop(context);
                 // Add action for 'Ringtone Maker'
               },
             ),
             ListTile(
-              leading: Icon(Icons.playlist_add),
+              leading: const Icon(Icons.playlist_add),
               title: Text(MusicStrings.t(lang, 'music_add_to_playlist')),
               onTap: () {
                 Navigator.pop(context);
@@ -97,7 +97,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               },
             ),
             ListTile(
-              leading: Icon(Icons.lock),
+              leading: const Icon(Icons.lock),
               title: Text(MusicStrings.t(lang, 'music_lock')),
               onTap: () {
                 Navigator.pop(context);
@@ -105,7 +105,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               },
             ),
             ListTile(
-              leading: Icon(Icons.share),
+              leading: const Icon(Icons.share),
               title: Text(MusicStrings.t(lang, 'music_share')),
               onTap: () {
                 Navigator.pop(context);
@@ -113,7 +113,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               },
             ),
             ListTile(
-              leading: Icon(Icons.queue_music),
+              leading: const Icon(Icons.queue_music),
               title: Text(MusicStrings.t(lang, 'music_add_to_queue')),
               onTap: () {
                 Navigator.pop(context);
@@ -121,7 +121,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               },
             ),
             ListTile(
-              leading: Icon(Icons.notifications),
+              leading: const Icon(Icons.notifications),
               title: Text(MusicStrings.t(lang, 'music_set_as_ringtone')),
               onTap: () {
                 Navigator.pop(context);
@@ -129,7 +129,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               },
             ),
             ListTile(
-              leading: Icon(Icons.delete),
+              leading: const Icon(Icons.delete),
               title: Text(MusicStrings.t(lang, 'music_delete')),
               onTap: () {
                 Navigator.pop(context);
@@ -137,7 +137,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               },
             ),
             ListTile(
-              leading: Icon(Icons.info),
+              leading: const Icon(Icons.info),
               title: Text(MusicStrings.t(lang, 'music_properties')),
               onTap: () {
                 Navigator.pop(context);
@@ -190,8 +190,8 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
                           closedColor: Theme.of(context).cardColor,
                           closedElevation: 0.0,
                           openElevation: 0.0,
-                          transitionDuration: Duration(milliseconds: 800),
-                          openBuilder: (BuildContext context, VoidCallback _) =>SizedBox(),
+                          transitionDuration: const Duration(milliseconds: 800),
+                          openBuilder: (BuildContext context, VoidCallback _) =>const SizedBox(),
                           closedBuilder: (BuildContext _, VoidCallback openContainer) {
                             return  ListTile(
                               title: Text(
@@ -216,7 +216,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
                                     _showBottomSheet(context);
 
                                   },
-                                  child: Container(
+                                  child: SizedBox(
                                     height: 40.sp,
                                     width: 50.sp,
                                     child: Icon(

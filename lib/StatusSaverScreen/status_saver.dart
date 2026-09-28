@@ -46,7 +46,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
   }
 
   Future<void> _openWhatsApp(String lang) async {
-    final AndroidIntent intent = AndroidIntent(
+    const AndroidIntent intent = AndroidIntent(
       action: 'android.intent.action.MAIN',
       package: 'com.whatsapp',
       componentName: 'com.whatsapp.Main',
@@ -57,7 +57,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
       await intent.launch();
     } catch (e) {
       // WhatsApp not found — open Play Store
-      final AndroidIntent storeIntent = AndroidIntent(
+      const AndroidIntent storeIntent = AndroidIntent(
         action: 'android.intent.action.VIEW',
         data: 'market://details?id=com.whatsapp',
         flags: [Flag.FLAG_ACTIVITY_NEW_TASK],
@@ -66,7 +66,7 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
         await storeIntent.launch();
       } catch (_) {
         // Play Store not found — open browser
-        final AndroidIntent browserIntent = AndroidIntent(
+        const AndroidIntent browserIntent = AndroidIntent(
           action: 'android.intent.action.VIEW',
           data:
           'https://play.google.com/store/apps/details?id=com.whatsapp',

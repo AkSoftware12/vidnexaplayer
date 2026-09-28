@@ -222,7 +222,7 @@ class _YouTubeTopPlaylistsState extends State<YouTubeTopPlaylists> {
       body: RefreshIndicator(
         onRefresh: forceRefresh,
         child: isLoading
-            ?  Center(
+            ?  const Center(
           child:CupertinoActivityIndicator(
             radius: 20,
             color: Colors.blue,

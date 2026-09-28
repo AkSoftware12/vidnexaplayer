@@ -129,7 +129,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
             context,
             MaterialPageRoute(
               settings: const RouteSettings(name: 'DeviceSpaceScreen'),
-              builder: (context) => DeviceSpaceScreen(),
+              builder: (context) => const DeviceSpaceScreen(),
             ),
           ),
         ),
@@ -159,7 +159,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
             context,
             MaterialPageRoute(
               settings: const RouteSettings(name: 'NetworkStreamScreen'),
-              builder: (context) => VideoPlayerStream(),
+              builder: (context) => const VideoPlayerStream(),
             ),
           ),
         ),
@@ -178,7 +178,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
             context,
             MaterialPageRoute(
               settings: const RouteSettings(name: 'OfflineMusicScreen'),
-              builder: (context) => HomeBottomNavigation(bottomIndex: 1),
+              builder: (context) => const HomeBottomNavigation(bottomIndex: 1),
             ),
           ),
         ),
@@ -318,7 +318,7 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                                 ),
                               ),
                             ),
-                            Spacer(),
+                            const Spacer(),
                             Text(
                               HomeStrings.t(lang, item.text),
                               style: TextStyle(fontFamily: 'Poppins', fontSize: 10.sp,

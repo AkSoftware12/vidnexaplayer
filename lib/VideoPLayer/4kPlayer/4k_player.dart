@@ -1,6 +1,5 @@
 import 'dart:async';
 import 'package:firebase_crashlytics/firebase_crashlytics.dart';
-import 'dart:typed_data';
 import 'dart:ui';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
@@ -654,7 +653,7 @@ class _FullScreenVideoPlayerSystemVolumeState
 
   void _startHideTimer() {
     _hideTimer?.cancel();
-    final duration = const Duration(seconds: 5);
+    const duration = Duration(seconds: 5);
     _hideTimer = Timer(duration, () {
       if (mounted && !_isLocked) {
         setState(() => _controlsVisible = false);
@@ -1288,19 +1287,17 @@ class _FullScreenVideoPlayerSystemVolumeState
       // ✅ Actually save the bytes to the gallery
       final fileName =
           'screenshot_${DateTime.now().millisecondsSinceEpoch}.png';
-      final AssetEntity? saved = await PhotoManager.editor.saveImage(
+      final AssetEntity saved = await PhotoManager.editor.saveImage(
         data,
         filename: fileName,
       );
 
       if (context.mounted) {
         Fluttertoast.showToast(
-          msg: saved != null
-              ? _t('player_screenshot_saved')
-              : _t('player_screenshot_save_failed'),
+          msg: _t('player_screenshot_saved'),
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.CENTER,
-          backgroundColor: saved != null ? Colors.green : Colors.red,
+          backgroundColor: Colors.green,
           textColor: Colors.white,
           fontSize: 14,
         );
@@ -2952,8 +2949,8 @@ class _FullScreenVideoPlayerSystemVolumeState
     final posMs = _currentPosition.inMilliseconds.clamp(0, safeMax);
 
     // ✅ Volume meter geometry — ONE scale for device + boost.
-    final double _volScale = _boostReady ? _maxBoost : 100.0;
-    final double _volTotal = _isBoosting ? _volumeBoost : _systemVolume;
+    final double volScale = _boostReady ? _maxBoost : 100.0;
+    final double volTotal = _isBoosting ? _volumeBoost : _systemVolume;
 
     final String appBarTitle =
     _hasLocalList
@@ -3025,14 +3022,14 @@ class _FullScreenVideoPlayerSystemVolumeState
               // subtle vignette (same)
               IgnorePointer(
                 child: Container(
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     gradient: RadialGradient(
                       radius: 1.0,
                       colors: [
-                        const Color(0x00000000),
-                        const Color(0x22000000),
+                        Color(0x00000000),
+                        Color(0x22000000),
                       ],
-                      stops: const [0.65, 1.0],
+                      stops: [0.65, 1.0],
                     ),
                   ),
                 ),
@@ -3156,10 +3153,10 @@ class _FullScreenVideoPlayerSystemVolumeState
                           : _systemVolume < 50
                           ? Icons.volume_down_rounded
                           : Icons.volume_up_rounded,
-                      fraction: _volTotal / _volScale,
-                      baseFraction: _systemVolume / _volScale,
-                      gate: _boostReady ? 100 / _volScale : null,
-                      value: _volTotal.round(),
+                      fraction: volTotal / volScale,
+                      baseFraction: _systemVolume / volScale,
+                      gate: _boostReady ? 100 / volScale : null,
+                      value: volTotal.round(),
                       boost: _isBoosting,
                     ),
                   ),

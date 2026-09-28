@@ -7,7 +7,7 @@ class GenrePage extends StatefulWidget {
   final Color color;
   final Color colortext;
 
-  const GenrePage({Key? key, required this.genre, required this.color, required this.colortext}) : super(key: key);
+  const GenrePage({super.key, required this.genre, required this.color, required this.colortext});
 
   @override
   State<GenrePage> createState() => _GenrePageState();
@@ -84,7 +84,7 @@ class _GenrePageState extends State<GenrePage> {
                           id: _songs[index].id,
                           type: ArtworkType.AUDIO,
                           artworkFit: BoxFit.cover,
-                          nullArtworkWidget: Icon(
+                          nullArtworkWidget: const Icon(
                             Icons.music_note,
                             size: 48,
                             color: Colors.blue,

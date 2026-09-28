@@ -21,13 +21,13 @@ class SeekBar extends StatefulWidget {
   final ValueChanged<Duration>? onChangeEnd;
 
   const SeekBar({
-    Key? key,
+    super.key,
     required this.duration,
     required this.position,
     this.bufferedPosition = Duration.zero,
     this.onChanged,
     this.onChangeEnd,
-  }) : super(key: key);
+  });
 
   @override
   SeekBarState createState() => SeekBarState();
@@ -162,7 +162,7 @@ class HiddenThumbComponentShape extends SliderComponentShape {
 }
 
 class LoggingAudioHandler extends CompositeAudioHandler {
-  LoggingAudioHandler(AudioHandler inner) : super(inner) {
+  LoggingAudioHandler(super.inner) {
     playbackState.listen((state) {
       _log('playbackState changed: $state');
     });
@@ -471,9 +471,9 @@ void showSliderDialog({
   showDialog<void>(
     context: context,
     builder: (context) => AlertDialog(
-      backgroundColor:Color(0xFF0B1220),
+      backgroundColor:const Color(0xFF0B1220),
 
-      title: Text(title, textAlign: TextAlign.center,style: TextStyle(color: Colors.white),),
+      title: Text(title, textAlign: TextAlign.center,style: const TextStyle(color: Colors.white),),
       content: StreamBuilder<double>(
         stream: stream,
         builder: (context, snapshot) => SizedBox(

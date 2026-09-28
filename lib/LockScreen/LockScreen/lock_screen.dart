@@ -79,6 +79,19 @@ class _VaultScreenState extends State<VaultScreen> {
         title: tr('lock_set_pin_title'),
         subtitle: tr('lock_set_pin_sub'),
         icon: Icons.shield_rounded,
+        primaryText: tr('lock_save_pin'),
+        onPrimary: () async {
+          if (!(formKey.currentState?.validate() ?? false)) return;
+          await vault.setPin(ctrl.text.trim());
+          if (mounted) Navigator.pop(context);
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text(tr('lock_pin_set_success'))),
+            );
+          }
+        },
+        secondaryText: null,
+        onSecondary: null,
         child: Form(
           key: formKey,
           child: TextFormField(
@@ -95,19 +108,6 @@ class _VaultScreenState extends State<VaultScreen> {
             },
           ),
         ),
-        primaryText: tr('lock_save_pin'),
-        onPrimary: () async {
-          if (!(formKey.currentState?.validate() ?? false)) return;
-          await vault.setPin(ctrl.text.trim());
-          if (mounted) Navigator.pop(context);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(tr('lock_pin_set_success'))),
-            );
-          }
-        },
-        secondaryText: null,
-        onSecondary: null,
       ),
     );
   }
@@ -191,6 +191,19 @@ class _VaultScreenState extends State<VaultScreen> {
         title: tr('lock_unlock_vault_title'),
         subtitle: tr('lock_unlock_vault_sub'),
         icon: Icons.lock_open_rounded,
+        primaryText: tr('lock_unlock'),
+        onPrimary: () async {
+          if (!(formKey.currentState?.validate() ?? false)) return;
+          final ok = await vault.verifyPin(ctrl.text.trim());
+          if (!dialogContext.mounted) return;
+          Navigator.pop(
+            dialogContext,
+            ok ? _UnlockOutcome.success : _UnlockOutcome.wrongPin,
+          );
+        },
+        secondaryText: tr('lock_cancel'),
+        onSecondary: () =>
+            Navigator.pop(dialogContext, _UnlockOutcome.cancelled),
         child: Form(
           key: formKey,
           child: TextFormField(
@@ -207,19 +220,6 @@ class _VaultScreenState extends State<VaultScreen> {
             },
           ),
         ),
-        primaryText: tr('lock_unlock'),
-        onPrimary: () async {
-          if (!(formKey.currentState?.validate() ?? false)) return;
-          final ok = await vault.verifyPin(ctrl.text.trim());
-          if (!dialogContext.mounted) return;
-          Navigator.pop(
-            dialogContext,
-            ok ? _UnlockOutcome.success : _UnlockOutcome.wrongPin,
-          );
-        },
-        secondaryText: tr('lock_cancel'),
-        onSecondary: () =>
-            Navigator.pop(dialogContext, _UnlockOutcome.cancelled),
       ),
     );
 

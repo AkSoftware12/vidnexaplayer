@@ -52,7 +52,7 @@ class PlaybackSpeedDialog {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           Padding(
-                            padding:  EdgeInsets.only(left: 8.0),
+                            padding:  const EdgeInsets.only(left: 8.0),
                             child: Text(
                               t('speed_adjust_title'),
                               style: const TextStyle(color: Colors.white, fontSize: 18),
@@ -70,7 +70,7 @@ class PlaybackSpeedDialog {
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.all(5),
-                                  decoration: BoxDecoration(
+                                  decoration: const BoxDecoration(
                                     color: Colors.white24,
                                     shape: BoxShape.circle,
                                   ),
@@ -104,7 +104,7 @@ class PlaybackSpeedDialog {
                                 },
                                 child: Container(
                                   padding: const EdgeInsets.all(5),
-                                  decoration: BoxDecoration(
+                                  decoration: const BoxDecoration(
                                     color: Colors.white24,
                                     shape: BoxShape.circle,
                                   ),

@@ -640,7 +640,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                             context,
                             MaterialPageRoute(
                               settings: const RouteSettings(name: 'NotificationScreen'),
-                              builder: (context) => NotificationScreen(),
+                              builder: (context) => const NotificationScreen(),
                             ),
                           );
                         },
@@ -764,17 +764,17 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   Widget _getPage(int page) {
     switch (page) {
       case 0:
-        return DemoHomeScreen();
+        return const DemoHomeScreen();
     // case 1:
     //   return Container();
       case 1:
-        return OfflineMusicTabScreen();
+        return const OfflineMusicTabScreen();
       case 2:
-        return YouTubeTopPlaylists();
+        return const YouTubeTopPlaylists();
       case 3:
-        return UserProfilePage();
+        return const UserProfilePage();
       default:
-        return DemoHomeScreen(); // Fallback to HomeScreen
+        return const DemoHomeScreen(); // Fallback to HomeScreen
     }
   }
 
@@ -807,6 +807,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
 class CustomBottomBar extends StatefulWidget {
   final int initialSelection;
   final ValueChanged<int> onTabChangedListener;
+  @override
   final GlobalKey<CustomBottomBarState> key;
 
   const CustomBottomBar({
@@ -1091,7 +1092,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context,
                         MaterialPageRoute(
                           settings: const RouteSettings(name: 'NetworkStreamScreen'),
-                          builder: (context) => VideoPlayerStream(),
+                          builder: (context) => const VideoPlayerStream(),
                         ),
                       );
                     },
@@ -1113,7 +1114,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context,
                         MaterialPageRoute(
                           settings: const RouteSettings(name: 'DeviceSpaceScreen'),
-                          builder: (context) => DeviceSpaceScreen(),
+                          builder: (context) => const DeviceSpaceScreen(),
                         ),
                       );
                     },
@@ -1130,7 +1131,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context,
                         MaterialPageRoute(
                           settings: const RouteSettings(name: 'StatusSaverScreen'),
-                          builder: (context) => StatusSaverHomePage(),
+                          builder: (context) => const StatusSaverHomePage(),
                         ),
                       );
                     },
@@ -1188,7 +1189,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: const ThemeSettingsSection(showHeader: false),
                   ),
 
-                  SizedBox(
+                  const SizedBox(
                     height: 10,
                   ),
 
@@ -1218,7 +1219,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         context,
                         MaterialPageRoute(
                           settings: const RouteSettings(name: 'NotificationScreen'),
-                          builder: (context) => NotificationScreen(),
+                          builder: (context) => const NotificationScreen(),
                         ),
                       );
                     },

@@ -25,7 +25,7 @@ import 'package:flutter/material.dart';
 class TextScroll extends StatefulWidget {
   const TextScroll(
       this.text, {
-        Key? key,
+        super.key,
         this.style,
         this.textAlign,
         this.textDirection = TextDirection.ltr,
@@ -41,7 +41,7 @@ class TextScroll extends StatefulWidget {
         this.fadedBorderWidth = 0.2,
         this.fadeBorderSide = FadeBorderSide.both,
         this.fadeBorderVisibility = FadeBorderVisibility.auto,
-      }) : super(key: key);
+      });
 
   /// The text string, that would be scrolled.
   /// In case text does fit into allocated space, it wouldn't be scrolled
@@ -286,10 +286,8 @@ class _TextScrollState extends State<TextScroll> {
   void initState() {
     super.initState();
 
-    final WidgetsBinding? binding = WidgetsBinding.instance;
-    if (binding != null) {
-      binding.addPostFrameCallback(_initScroller);
-    }
+    final WidgetsBinding binding = WidgetsBinding.instance;
+    binding.addPostFrameCallback(_initScroller);
   }
 
   @override
@@ -327,7 +325,7 @@ class _TextScrollState extends State<TextScroll> {
       textDirection: widget.textDirection,
       child: SingleChildScrollView(
           controller: _scrollController,
-          physics: NeverScrollableScrollPhysics(),
+          physics: const NeverScrollableScrollPhysics(),
           scrollDirection: Axis.horizontal,
           child: ConstrainedBox(
             constraints: BoxConstraints(

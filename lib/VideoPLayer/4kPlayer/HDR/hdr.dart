@@ -62,7 +62,7 @@ class FilterPopup {
                             child: Text(
                               t('hdr_dialog_title'),
                               textAlign: TextAlign.center,
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: Colors.red,
                                 fontSize: 16,
                                 fontWeight: FontWeight.bold,
@@ -110,7 +110,7 @@ class FilterPopup {
                               _radioTile(
                                 context,
                                 title: t('hdr_filter_blue'),
-                                color: Color(0xFF3F51FF),
+                                color: const Color(0xFF3F51FF),
                                 value: "blue",
                                 groupValue: selectedKey,
                                 onSelected: onSelected,

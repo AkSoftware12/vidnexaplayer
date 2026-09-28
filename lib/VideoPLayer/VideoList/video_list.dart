@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:photo_manager/photo_manager.dart';
@@ -154,10 +153,10 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
                     });
                   },
                   child: Container(
-                    padding: EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: _isGridView ? ColorSelect.maineColor2 : AppPalette.raised,
-                      borderRadius: BorderRadius.only(
+                      borderRadius: const BorderRadius.only(
                         topLeft: Radius.circular(10),
                         bottomLeft: Radius.circular(10),
                       ),
@@ -176,10 +175,10 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
                     });
                   },
                   child: Container(
-                    padding: EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(10),
                     decoration: BoxDecoration(
                       color: !_isGridView ? ColorSelect.maineColor2 : AppPalette.raised,
-                      borderRadius: BorderRadius.only(
+                      borderRadius: const BorderRadius.only(
                         topRight: Radius.circular(10),
                         bottomRight: Radius.circular(10),
                       ),
@@ -462,7 +461,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
           title: Row(
             children: [
               Icon(Icons.video_file, color: ColorSelect.maineColor, size: 30),
-              SizedBox(width: 8),
+              const SizedBox(width: 8),
               Text(
                 _t('video_info_title'),
                 style: TextStyle(
@@ -476,7 +475,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             future: photo.file,
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
-                return Center(child: CircularProgressIndicator());
+                return const Center(child: CircularProgressIndicator());
               }
 
               if (!snapshot.hasData || snapshot.data == null) {
@@ -496,13 +495,13 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildInfoRow(_t('video_info_name'), photo.title ?? _t('video_info_unknown')),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   _buildInfoRow(_t('video_info_path'), file.path),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   _buildInfoRow(_t('video_info_size'), '${size.toStringAsFixed(2)} MB'),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   _buildInfoRow(_t('video_info_duration'), durationText),
-                  SizedBox(height: 12),
+                  const SizedBox(height: 12),
                   _buildInfoRow(
                     // `createDateTime` is non-nullable — the `?.`/`??` never fired.
                     _t('video_info_last_modified'),
@@ -519,14 +518,14 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
               child: Container(
-                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: ColorSelect.maineColor,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Text(
                   _t('common_ok'),
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
@@ -550,7 +549,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             color: AppPalette.textS,
           ),
         ),
-        SizedBox(height: 4),
+        const SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(fontWeight: FontWeight.w400, color: AppPalette.textH),
@@ -769,7 +768,7 @@ class PhotoTile extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, color: color, size: 20.sp),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(label, style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp)),
         ],
       ),
@@ -830,10 +829,12 @@ class _PhotoTileFileInfoState extends State<_PhotoTileFileInfo> {
 
     if (_PhotoTileFileInfo._cache.containsKey(id)) {
       final cached = _PhotoTileFileInfo._cache[id];
-      if (mounted) setState(() {
+      if (mounted) {
+        setState(() {
         _sizeMB = cached;
         _resolved = true;
       });
+      }
       return;
     }
 
@@ -1097,7 +1098,7 @@ class GridviewList extends StatelessWidget {
       child: Row(
         children: [
           Icon(icon, color: color, size: 20.sp),
-          SizedBox(width: 8),
+          const SizedBox(width: 8),
           Text(label, style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp)),
         ],
       ),

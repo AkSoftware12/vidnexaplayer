@@ -139,7 +139,7 @@ class VoiceSearchStateView extends StatelessWidget {
         children: [
           Icon(icon, size: 44, color: ColorSelect.subtextColor),
           const SizedBox(height: 12),
-          Text(title, style: TextStyle(fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w600)),
+          Text(title, style: const TextStyle(fontFamily: 'Poppins', fontSize: 15, fontWeight: FontWeight.w600)),
           const SizedBox(height: 6),
           Text(
             subtitle,
@@ -167,7 +167,7 @@ class VoiceSearchStateView extends StatelessWidget {
       children: _examples
           .map(
             (e) => ActionChip(
-              label: Text(e, style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5)),
+              label: Text(e, style: const TextStyle(fontFamily: 'Poppins', fontSize: 11.5)),
               onPressed: () => onExampleTap(e),
             ),
           )

@@ -325,7 +325,7 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(14),
-                        borderSide: BorderSide(color: _T.accent, width: 2),
+                        borderSide: const BorderSide(color: _T.accent, width: 2),
                       ),
                     ),
                     onChanged: (_) => local(() {}),
@@ -559,7 +559,7 @@ class _HeroBanner extends StatelessWidget {
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.workspace_premium, color: _T.gold, size: 13),
+                                const Icon(Icons.workspace_premium, color: _T.gold, size: 13),
                                 const SizedBox(width: 5),
                                 Text(
                                   ProfileStrings.t(lang, 'profile_premium_member'),
@@ -621,7 +621,7 @@ class _StorageRow extends StatelessWidget {
     final cards = [
       _SC(icon: Icons.folder_rounded,        label: ProfileStrings.t(lang, 'profile_files'),   sub: '3.2 GB',
           grad: [const Color(0xFF1D4ED8), const Color(0xFF3B82F6)],
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => DeviceSpaceScreen(), settings: const RouteSettings(name: 'DeviceSpaceScreen')))),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceSpaceScreen(), settings: const RouteSettings(name: 'DeviceSpaceScreen')))),
       _SC(icon: Icons.video_library_rounded,  label: ProfileStrings.t(lang, 'profile_videos'),  sub: '124 GB',
           grad: [const Color(0xFFD97706), const Color(0xFFFBBF24)], onTap: () {}),
       _SC(icon: Icons.photo_rounded,
@@ -710,7 +710,7 @@ class _QuickActionsGrid extends StatelessWidget {
           color: const Color(0xFF2563EB), bg: const Color(0xFFDBEAFE), onTap: () {}),
       _QA(icon: Icons.lock_rounded,        label: ProfileStrings.t(lang, 'profile_private'),   sub: ProfileStrings.t(lang, 'profile_vault'),
           color: const Color(0xFF7C3AED), bg: const Color(0xFFEDE9FE),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => VaultScreen(), settings: const RouteSettings(name: 'VaultScreen')))),
+          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VaultScreen(), settings: const RouteSettings(name: 'VaultScreen')))),
       _QA(icon: Icons.add_circle_rounded,  label: ProfileStrings.t(lang, 'profile_add_new'),   sub: ProfileStrings.t(lang, 'profile_playlist'),
           color: _T.accent, bg: _T.accentSoft, onTap: () {}),
     ];
@@ -832,7 +832,7 @@ class _SettingsCard extends StatelessWidget {
               title: t('profile_stream_title'), sub: t('profile_stream_sub'),
               badge: _Badge(text: t('profile_badge_new'), color: _T.accent),
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerStream(), settings: const RouteSettings(name: 'NetworkStreamScreen')));
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const VideoPlayerStream(), settings: const RouteSettings(name: 'NetworkStreamScreen')));
               }),
           _Div(),
 
@@ -841,7 +841,7 @@ class _SettingsCard extends StatelessWidget {
               title: t('profile_status_saver_title'), sub: t('profile_status_saver_sub'),
               badge: _Badge(text: t('profile_badge_hot'), color: const Color(0xFFEA580C)),
               onTap: () {
-                Navigator.push(context, MaterialPageRoute(builder: (context) => StatusSaverHomePage(), settings: const RouteSettings(name: 'StatusSaverScreen')));
+                Navigator.push(context, MaterialPageRoute(builder: (context) => const StatusSaverHomePage(), settings: const RouteSettings(name: 'StatusSaverScreen')));
               }),
           _Div(),
 
@@ -902,7 +902,7 @@ class _SettingsCard extends StatelessWidget {
               iColor: const Color(0xFF8B5CF6), iBg: const Color(0xFFF3E8FF),
               title: t('profile_notifications_title'), sub: t('profile_notifications_sub'),
               onTap: () => Navigator.push(context,
-                  MaterialPageRoute(builder: (_) => NotificationScreen(), settings: const RouteSettings(name: 'NotificationScreen')))),
+                  MaterialPageRoute(builder: (_) => const NotificationScreen(), settings: const RouteSettings(name: 'NotificationScreen')))),
           _Div(),
 
           // _Tile(icon: HeroIcons.paint_brush,

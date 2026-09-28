@@ -183,7 +183,7 @@ class _YouTubePlaylistVideosState extends State<YouTubePlaylistVideos> {
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     return Scaffold(
       appBar: AppBar(
-        iconTheme:  IconThemeData(color: Colors.white),
+        iconTheme:  const IconThemeData(color: Colors.white),
         title: Text(
           widget.playlistTitle,
           maxLines: 1,
@@ -249,7 +249,7 @@ class _YouTubePlaylistVideosState extends State<YouTubePlaylistVideos> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  CupertinoActivityIndicator(
+                  const CupertinoActivityIndicator(
                     radius: 20,
                     color: Colors.blue,
                   ),

@@ -17,7 +17,7 @@ class ComingSoonScreen extends StatelessWidget {
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
         backgroundColor: Colors.grey[100],
-        title: Text('${title}',
+        title: Text(title,
           style: (TextStyle(
               color: Colors.black,
               fontSize: 16.sp,
@@ -36,7 +36,7 @@ class ComingSoonScreen extends StatelessWidget {
               height: 200.sp,
               fit: BoxFit.contain,
             ),
-            SizedBox(height: 30),
+            const SizedBox(height: 30),
             ElevatedButton(
               onPressed: () {
                 Navigator.pop(context); // Back button functionality
@@ -47,7 +47,7 @@ class ComingSoonScreen extends StatelessWidget {
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(20),
                 ),
-                padding: EdgeInsets.symmetric(horizontal: 30, vertical: 15),
+                padding: const EdgeInsets.symmetric(horizontal: 30, vertical: 15),
               ),
               child: Text(
                 HomeStrings.t(lang, 'coming_soon_go_back'),

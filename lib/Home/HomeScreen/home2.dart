@@ -411,7 +411,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                   ? Center(
                                 child: Padding(
                                   padding: EdgeInsets.all(20.sp),
-                                  child: CircularProgressIndicator(
+                                  child: const CircularProgressIndicator(
                                     color: Colors.blue,
                                   ),
                                 ),
@@ -483,14 +483,14 @@ class _HomeScreenState extends State<DemoHomeScreen>
 
                                       : _isGridView
                                       ? GridView.builder(
-                                    key: ValueKey('gridView'),
+                                    key: const ValueKey('gridView'),
                                     padding: EdgeInsets.symmetric(
                                       horizontal: 3.sp,
                                       vertical: 0.sp,
                                     ),
                                     shrinkWrap: true,
                                     physics:
-                                    NeverScrollableScrollPhysics(),
+                                    const NeverScrollableScrollPhysics(),
                                     itemCount: _albums.length,
                                     gridDelegate:
                                     SliverGridDelegateWithFixedCrossAxisCount(
@@ -511,7 +511,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                     itemCount: _albums.length,
                                     shrinkWrap: true,
                                     physics:
-                                    NeverScrollableScrollPhysics(),
+                                    const NeverScrollableScrollPhysics(),
                                     gridDelegate:
                                     SliverGridDelegateWithFixedCrossAxisCount(
                                       crossAxisCount: 3,
@@ -549,7 +549,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
     return GestureDetector(
       onTap: onTap,
       child: AnimatedContainer(
-        duration: Duration(milliseconds: 200),
+        duration: const Duration(milliseconds: 200),
         padding: EdgeInsets.symmetric(horizontal: 10.sp, vertical: 5.sp),
         decoration: BoxDecoration(
           color: isActive ? ColorSelect.maineColor2 : Colors.transparent,
@@ -625,7 +625,7 @@ class AlbumTile extends StatelessWidget {
 
           },
           child: ScaleIn(
-            duration: Duration(milliseconds: 500),
+            duration: const Duration(milliseconds: 500),
             scale: snapshot.hasData ? 1.0 : 1,
             child: Container(
               margin: EdgeInsets.symmetric(vertical: 5.sp, horizontal: 5.sp),
@@ -720,7 +720,7 @@ class AlbumTile extends StatelessWidget {
                         //   lastModified,
                         // );
                       },
-                      child: Container(
+                      child: SizedBox(
                         height: 40.sp,
                         width: 50.sp,
                         child: Icon(
@@ -796,7 +796,7 @@ class AlbumGridTile extends StatelessWidget {
             );
           },
           child: ScaleIn(
-            duration: Duration(milliseconds: 500),
+            duration: const Duration(milliseconds: 500),
             scale: snapshot.hasData ? 1.0 : 1,
             child: Container(
               margin: EdgeInsets.all(4.sp),
@@ -808,7 +808,7 @@ class AlbumGridTile extends StatelessWidget {
                     color: selectedColor.withValues(alpha:0.3),
                     blurRadius: 10,
                     spreadRadius: 2,
-                    offset: Offset(2, 3),
+                    offset: const Offset(2, 3),
                   ),
                 ],
               ),
@@ -901,7 +901,7 @@ class AlbumGridTile extends StatelessWidget {
                         // );
                       },
 
-                      child: Container(
+                      child: SizedBox(
                         height: 40.sp,
                         width: 20.sp,
                         child: Icon(
@@ -997,7 +997,7 @@ class AlbumGridTile3 extends StatelessWidget {
                   color: selectedColor.withValues(alpha:0.3),
                   blurRadius: 10,
                   spreadRadius: 2,
-                  offset: Offset(2, 3),
+                  offset: const Offset(2, 3),
                 ),
               ],
             ),
@@ -1093,7 +1093,7 @@ class AlbumGridTile3 extends StatelessWidget {
                             // );
                           },
 
-                          child: Container(
+                          child: SizedBox(
                             height: 40.sp,
                             width: 10.sp,
                             child: Icon(

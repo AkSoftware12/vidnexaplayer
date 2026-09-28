@@ -440,7 +440,7 @@ class _ProfileTile extends StatelessWidget {
                     subtitle: bindings[device] != null &&
                             bindings[device] != profile.id
                         ? Text(_t(ctx, 'eq_device_used_by_other'),
-                            style: TextStyle(fontSize: 11))
+                            style: const TextStyle(fontSize: 11))
                         : null,
                     value: bindings[device] == profile.id,
                     onChanged: (checked) async {
