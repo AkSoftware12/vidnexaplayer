@@ -35,7 +35,7 @@ class LocalNotifications {
     if (_ready) return;
     try {
       await _plugin.initialize(
-        const InitializationSettings(
+        settings: const InitializationSettings(
           android: AndroidInitializationSettings('@mipmap/ic_launcher'),
         ),
       );
@@ -66,10 +66,10 @@ class LocalNotifications {
       await _plugin.show(
         // A stable-ish id derived from the message, so the same push does not
         // stack twice if it is ever delivered again.
-        message.messageId.hashCode,
-        title,
-        body,
-        NotificationDetails(
+        id: message.messageId.hashCode,
+        title: title,
+        body: body,
+        notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             _channel.id,
             _channel.name,
@@ -83,5 +83,4 @@ class LocalNotifications {
     } catch (error) {
       debugPrint('LocalNotifications.show failed: $error');
     }
-  }
-}
+  }}
