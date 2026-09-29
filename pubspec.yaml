@@ -105,7 +105,7 @@ dependencies:
   disk_space_plus: ^0.2.5
   rxdart: ^0.27.7
 #  google_mobile_ads: ^7.0.0
-  google_mobile_ads: ^6.0.0
+  google_mobile_ads: ^9.1.0
   android_intent_plus: ^6.0.0
 
   # ✅ Google Play Billing (Play Billing Library 8.x via the official plugin).
