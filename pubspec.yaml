@@ -5,7 +5,7 @@ publish_to: 'none'
 version: 1.0.30+30
 
 environment:
-  sdk: ^3.7.0
+  sdk: ^3.13.0
 
 dependencies:
   flutter:
@@ -55,7 +55,7 @@ dependencies:
   # ✅ Utility Packages
   file_picker: ^10.2.0
   shared_preferences: ^2.5.3
-  package_info_plus: ^8.3.0
+  package_info_plus: ^9.0.1
   permission_handler: ^12.0.1
   url_launcher: ^6.3.2
   path_provider: ^2.1.5
@@ -72,8 +72,8 @@ dependencies:
   # on the main thread during startup. Nothing in the app ever spoke, so the
   # whole cost was a crash source. Add it back only with a real TTS call site.
   firebase_messaging: ^15.2.9
-  device_info_plus: ^11.5.0
-  share_plus: ^11.0.0
+  device_info_plus: ^12.4.0
+  share_plus: ^12.0.2
   flutter_local_notifications: ^17.2.1
   # ✅ Was imported by Home/YoutubeScreen/playlists_screen.dart but never declared
   #    (it only resolved transitively — one upstream bump away from breaking).
@@ -81,7 +81,7 @@ dependencies:
   # ✅ Salted SHA-256 hashing for the vault PIN (was stored in plaintext).
   crypto: ^3.0.3
   # ✅ Internet on/off detection for the connectivity banner.
-  connectivity_plus: ^6.1.0
+  connectivity_plus: ^7.3.1
 
   # ✅ UI Helpers
   smooth_page_indicator: ^1.2.1

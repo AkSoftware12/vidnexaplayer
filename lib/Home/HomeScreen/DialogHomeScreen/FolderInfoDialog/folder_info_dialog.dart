@@ -12,7 +12,7 @@ class FolderInfoDialog {
         required String size,
         required String location,
         required String modifiedDate,
-        required final AssetPathEntity videos,
+        required  AssetPathEntity videos,
       }) {
     final lang = context.read<LocaleProvider>().locale.languageCode;
     showDialog(

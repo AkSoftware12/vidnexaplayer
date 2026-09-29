@@ -12,7 +12,7 @@ class FolderBottomSheet {
   static void show(
       BuildContext context, {
         required String folderName,
-        required final AssetPathEntity videos,
+        required AssetPathEntity videos,
         required String formattedSize,
         required String location,
         required String date,
