@@ -54,62 +54,45 @@ class _VaultScreenState extends State<VaultScreen> {
     setState(() => loading = false);
   }
 
+  /// First-run PIN setup.
+  ///
+  /// The dialog owns its TextEditingController (see [_PinEntryDialog]). It
+  /// used to be created here and disposed right after `showDialog` returned,
+  /// while the dialog's exit animation was still rebuilding the TextField —
+  /// which threw "TextEditingController was used after being disposed" and
+  /// replaced the field with a ~100000px error box (the RenderFlex overflow).
   Future<void> _setPinFlow() async {
-    final ctrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
-
-    try {
-      await _runSetPinDialog(ctrl, formKey);
-    } finally {
-      // The controller used to be created per-dialog and never disposed.
-      ctrl.dispose();
-    }
-  }
-
-  Future<void> _runSetPinDialog(
-    TextEditingController ctrl,
-    GlobalKey<FormState> formKey,
-  ) async {
     final lang = context.read<LocaleProvider>().locale.languageCode;
     String tr(String key) => ProfileStrings.t(lang, key);
-    await showDialog(
+
+    final saved = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
-      builder: (_) => _GlassDialog(
+      builder: (_) => _PinEntryDialog<bool>(
         title: tr('lock_set_pin_title'),
         subtitle: tr('lock_set_pin_sub'),
         icon: Icons.shield_rounded,
         primaryText: tr('lock_save_pin'),
-        onPrimary: () async {
-          if (!(formKey.currentState?.validate() ?? false)) return;
-          await vault.setPin(ctrl.text.trim());
-          if (mounted) Navigator.pop(context);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text(tr('lock_pin_set_success'))),
-            );
-          }
+        decoration:
+        _inputDeco(tr('lock_enter_pin_hint'), Icons.password_rounded),
+        validator: (v) {
+          final t = (v ?? "").trim();
+          if (t.length < 4) return tr('lock_min_digits');
+          if (t.length > 6) return tr('lock_max_digits');
+          return null;
         },
-        secondaryText: null,
-        onSecondary: null,
-        child: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: ctrl,
-            keyboardType: TextInputType.number,
-            obscureText: true,
-            maxLength: 6,
-            decoration: _inputDeco(tr('lock_enter_pin_hint'), Icons.password_rounded),
-            validator: (v) {
-              final t = (v ?? "").trim();
-              if (t.length < 4) return tr('lock_min_digits');
-              if (t.length > 6) return tr('lock_max_digits');
-              return null;
-            },
-          ),
-        ),
+        onSubmit: (pin) async {
+          await vault.setPin(pin);
+          return true;
+        },
       ),
     );
+
+    if (saved == true && mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(tr('lock_pin_set_success'))),
+      );
+    }
   }
 
   /// Wrong-PIN attempts since the last success, used for a simple lockout.
@@ -121,29 +104,46 @@ class _VaultScreenState extends State<VaultScreen> {
 
   Future<void> _unlockFlow() async {
     final lang = context.read<LocaleProvider>().locale.languageCode;
+    String tr(String key) => ProfileStrings.t(lang, key);
+
     final lockedUntil = _lockedOutUntil;
     if (lockedUntil != null && DateTime.now().isBefore(lockedUntil)) {
       final secs = lockedUntil.difference(DateTime.now()).inSeconds;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            ProfileStrings.t(lang, 'lock_too_many_attempts')
-                .replaceAll('{secs}', '$secs'),
+            tr('lock_too_many_attempts').replaceAll('{secs}', '$secs'),
           ),
         ),
       );
       return;
     }
 
-    final ctrl = TextEditingController();
-    final formKey = GlobalKey<FormState>();
+    final result = await showDialog<_UnlockOutcome>(
+      context: context,
+      barrierDismissible: true,
+      builder: (_) => _PinEntryDialog<_UnlockOutcome>(
+        title: tr('lock_unlock_vault_title'),
+        subtitle: tr('lock_unlock_vault_sub'),
+        icon: Icons.lock_open_rounded,
+        primaryText: tr('lock_unlock'),
+        secondaryText: tr('lock_cancel'),
+        cancelValue: _UnlockOutcome.cancelled,
+        decoration: _inputDeco(tr('lock_enter_pin_short'), Icons.lock_rounded),
+        validator: (v) {
+          final t = (v ?? "").trim();
+          if (t.isEmpty) return tr('lock_pin_required');
+          if (t.length < 4) return tr('lock_wrong_pin_length');
+          return null;
+        },
+        onSubmit: (pin) async => await vault.verifyPin(pin)
+            ? _UnlockOutcome.success
+            : _UnlockOutcome.wrongPin,
+      ),
+    );
 
-    final _UnlockOutcome outcome;
-    try {
-      outcome = await _runUnlockDialog(ctrl, formKey);
-    } finally {
-      ctrl.dispose();
-    }
+    // `null` means the barrier was tapped / back was pressed.
+    final outcome = result ?? _UnlockOutcome.cancelled;
 
     if (!mounted) return;
 
@@ -161,70 +161,19 @@ class _VaultScreenState extends State<VaultScreen> {
           _lockedOutUntil = DateTime.now().add(_lockoutDuration);
           _failedAttempts = 0;
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(ProfileStrings.t(lang, 'lock_too_many_wrong')),
-            ),
+            SnackBar(content: Text(tr('lock_too_many_wrong'))),
           );
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(ProfileStrings.t(lang, 'lock_wrong_pin'))),
+            SnackBar(content: Text(tr('lock_wrong_pin'))),
           );
         }
 
       case _UnlockOutcome.cancelled:
-        // Tapping outside or pressing Cancel is not a failed attempt — the old
-        // code showed "Wrong PIN" for both.
+      // Tapping outside or pressing Cancel is not a failed attempt — the old
+      // code showed "Wrong PIN" for both.
         break;
     }
-  }
-
-  Future<_UnlockOutcome> _runUnlockDialog(
-    TextEditingController ctrl,
-    GlobalKey<FormState> formKey,
-  ) async {
-    final lang = context.read<LocaleProvider>().locale.languageCode;
-    String tr(String key) => ProfileStrings.t(lang, key);
-    final result = await showDialog<_UnlockOutcome>(
-      context: context,
-      barrierDismissible: true,
-      builder: (dialogContext) => _GlassDialog(
-        title: tr('lock_unlock_vault_title'),
-        subtitle: tr('lock_unlock_vault_sub'),
-        icon: Icons.lock_open_rounded,
-        primaryText: tr('lock_unlock'),
-        onPrimary: () async {
-          if (!(formKey.currentState?.validate() ?? false)) return;
-          final ok = await vault.verifyPin(ctrl.text.trim());
-          if (!dialogContext.mounted) return;
-          Navigator.pop(
-            dialogContext,
-            ok ? _UnlockOutcome.success : _UnlockOutcome.wrongPin,
-          );
-        },
-        secondaryText: tr('lock_cancel'),
-        onSecondary: () =>
-            Navigator.pop(dialogContext, _UnlockOutcome.cancelled),
-        child: Form(
-          key: formKey,
-          child: TextFormField(
-            controller: ctrl,
-            keyboardType: TextInputType.number,
-            obscureText: true,
-            maxLength: 6,
-            decoration: _inputDeco(tr('lock_enter_pin_short'), Icons.lock_rounded),
-            validator: (v) {
-              final t = (v ?? "").trim();
-              if (t.isEmpty) return tr('lock_pin_required');
-              if (t.length < 4) return tr('lock_wrong_pin_length');
-              return null;
-            },
-          ),
-        ),
-      ),
-    );
-
-    // `null` means the barrier was tapped / back was pressed.
-    return result ?? _UnlockOutcome.cancelled;
   }
 
   Future<void> _refresh() async {
@@ -243,7 +192,7 @@ class _VaultScreenState extends State<VaultScreen> {
   }
 
   Future<void> _addFile() async {
-    final res = await FilePicker.platform.pickFiles();
+    final res = await FilePicker.pickFiles();
     // `.single` throws if the platform ever hands back more (or fewer) than
     // exactly one file — some Android file providers do that even without
     // `allowMultiple` set. `.first` degrades gracefully instead of crashing.
@@ -259,8 +208,8 @@ class _VaultScreenState extends State<VaultScreen> {
       final result = await vault.addToVault(File(path));
       message = result.originalRemoved
           ? ProfileStrings.t(lang, 'lock_moved_to_vault')
-          // The file is hidden in the vault but the original could not be
-          // deleted, so be honest that it is still in the gallery.
+      // The file is hidden in the vault but the original could not be
+      // deleted, so be honest that it is still in the gallery.
           : ProfileStrings.t(lang, 'lock_copied_to_vault');
     } catch (e) {
       message = ProfileStrings.t(lang, 'lock_could_not_add')
@@ -284,7 +233,7 @@ class _VaultScreenState extends State<VaultScreen> {
 
     // 2) fallback: ask directory
     if (restored == null) {
-      final dirPath = await FilePicker.platform.getDirectoryPath();
+      final dirPath = await FilePicker.getDirectoryPath();
       if (dirPath != null) {
         restored = await vault.restoreFromVault(
           vaultFile: vaultFile,
@@ -308,7 +257,8 @@ class _VaultScreenState extends State<VaultScreen> {
       );
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(ProfileStrings.t(lang, 'lock_restore_cancelled'))),
+        SnackBar(
+            content: Text(ProfileStrings.t(lang, 'lock_restore_cancelled'))),
       );
     }
   }
@@ -319,17 +269,24 @@ class _VaultScreenState extends State<VaultScreen> {
     final lang = context.read<LocaleProvider>().locale.languageCode;
     final ok = await showDialog<bool>(
       context: context,
-      builder: (_) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: Text(ProfileStrings.t(lang, 'lock_delete_file_title')),
         content: Text(ProfileStrings.t(lang, 'lock_delete_file_body')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: Text(ProfileStrings.t(lang, 'lock_cancel'))),
-          FilledButton(onPressed: () => Navigator.pop(context, true), child: Text(ProfileStrings.t(lang, 'lock_delete'))),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: Text(ProfileStrings.t(lang, 'lock_cancel')),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: Text(ProfileStrings.t(lang, 'lock_delete')),
+          ),
         ],
       ),
     );
 
     if (ok != true) return;
+    if (!mounted) return;
 
     setState(() => busy = true);
     await vault.deleteFromVault(vaultFile);
@@ -338,7 +295,8 @@ class _VaultScreenState extends State<VaultScreen> {
     setState(() => busy = false);
 
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(ProfileStrings.t(lang, 'lock_deleted_from_vault'))),
+      SnackBar(
+          content: Text(ProfileStrings.t(lang, 'lock_deleted_from_vault'))),
     );
   }
 
@@ -350,14 +308,20 @@ class _VaultScreenState extends State<VaultScreen> {
         lower.endsWith(".webp")) {
       return Icons.image_rounded;
     }
-    if (lower.endsWith(".mp4") || lower.endsWith(".mkv") || lower.endsWith(".mov")) {
+    if (lower.endsWith(".mp4") ||
+        lower.endsWith(".mkv") ||
+        lower.endsWith(".mov")) {
       return Icons.video_file_rounded;
     }
-    if (lower.endsWith(".mp3") || lower.endsWith(".wav") || lower.endsWith(".aac")) {
+    if (lower.endsWith(".mp3") ||
+        lower.endsWith(".wav") ||
+        lower.endsWith(".aac")) {
       return Icons.audio_file_rounded;
     }
     if (lower.endsWith(".pdf")) return Icons.picture_as_pdf_rounded;
-    if (lower.endsWith(".zip") || lower.endsWith(".rar")) return Icons.folder_zip_rounded;
+    if (lower.endsWith(".zip") || lower.endsWith(".rar")) {
+      return Icons.folder_zip_rounded;
+    }
     return Icons.insert_drive_file_rounded;
   }
 
@@ -395,7 +359,6 @@ class _VaultScreenState extends State<VaultScreen> {
                   onAdd: unlocked ? _addFile : null,
                   onRefresh: unlocked ? _refresh : null,
                 ),
-
                 Expanded(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(14, 14, 14, 14),
@@ -515,9 +478,11 @@ class _VaultAppBar extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  unlocked ? t('lock_secured_unlocked') : t('lock_locked_enter_pin'),
+                  unlocked
+                      ? t('lock_secured_unlocked')
+                      : t('lock_locked_enter_pin'),
                   style: TextStyle(
-                    color: Colors.white.withValues(alpha:0.85),
+                    color: Colors.white.withValues(alpha: 0.85),
                     fontSize: 12.5,
                     fontWeight: FontWeight.w500,
                   ),
@@ -570,7 +535,7 @@ class _LockedView extends StatelessWidget {
                 border: Border.all(color: AppPalette.border),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha:0.10),
+                    color: Colors.black.withValues(alpha: 0.10),
                     blurRadius: 22,
                     offset: const Offset(0, 10),
                   )
@@ -584,14 +549,16 @@ class _LockedView extends StatelessWidget {
                     width: 56,
                     decoration: BoxDecoration(
                       shape: BoxShape.circle,
-                      color: const Color(0xFF0A1AFF).withValues(alpha:0.10),
+                      color: const Color(0xFF0A1AFF).withValues(alpha: 0.10),
                     ),
-                    child: const Icon(Icons.lock_rounded, color: Color(0xFF0A1AFF), size: 28),
+                    child: const Icon(Icons.lock_rounded,
+                        color: Color(0xFF0A1AFF), size: 28),
                   ),
                   const SizedBox(height: 12),
                   Text(
                     t('lock_vault_locked_title'),
-                    style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+                    style: const TextStyle(
+                        fontSize: 18, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 6),
                   Text(
@@ -610,7 +577,8 @@ class _LockedView extends StatelessWidget {
                     child: FilledButton.icon(
                       style: FilledButton.styleFrom(
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                        shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16)),
                       ),
                       onPressed: onUnlock,
                       icon: const Icon(Icons.lock_open_rounded),
@@ -663,7 +631,7 @@ class _UnlockedView extends StatelessWidget {
               border: Border.all(color: AppPalette.border),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha:0.06),
+                  color: Colors.black.withValues(alpha: 0.06),
                   blurRadius: 22,
                   offset: const Offset(0, 10),
                 ),
@@ -684,13 +652,15 @@ class _UnlockedView extends StatelessWidget {
                 const SizedBox(height: 10),
                 Text(
                   t('lock_no_files_title'),
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
+                  style: const TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w800),
                 ),
                 const SizedBox(height: 6),
                 Text(
                   t('lock_no_files_body'),
                   textAlign: TextAlign.center,
-                  style: TextStyle(color: AppPalette.textB, fontWeight: FontWeight.w500),
+                  style: TextStyle(
+                      color: AppPalette.textB, fontWeight: FontWeight.w500),
                 ),
               ],
             ),
@@ -705,10 +675,10 @@ class _UnlockedView extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: Colors.black.withValues(alpha:0.06)),
+          border: Border.all(color: Colors.black.withValues(alpha: 0.06)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha:0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 22,
               offset: const Offset(0, 10),
             ),
@@ -717,20 +687,24 @@ class _UnlockedView extends StatelessWidget {
         child: ListView.separated(
           padding: const EdgeInsets.only(top: 6, bottom: 6),
           itemCount: files.length,
-          separatorBuilder: (_, __) => Divider(height: 1, color: Colors.black.withValues(alpha:0.06)),
+          separatorBuilder: (_, __) => Divider(
+              height: 1, color: Colors.black.withValues(alpha: 0.06)),
           itemBuilder: (ctx, i) {
             final entity = files[i];
             final f = File(entity.path);
-            final name = f.uri.pathSegments.isNotEmpty ? f.uri.pathSegments.last : f.path;
+            final name = f.uri.pathSegments.isNotEmpty
+                ? f.uri.pathSegments.last
+                : f.path;
 
             return ListTile(
-              contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+              contentPadding:
+              const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
               leading: Container(
                 height: 44,
                 width: 44,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(14),
-                  color: Colors.black.withValues(alpha:0.04),
+                  color: Colors.black.withValues(alpha: 0.04),
                 ),
                 child: Icon(iconFor(name)),
               ),
@@ -744,10 +718,13 @@ class _UnlockedView extends StatelessWidget {
                 f.path,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.black.withValues(alpha:0.55), fontWeight: FontWeight.w500),
+                style: TextStyle(
+                    color: Colors.black.withValues(alpha: 0.55),
+                    fontWeight: FontWeight.w500),
               ),
               trailing: PopupMenuButton<String>(
-                icon: Icon(Icons.more_vert_rounded, color: Colors.black.withValues(alpha:0.55)),
+                icon: Icon(Icons.more_vert_rounded,
+                    color: Colors.black.withValues(alpha: 0.55)),
                 onSelected: (v) async {
                   if (busy) return;
                   if (v == "restore") await onRestore(f);
@@ -802,9 +779,9 @@ class _TopIcon extends StatelessWidget {
           height: 42,
           width: 42,
           decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha:0.18),
+            color: Colors.white.withValues(alpha: 0.18),
             borderRadius: BorderRadius.circular(14),
-            border: Border.all(color: Colors.white.withValues(alpha:0.25)),
+            border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
           ),
           child: Icon(icon, color: Colors.white),
         ),
@@ -824,9 +801,9 @@ class _PillBadge extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha:0.18),
+        color: Colors.white.withValues(alpha: 0.18),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha:0.25)),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.25)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -835,7 +812,8 @@ class _PillBadge extends StatelessWidget {
           const SizedBox(width: 6),
           Text(
             text,
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
+            style: const TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w700, fontSize: 12),
           ),
         ],
       ),
@@ -848,7 +826,8 @@ class _PrimaryButton extends StatelessWidget {
   final String label;
   final VoidCallback? onTap;
 
-  const _PrimaryButton({required this.icon, required this.label, required this.onTap});
+  const _PrimaryButton(
+      {required this.icon, required this.label, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
@@ -860,7 +839,8 @@ class _PrimaryButton extends StatelessWidget {
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(18),
           gradient: onTap == null
-              ? LinearGradient(colors: [Colors.grey.shade400, Colors.grey.shade500])
+              ? LinearGradient(
+              colors: [Colors.grey.shade400, Colors.grey.shade500])
               : const LinearGradient(
             colors: [Color(0xFF0A1AFF), Color(0xFF010071)],
             begin: Alignment.topLeft,
@@ -868,7 +848,7 @@ class _PrimaryButton extends StatelessWidget {
           ),
           boxShadow: [
             BoxShadow(
-              color: const Color(0xFF0A1AFF).withValues(alpha:0.25),
+              color: const Color(0xFF0A1AFF).withValues(alpha: 0.25),
               blurRadius: 18,
               offset: const Offset(0, 10),
             ),
@@ -881,7 +861,8 @@ class _PrimaryButton extends StatelessWidget {
             const SizedBox(width: 8),
             Text(
               label,
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                  color: Colors.white, fontWeight: FontWeight.w800),
             ),
           ],
         ),
@@ -895,7 +876,8 @@ class _IconButtonGlass extends StatelessWidget {
   final VoidCallback? onTap;
   final String tooltip;
 
-  const _IconButtonGlass({required this.icon, required this.onTap, required this.tooltip});
+  const _IconButtonGlass(
+      {required this.icon, required this.onTap, required this.tooltip});
 
   @override
   Widget build(BuildContext context) {
@@ -912,9 +894,10 @@ class _IconButtonGlass extends StatelessWidget {
               height: 50,
               width: 54,
               decoration: BoxDecoration(
-                color: Colors.white.withValues(alpha:0.75),
+                color: Colors.white.withValues(alpha: 0.75),
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.black.withValues(alpha:0.06)),
+                border:
+                Border.all(color: Colors.black.withValues(alpha: 0.06)),
               ),
               child: Icon(icon),
             ),
@@ -958,12 +941,12 @@ class _GlassDialog extends StatelessWidget {
           child: Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha:0.92),
+              color: Colors.white.withValues(alpha: 0.92),
               borderRadius: BorderRadius.circular(22),
-              border: Border.all(color: Colors.white.withValues(alpha:0.75)),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.75)),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha:0.12),
+                  color: Colors.black.withValues(alpha: 0.12),
                   blurRadius: 24,
                   offset: const Offset(0, 12),
                 ),
@@ -979,7 +962,7 @@ class _GlassDialog extends StatelessWidget {
                       width: 42,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(14),
-                        color: const Color(0xFF0A1AFF).withValues(alpha:0.10),
+                        color: const Color(0xFF0A1AFF).withValues(alpha: 0.10),
                       ),
                       child: Icon(icon, color: const Color(0xFF0A1AFF)),
                     ),
@@ -988,11 +971,15 @@ class _GlassDialog extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w900)),
+                          Text(title,
+                              style: const TextStyle(
+                                  fontSize: 16, fontWeight: FontWeight.w900)),
                           const SizedBox(height: 2),
                           Text(
                             subtitle,
-                            style: TextStyle(color: Colors.black.withValues(alpha:0.60), fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                                color: Colors.black.withValues(alpha: 0.60),
+                                fontWeight: FontWeight.w500),
                           ),
                         ],
                       ),
@@ -1009,8 +996,10 @@ class _GlassDialog extends StatelessWidget {
                         child: OutlinedButton(
                           onPressed: onSecondary,
                           style: OutlinedButton.styleFrom(
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            side: BorderSide(color: Colors.black.withValues(alpha:0.10)),
+                            shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(14)),
+                            side: BorderSide(
+                                color: Colors.black.withValues(alpha: 0.10)),
                             padding: const EdgeInsets.symmetric(vertical: 12),
                           ),
                           child: Text(
@@ -1026,9 +1015,12 @@ class _GlassDialog extends StatelessWidget {
                         onPressed: onPrimary,
                         style: FilledButton.styleFrom(
                           padding: const EdgeInsets.symmetric(vertical: 12),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(14)),
                         ),
-                        child: Text(primaryText, style: const TextStyle(fontWeight: FontWeight.w900)),
+                        child: Text(primaryText,
+                            style:
+                            const TextStyle(fontWeight: FontWeight.w900)),
                       ),
                     ),
                   ],
@@ -1036,6 +1028,94 @@ class _GlassDialog extends StatelessWidget {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+/// PIN entry dialog that owns its own controller and form key.
+///
+/// The controller used to be created by the caller and disposed as soon as
+/// `showDialog` returned — but the dialog's exit animation keeps rebuilding
+/// the TextField for a few more frames, which threw "TextEditingController
+/// was used after being disposed". Owning it here means it is disposed only
+/// after the route (and its animation) is fully gone.
+class _PinEntryDialog<T> extends StatefulWidget {
+  final String title;
+  final String subtitle;
+  final IconData icon;
+  final String primaryText;
+  final String? secondaryText;
+  final T? cancelValue;
+  final InputDecoration decoration;
+  final String? Function(String?) validator;
+  final Future<T> Function(String pin) onSubmit;
+
+  const _PinEntryDialog({
+    required this.title,
+    required this.subtitle,
+    required this.icon,
+    required this.primaryText,
+    required this.decoration,
+    required this.validator,
+    required this.onSubmit,
+    this.secondaryText,
+    this.cancelValue,
+  });
+
+  @override
+  State<_PinEntryDialog<T>> createState() => _PinEntryDialogState<T>();
+}
+
+class _PinEntryDialogState<T> extends State<_PinEntryDialog<T>> {
+  final _ctrl = TextEditingController();
+  final _formKey = GlobalKey<FormState>();
+
+  /// Guards against a double tap on the primary button running the PIN
+  /// check (or the PIN save) twice.
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  Future<void> _submit() async {
+    if (_submitting) return;
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+    _submitting = true;
+    try {
+      final value = await widget.onSubmit(_ctrl.text.trim());
+      if (!mounted) return;
+      Navigator.pop(context, value);
+    } finally {
+      _submitting = false;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return _GlassDialog(
+      title: widget.title,
+      subtitle: widget.subtitle,
+      icon: widget.icon,
+      primaryText: widget.primaryText,
+      onPrimary: _submit,
+      secondaryText: widget.secondaryText,
+      onSecondary: widget.secondaryText == null
+          ? null
+          : () => Navigator.pop(context, widget.cancelValue),
+      child: Form(
+        key: _formKey,
+        child: TextFormField(
+          controller: _ctrl,
+          keyboardType: TextInputType.number,
+          obscureText: true,
+          maxLength: 6,
+          decoration: widget.decoration,
+          validator: widget.validator,
         ),
       ),
     );
