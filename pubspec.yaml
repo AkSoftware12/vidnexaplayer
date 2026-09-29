@@ -56,7 +56,7 @@ dependencies:
   file_picker: ^11.0.3
   shared_preferences: ^2.5.3
   package_info_plus: ^9.0.1
-  permission_handler: ^13.0.2
+  permission_handler: ^12.0.3
   url_launcher: ^6.3.2
   path_provider: ^2.1.5
   provider: ^6.1.5
@@ -71,7 +71,7 @@ dependencies:
   #   java.lang.OutOfMemoryError ... FlutterTtsPlugin.onInitListenerWithoutCallback
   # on the main thread during startup. Nothing in the app ever spoke, so the
   # whole cost was a crash source. Add it back only with a real TTS call site.
-  firebase_messaging: ^15.2.9
+  firebase_messaging: ^16.7.0
   device_info_plus: ^12.4.0
   share_plus: ^12.0.2
   flutter_local_notifications: ^17.2.1
@@ -86,7 +86,7 @@ dependencies:
   # ✅ UI Helpers
   smooth_page_indicator: ^1.2.1
   file_manager: ^1.0.2
-  firebase_core: ^3.15.1
+  firebase_core: ^4.15.0
   new_version_plus: ^0.1.1
   image: ^4.2.0
   animate_do: ^4.2.0
@@ -141,9 +141,9 @@ dependencies:
   # ✅ Voice command video search (offline-first local index)
   speech_to_text: ^7.0.0
   sqflite: ^2.4.1
-  firebase_crashlytics: ^4.3.10
-  firebase_analytics: ^11.6.0
-  firebase_in_app_messaging: ^0.8.1+10
+  firebase_crashlytics: ^5.4.0
+  firebase_analytics: ^12.6.0
+  firebase_in_app_messaging: ^0.9.4
 
 
 
