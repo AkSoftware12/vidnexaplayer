@@ -149,7 +149,6 @@ class _VideoThumbState extends State<VideoThumb> {
     }
   }
 
-  static void clearCache() => _cache.clear();
 
   @override
   Widget build(BuildContext context) {

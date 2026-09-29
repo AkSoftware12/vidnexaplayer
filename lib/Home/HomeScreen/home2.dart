@@ -930,14 +930,6 @@ class AlbumGridTile3 extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final gradients = [
-      [Colors.blueAccent, Colors.purpleAccent],
-      [Colors.teal, Colors.greenAccent],
-      [Colors.orangeAccent, Colors.redAccent],
-      [Colors.indigoAccent, Colors.deepPurpleAccent],
-      [Colors.pinkAccent, Colors.orangeAccent],
-    ];
-
     final lang = context.watch<LocaleProvider>().locale.languageCode;
     return FutureBuilder<int>(
       future: album.assetCountAsync,

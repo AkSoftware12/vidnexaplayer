@@ -218,17 +218,6 @@ class _Skin {
           .toColor(),
     ];
   }
-
-  static List<Color> get gradient {
-    final hsl = HSLColor.fromColor(brand);
-    return [
-      hsl
-          .withLightness((hsl.lightness + 0.08).clamp(0.0, 1.0))
-          .withSaturation((hsl.saturation + 0.10).clamp(0.0, 1.0))
-          .toColor(),
-      hsl.withLightness((hsl.lightness - 0.22).clamp(0.0, 1.0)).toColor(),
-    ];
-  }
 }
 
 // ---------------------------------------------------------------------------

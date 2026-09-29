@@ -1283,15 +1283,6 @@ class _FullScreenVideoPlayerSystemVolumeState
         }
         return;
       }
-
-      // ✅ Actually save the bytes to the gallery
-      final fileName =
-          'screenshot_${DateTime.now().millisecondsSinceEpoch}.png';
-      final AssetEntity saved = await PhotoManager.editor.saveImage(
-        data,
-        filename: fileName,
-      );
-
       if (context.mounted) {
         Fluttertoast.showToast(
           msg: _t('player_screenshot_saved'),
@@ -2961,8 +2952,8 @@ class _FullScreenVideoPlayerSystemVolumeState
     final videoWidget = Transform(
       alignment: Alignment.center,
       transform: Matrix4.identity()
-        ..translate(_videoOffset.dx, _videoOffset.dy)
-        ..scale(_videoScale),
+        ..translateByDouble(_videoOffset.dx, _videoOffset.dy, 0, 1)
+        ..scaleByDouble(_videoScale, _videoScale, _videoScale, 1),
       child: ColorFiltered(
         colorFilter: ColorFilter.matrix(
           _getColorMatrix(_selectedFilter, hdrIntensity: 0.8),
@@ -2981,7 +2972,6 @@ class _FullScreenVideoPlayerSystemVolumeState
         ),
       ),
     );
-
     // `WillPopScope` is never invoked once the manifest sets
     // android:enableOnBackInvokedCallback="true" (Android 13+ predictive back),
     // so the PiP hand-off silently stopped working. `PopScope` is the API that
