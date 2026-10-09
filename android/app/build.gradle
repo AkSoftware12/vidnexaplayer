@@ -157,6 +157,9 @@ dependencies {
     implementation 'com.google.android.play:review:2.0.1'
     implementation 'com.google.android.play:review-ktx:2.0.1'
     implementation "androidx.documentfile:documentfile:1.0.1"
+    // local_auth (vault fingerprint unlock) needs Theme.AppCompat on the
+    // launch/normal themes, or BiometricPrompt crashes on Android 8 and below.
+    implementation "androidx.appcompat:appcompat:1.7.0"
     // NOTE: there is deliberately NO explicit com.android.billingclient:billing
     // line here. The in_app_purchase_android plugin brings Play Billing 8.0.0
     // itself, and its Java code is compiled against that exact API. Forcing a

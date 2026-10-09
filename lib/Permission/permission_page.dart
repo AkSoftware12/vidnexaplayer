@@ -256,9 +256,9 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
                     ),
                     SizedBox(height: 10.sp),
                     _buildFeatureCard(
-                      iconPath: 'assets/subtitle.png',
-                      title: t('perm_subtitle_files_title'),
-                      subtitle: t('perm_subtitle_files_sub'),
+                      iconPath: 'assets/music_img.png',
+                      title: t('perm_music_photos_title'),
+                      subtitle: t('perm_music_photos_sub'),
                     ),
                     SizedBox(height: 50.sp),
 

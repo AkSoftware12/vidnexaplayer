@@ -16,7 +16,9 @@ import '../../Billing/billing_service.dart';
 import '../../Billing/paywall_screen.dart';
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/theme_settings_section.dart';
+import '../../DarkMode/text_size_section.dart';
 import '../../Utils/app_palette.dart';
+import '../../ads/ad_consent.dart';
 import '../../ads/app_open_ad_manager.dart';
 import '../../DeviceSpace/device_space.dart';
 import '../../LockScreen/LockScreen/lock_screen.dart';
@@ -25,6 +27,7 @@ import '../../Notification/notification.dart';
 import '../../NotifyListeners/AppBar/app_bar_color.dart';
 import '../../NotifyListeners/LanguageProvider/language_picker_sheet.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../WhatsNew/whats_new.dart';
 import '../../NotifyListeners/LanguageProvider/paywall_strings.dart';
 import '../../NotifyListeners/LanguageProvider/profile_strings.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
@@ -411,15 +414,9 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
                   delegate: SliverChildListDelegate([
                     SizedBox(height: 5.sp),
 
-                    _SectionHeader(title: ProfileStrings.t(lang, 'profile_storage_overview')),
-                    SizedBox(height: 10.sp),
-                    _StorageRow(isLoading: _isLoading, totalImages: _totalEntitiesCount),
-
-                    SizedBox(height: 15.sp),
-
                     _SectionHeader(title: ProfileStrings.t(lang, 'profile_quick_actions')),
                     SizedBox(height: 10.sp),
-                    const _QuickActionsGrid(),
+                    _QuickRow(isLoading: _isLoading, totalImages: _totalEntitiesCount),
 
                     // Between two sections rather than at either end: the
                     // bottom nav already pins a banner under this page, and
@@ -563,7 +560,7 @@ class _HeroBanner extends StatelessWidget {
                                 const SizedBox(width: 5),
                                 Text(
                                   ProfileStrings.t(lang, 'profile_premium_member'),
-                                  style: TextStyle(fontFamily: 'Outfit', fontSize: 9.sp, fontWeight: FontWeight.w700,
+                                  style: TextStyle(fontFamily: 'Outfit', fontSize: 10.sp, fontWeight: FontWeight.w700,
                                     color: _T.accent, letterSpacing: 1.2,
                                   ),
                                 ),
@@ -608,64 +605,116 @@ class _SectionHeader extends StatelessWidget {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-//  STORAGE ROW
+//  QUICK ROW — Files, Gallery, Music, Private vault
 // ─────────────────────────────────────────────────────────────────────────────
-class _StorageRow extends StatelessWidget {
+/// The four shortcuts, side by side in one row.
+///
+/// Replaces a scrolling "storage overview" strip and a separate quick-actions
+/// grid. Between them they showed sizes that were hard-coded strings
+/// ("3.2 GB", "124 GB"), and three tiles — Videos, Folders, Downloads, Add new
+/// — whose taps did nothing. The only number left is the photo count, which is
+/// real.
+class _QuickRow extends StatelessWidget {
   final bool isLoading;
   final int totalImages;
-  const _StorageRow({required this.isLoading, required this.totalImages});
+  const _QuickRow({required this.isLoading, required this.totalImages});
 
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LocaleProvider>().locale.languageCode;
+    String t(String key) => ProfileStrings.t(lang, key);
+
     final cards = [
-      _SC(icon: Icons.folder_rounded,        label: ProfileStrings.t(lang, 'profile_files'),   sub: '3.2 GB',
-          grad: [const Color(0xFF1D4ED8), const Color(0xFF3B82F6)],
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const DeviceSpaceScreen(), settings: const RouteSettings(name: 'DeviceSpaceScreen')))),
-      _SC(icon: Icons.video_library_rounded,  label: ProfileStrings.t(lang, 'profile_videos'),  sub: '124 GB',
-          grad: [const Color(0xFFD97706), const Color(0xFFFBBF24)], onTap: () {}),
-      _SC(icon: Icons.photo_rounded,
-          label: isLoading ? '—' : '$totalImages', sub: ProfileStrings.t(lang, 'profile_images'),
-          grad: [const Color(0xFFDC2626), const Color(0xFFF87171)],
-          isLoading: isLoading,
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const GalleryHomePage(), settings: const RouteSettings(name: 'GalleryHomeScreen')))),
-      _SC(icon: Icons.music_note_rounded,     label: ProfileStrings.t(lang, 'profile_music'),   sub: '5.6 GB',
-          grad: [const Color(0xFF7C3AED), const Color(0xFFA78BFA)],
-          onTap: () => Navigator.push(context,
-              MaterialPageRoute(builder: (_) => const HomeBottomNavigation(bottomIndex: 1), settings: const RouteSettings(name: 'OfflineMusicScreen')))),
+      _QC(
+        icon: Icons.folder_rounded,
+        label: t('profile_files'),
+        grad: const [Color(0xFF1D4ED8), Color(0xFF3B82F6)],
+        feature: NewFeature.files,
+        onTap: () => _toTabOr(context, HomeBottomNavigation.filesTab,
+            () => MaterialPageRoute(builder: (_) => const DeviceSpaceScreen(), settings: const RouteSettings(name: 'DeviceSpaceScreen'))),
+      ),
+      _QC(
+        icon: Icons.photo_rounded,
+        label: t('profile_gallery'),
+        sub: isLoading ? null : '$totalImages',
+        isLoading: isLoading,
+        grad: const [Color(0xFFDC2626), Color(0xFFF87171)],
+        onTap: () => _toTabOr(context, HomeBottomNavigation.galleryTab,
+            () => MaterialPageRoute(builder: (_) => const GalleryHomePage(), settings: const RouteSettings(name: 'GalleryHomeScreen'))),
+      ),
+      _QC(
+        icon: Icons.music_note_rounded,
+        label: t('profile_music'),
+        grad: const [Color(0xFF7C3AED), Color(0xFFA78BFA)],
+        onTap: () => _toTabOr(context, HomeBottomNavigation.musicTab,
+            () => MaterialPageRoute(builder: (_) => const HomeBottomNavigation(bottomIndex: HomeBottomNavigation.musicTab), settings: const RouteSettings(name: 'OfflineMusicScreen'))),
+      ),
+      _QC(
+        icon: Icons.lock_rounded,
+        label: t('profile_private'),
+        sub: t('profile_vault'),
+        grad: const [Color(0xFF0F766E), Color(0xFF14B8A6)],
+        feature: NewFeature.vault,
+        onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VaultScreen(), settings: const RouteSettings(name: 'VaultScreen'))),
+      ),
     ];
 
+    // Equal shares of the width rather than fixed-width cards, so all four
+    // fit on any phone without the row scrolling.
     return SizedBox(
       height: 80.sp,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: cards.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 10),
-        itemBuilder: (_, i) => _StorageCard(c: cards[i]),
+      child: Row(
+        children: [
+          for (var i = 0; i < cards.length; i++) ...[
+            if (i > 0) const SizedBox(width: 10),
+            Expanded(child: _QuickCard(c: cards[i])),
+          ],
+        ],
       ),
     );
   }
 }
 
-class _SC {
+/// Switches the bottom bar to [tab] — Files, Gallery and Music are tabs of
+/// their own, so pushing them would stack a second copy over the bar. Pushes
+/// [route] only when this page is not inside the bar.
+void _toTabOr(BuildContext context, int tab, Route<void> Function() route) {
+  if (HomeBottomNavigation.goToTab(context, tab)) return;
+  Navigator.push(context, route());
+}
+
+class _QC {
   final IconData icon;
-  final String label, sub;
+  final String label;
+  final String? sub;
   final List<Color> grad;
   final bool isLoading;
   final VoidCallback onTap;
-  const _SC({required this.icon, required this.label, required this.sub,
-    required this.grad, required this.onTap, this.isLoading = false});
+
+  /// Shows a "NEW" pill on the card until this feature is visited.
+  final NewFeature? feature;
+  const _QC({required this.icon, required this.label, required this.grad,
+    required this.onTap, this.sub, this.isLoading = false, this.feature});
 }
 
-class _StorageCard extends StatelessWidget {
-  final _SC c;
-  const _StorageCard({required this.c});
+class _QuickCard extends StatelessWidget {
+  final _QC c;
+  const _QuickCard({required this.c});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: c.onTap,
-    child: Container(
-      width: 78.sp,
+    child: Stack(
+      clipBehavior: Clip.none,
+      children: [
+        Positioned.fill(child: _body()),
+        if (c.feature != null)
+          Positioned(top: 5, right: 5, child: NewBadge(c.feature!, onDark: true)),
+      ],
+    ),
+  );
+
+  Widget _body() => Container(
       decoration: BoxDecoration(
         gradient: LinearGradient(colors: c.grad, begin: Alignment.topLeft, end: Alignment.bottomRight),
         borderRadius: BorderRadius.circular(16),
@@ -682,79 +731,30 @@ class _StorageCard extends StatelessWidget {
             child: Icon(c.icon, color: Colors.white, size: 18.sp),
           ),
           SizedBox(height: 5.sp),
+          // Shrink rather than ellipsize: a quarter of the row is narrow, and
+          // "Thư viện" / "Kho bảo mật" came out as "Thư vi…".
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4),
+            child: FittedBox(
+              fit: BoxFit.scaleDown,
+              child: Text(c.label, textAlign: TextAlign.center, maxLines: 1,
+                  style: TextStyle(fontFamily: 'Outfit', fontSize: 10.sp, fontWeight: FontWeight.w700, color: Colors.white)),
+            ),
+          ),
           if (c.isLoading)
             const CupertinoActivityIndicator(radius: 6, color: Colors.white)
-          else
-            Text(c.label, textAlign: TextAlign.center,
-                style: TextStyle(fontFamily: 'Outfit', fontSize: 10.sp, fontWeight: FontWeight.w700, color: Colors.white)),
-          Text(c.sub, style: TextStyle(fontFamily: 'Outfit', fontSize: 9.sp, color: Colors.white70)),
+          else if (c.sub != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4),
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(c.sub!, maxLines: 1,
+                    style: TextStyle(fontFamily: 'Outfit', fontSize: 10.sp, color: Colors.white70)),
+              ),
+            ),
         ],
       ),
-    ),
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-//  QUICK ACTIONS GRID
-// ─────────────────────────────────────────────────────────────────────────────
-class _QuickActionsGrid extends StatelessWidget {
-  const _QuickActionsGrid();
-
-  @override
-  Widget build(BuildContext context) {
-    final lang = context.watch<LocaleProvider>().locale.languageCode;
-    final items = [
-      _QA(icon: Icons.folder_open_rounded, label: ProfileStrings.t(lang, 'profile_folders'),   sub: '3.2 GB',
-          color: const Color(0xFF16A34A), bg: const Color(0xFFDCFCE7), onTap: () {}),
-      _QA(icon: Icons.download_rounded,    label: ProfileStrings.t(lang, 'profile_downloads'), sub: '124 GB',
-          color: const Color(0xFF2563EB), bg: const Color(0xFFDBEAFE), onTap: () {}),
-      _QA(icon: Icons.lock_rounded,        label: ProfileStrings.t(lang, 'profile_private'),   sub: ProfileStrings.t(lang, 'profile_vault'),
-          color: const Color(0xFF7C3AED), bg: const Color(0xFFEDE9FE),
-          onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const VaultScreen(), settings: const RouteSettings(name: 'VaultScreen')))),
-      _QA(icon: Icons.add_circle_rounded,  label: ProfileStrings.t(lang, 'profile_add_new'),   sub: ProfileStrings.t(lang, 'profile_playlist'),
-          color: _T.accent, bg: _T.accentSoft, onTap: () {}),
-    ];
-
-    return GridView.count(
-      crossAxisCount: 4,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisSpacing: 10, mainAxisSpacing: 10,
-      childAspectRatio: 0.88,
-      children: items.map((a) => GestureDetector(
-        onTap: a.onTap,
-        child: Container(
-          decoration: BoxDecoration(
-            color: _T.white,
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: Colors.grey.shade300, width: 1),
-          ),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 42.sp, height: 42.sp,
-                decoration: BoxDecoration(color: a.bg, borderRadius: BorderRadius.circular(12)),
-                child: Icon(a.icon, color: a.color, size: 20.sp),
-              ),
-              SizedBox(height: 5.sp),
-              Text(a.label, style: _T.outfit(size: 9.5, w: FontWeight.w600, color: _T.textH), textAlign: TextAlign.center),
-              Text(a.sub,   style: _T.outfit(size: 8.5, color: a.color),                      textAlign: TextAlign.center),
-            ],
-          ),
-        ),
-      )).toList(),
     );
-  }
-}
-
-class _QA {
-  final IconData icon;
-  final String label, sub;
-  final Color color, bg;
-  final VoidCallback onTap;
-  const _QA({required this.icon, required this.label, required this.sub,
-    required this.color, required this.bg, required this.onTap});
 }
 
 /// Opens Android's own Cast picker, which mirrors the whole screen.
@@ -830,7 +830,7 @@ class _SettingsCard extends StatelessWidget {
           _Tile(icon: Icons.cast_rounded,
               iColor: const Color(0xFF0EA5E9), iBg: const Color(0xFFE0F2FE),
               title: t('profile_stream_title'), sub: t('profile_stream_sub'),
-              badge: _Badge(text: t('profile_badge_new'), color: _T.accent),
+              badge: const NewBadge(NewFeature.stream),
               onTap: () {
                 Navigator.push(context, MaterialPageRoute(builder: (context) => const VideoPlayerStream(), settings: const RouteSettings(name: 'NetworkStreamScreen')));
               }),
@@ -922,11 +922,16 @@ class _SettingsCard extends StatelessWidget {
             padding: EdgeInsets.symmetric(horizontal: 14.sp, vertical: 10.sp),
             child: const ThemeSettingsSection(),
           ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(14.sp, 4.sp, 14.sp, 12.sp),
+            child: const TextSizeSection(),
+          ),
           _Div(),
 
           _Tile(icon: Icons.language_rounded,
               iColor: const Color(0xFF0891B2), iBg: const Color(0xFFE0F7FA),
               title: t('profile_language_title'), sub: t('profile_language_sub'),
+              badge: const NewBadge(NewFeature.languages),
               onTap: () => showLanguagePickerSheet(context)),
           _Div(),
 
@@ -935,11 +940,30 @@ class _SettingsCard extends StatelessWidget {
               title: t('profile_privacy_title'), sub: t('profile_privacy_sub'),
               onTap: () async {
                 final uri = Uri.parse(
-                    'https://www.freeprivacypolicy.com/live/3a47e749-0364-44f5-8cc3-559f2cd90336');
+                    'https://vidnexaplayer.com/privacy-policy.html');
                 if (await canLaunchUrl(uri)) {
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
               }),
+
+          // Required by UMP for users it asked for consent (EEA/UK/CH), and
+          // promised by the privacy policy. Hidden everywhere else.
+          ListenableBuilder(
+            listenable: AdConsent.instance,
+            builder: (context, _) {
+              if (!AdConsent.instance.privacyOptionsRequired) {
+                return const SizedBox.shrink();
+              }
+              return Column(children: [
+                _Div(),
+                _Tile(icon: Icons.privacy_tip_outlined,
+                    iColor: const Color(0xFF64748B), iBg: const Color(0xFFF1F5F9),
+                    title: t('profile_ad_privacy_title'),
+                    sub: t('profile_ad_privacy_sub'),
+                    onTap: AdConsent.instance.showPrivacyOptions),
+              ]);
+            },
+          ),
 
           // ── PREMIUM ───────────────────────────────────────────────────
           _Sub(t('profile_section_premium')),
@@ -960,7 +984,12 @@ class _SettingsCard extends StatelessWidget {
           _Tile(icon: Icons.chat_bubble_outline_rounded,
               iColor: const Color(0xFF059669), iBg: const Color(0xFFD1FAE5),
               title: t('profile_feedback_title'), sub: t('profile_feedback_sub'),
-              onTap: () {}),
+              // Same inbox as the drawer's Feedback entry.
+              onTap: () => launchUrl(Uri(
+                    scheme: 'mailto',
+                    path: 'vidnexaplayer@gmail.com',
+                    query: 'subject=App Feedback',
+                  ))),
           _Div(),
 
           _Tile(icon: Icons.share_rounded,
@@ -1084,7 +1113,7 @@ class _Badge extends StatelessWidget {
       border: Border.all(color: color.withValues(alpha:0.3)),
     ),
     child: Text(text,
-        style: TextStyle(fontFamily: 'Outfit', fontSize: 8.sp, fontWeight: FontWeight.w700,
+        style: TextStyle(fontFamily: 'Outfit', fontSize: 9.5.sp, fontWeight: FontWeight.w700,
             color: color, letterSpacing: 0.5)),
   );
 }
@@ -1134,11 +1163,15 @@ class _RemoveAdsTile extends StatelessWidget {
                   children: [
                     Row(
                       children: [
-                        Text(
-                            premium
-                                ? PaywallStrings.t(lang, 'paywall_active_title')
-                                : ProfileStrings.t(lang, 'profile_remove_ads_title'),
-                            style: _T.outfit(size: 13, w: FontWeight.w700, color: _T.textH)),
+                        Flexible(
+                          child: Text(
+                              premium
+                                  ? PaywallStrings.t(lang, 'paywall_active_title')
+                                  : ProfileStrings.t(lang, 'profile_remove_ads_title'),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: _T.outfit(size: 13, w: FontWeight.w700, color: _T.textH)),
+                        ),
                         const SizedBox(width: 7),
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2.5),
@@ -1147,9 +1180,14 @@ class _RemoveAdsTile extends StatelessWidget {
                             borderRadius: BorderRadius.circular(6),
                           ),
                           child: Text(ProfileStrings.t(lang, 'profile_badge_pro'),
-                              style: TextStyle(fontFamily: 'Outfit', fontSize: 7.sp, fontWeight: FontWeight.w700,
+                              style: TextStyle(fontFamily: 'Outfit', fontSize: 9.5.sp, fontWeight: FontWeight.w700,
                                   color: Colors.white, letterSpacing: 0.8)),
                         ),
+                        // The monthly plan is new in this release.
+                        if (!premium) ...[
+                          const SizedBox(width: 6),
+                          const NewBadge(NewFeature.pro),
+                        ],
                       ],
                     ),
                     SizedBox(height: 2.sp),
@@ -1196,7 +1234,10 @@ class _RateUsTile extends StatefulWidget {
 }
 
 class _RateUsTileState extends State<_RateUsTile> {
-  int _rating = 5;
+  /// Starts empty. Five pre-filled stars read as a suggested score, and Play's
+  /// ratings policy is strict about nudging what users rate. Any star — like
+  /// the tile itself — opens the store, so no rating is filtered either.
+  int _rating = 0;
 
   Future<void> _openPlayStore() async {
     final Uri url = Uri.parse(
@@ -1308,6 +1349,15 @@ void showHelpSupportSheet(BuildContext context) {
 class _HelpSupportSheet extends StatelessWidget {
   const _HelpSupportSheet();
 
+  /// Same inbox and subject as the drawer's Help & Support entry.
+  static void _emailSupport() {
+    launchUrl(Uri(
+      scheme: 'mailto',
+      path: 'vidnexaplayer@gmail.com',
+      query: 'subject=${Uri.encodeComponent('Help & Support')}',
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LocaleProvider>().locale.languageCode;
@@ -1358,26 +1408,6 @@ class _HelpSupportSheet extends StatelessWidget {
                   ],
                 ),
               ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Container(
-                  height: 48,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF1F5F9),
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 14),
-                      const Icon(Icons.search_rounded, color: Color(0xFF94A3B8), size: 20),
-                      const SizedBox(width: 10),
-                      Text(t('profile_search_help'),
-                          style: const TextStyle(color: Color(0xFF94A3B8), fontSize: 14)),
-                    ],
-                  ),
-                ),
-              ),
               const SizedBox(height: 24),
               Expanded(
                 child: ListView(
@@ -1388,16 +1418,13 @@ class _HelpSupportSheet extends StatelessWidget {
                         style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600,
                             color: Color(0xFF64748B), letterSpacing: 0.5)),
                     const SizedBox(height: 12),
+                    // Email is the only support channel that actually exists —
+                    // no chat, no phone line — so it is the only action shown.
                     Row(
                       children: [
-                        _QuickActionCard(icon: Icons.chat_bubble_outline_rounded, label: t('profile_live_chat'),
-                            color: const Color(0xFF0284C7), bg: const Color(0xFFE0F2FE), onTap: () {}),
-                        const SizedBox(width: 12),
-                        _QuickActionCard(icon: Icons.phone_outlined, label: t('profile_call_us'),
-                            color: const Color(0xFF16A34A), bg: const Color(0xFFDCFCE7), onTap: () {}),
-                        const SizedBox(width: 12),
                         _QuickActionCard(icon: Icons.email_outlined, label: t('profile_email'),
-                            color: const Color(0xFF9333EA), bg: const Color(0xFFF3E8FF), onTap: () {}),
+                            color: const Color(0xFF9333EA), bg: const Color(0xFFF3E8FF),
+                            onTap: _emailSupport),
                       ],
                     ),
                     const SizedBox(height: 28),
@@ -1421,6 +1448,10 @@ class _HelpSupportSheet extends StatelessWidget {
                       question: t('profile_faq_q4'),
                       answer: t('profile_faq_a4'),
                     ),
+                    _FaqTile(
+                      question: t('profile_faq_q5'),
+                      answer: t('profile_faq_a5'),
+                    ),
                     const SizedBox(height: 28),
                     Container(
                       padding: const EdgeInsets.all(20),
@@ -1440,13 +1471,13 @@ class _HelpSupportSheet extends StatelessWidget {
                                 Text(t('profile_still_need_help'),
                                     style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 16)),
                                 const SizedBox(height: 4),
-                                Text(t('profile_support_247'),
+                                Text(t('profile_support_reply'),
                                     style: const TextStyle(color: Color(0xFFBAE6FD), fontSize: 13)),
                               ],
                             ),
                           ),
                           ElevatedButton(
-                            onPressed: () {},
+                            onPressed: _emailSupport,
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.white,
                               foregroundColor: const Color(0xFF0284C7),

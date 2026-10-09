@@ -1,3 +1,11 @@
+import 'translations/vi.dart';
+import 'translations/tr.dart';
+import 'translations/ru.dart';
+import 'translations/bn.dart';
+import 'translations/ar.dart';
+import 'translations/id.dart';
+import 'translations/pt.dart';
+import 'translations/es.dart';
 /// Translation table for the shared equalizer (page, bottom sheet, profiles,
 /// presets). Mirrors the pattern used by [VideoStrings] / [MusicStrings] but is
 /// its own namespace so the whole feature's copy lives in one place.
@@ -42,7 +50,7 @@ class EqStrings {
           'Dolby (AC3/E-AC3) track detected — level auto-compensated.',
 
       // ── AI suggestion ──────────────────────────────────────────────────
-      'eq_ai_suggests': 'AI suggests:',
+      'eq_ai_suggests': 'Suggested:',
       'eq_ai_detected': 'detected',
       'eq_apply': 'Apply',
 
@@ -183,6 +191,14 @@ class EqStrings {
       // ── settings entry ─────────────────────────────────────────────────
       'eq_entry_sub': 'Presets, profiles, bass boost & dialogue clarity',
     },
+    'es': esEqualizer,
+    'pt': ptEqualizer,
+    'id': idEqualizer,
+    'ar': arEqualizer,
+    'bn': bnEqualizer,
+    'ru': ruEqualizer,
+    'tr': trEqualizer,
+    'vi': viEqualizer,
     'hi': {
       // ── shell ──────────────────────────────────────────────────────────
       'eq_title': 'इक्वलाइज़र',
@@ -213,7 +229,7 @@ class EqStrings {
           'डॉल्बी (AC3/E-AC3) ट्रैक मिला — आवाज़ अपने आप संतुलित की गई।',
 
       // ── AI suggestion ──────────────────────────────────────────────────
-      'eq_ai_suggests': 'AI सुझाव:',
+      'eq_ai_suggests': 'सुझाव:',
       'eq_ai_detected': 'पहचाना गया',
       'eq_apply': 'लागू करें',
 

@@ -22,12 +22,6 @@ class RewardedUnlock {
   /// stored under different preference keys and expire independently.
   static const String filters = 'filters';
 
-  /// Saving a WhatsApp status to the gallery.
-  ///
-  /// Its own key, like the tools above: an ad watched to save a status opens a
-  /// window for saving statuses only, and expires on its own schedule.
-  static const String statusSaver = 'status_saver';
-
   static const Duration window = Duration(minutes: 30);
 
   static String _key(String feature) => 'rewarded_unlock_$feature';

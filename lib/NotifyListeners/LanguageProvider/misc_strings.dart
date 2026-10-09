@@ -1,3 +1,11 @@
+import 'translations/vi.dart';
+import 'translations/tr.dart';
+import 'translations/ru.dart';
+import 'translations/bn.dart';
+import 'translations/ar.dart';
+import 'translations/id.dart';
+import 'translations/pt.dart';
+import 'translations/es.dart';
 /// Tiny in-code translation table for miscellaneous, scattered UI surfaces
 /// (notifications screen, toolbar color picker, internet banner, rating /
 /// feedback popup, ad "Sponsored" labels, voice search) that aren't covered
@@ -29,35 +37,13 @@ class MiscStrings {
       'internet_banner_offline': 'No internet connection',
 
       // ---- Rating popup ----
-      'rating_popup_title': 'Please Rate Vidnexa Player',
-      'rating_popup_subtitle': 'Help us improve with your honest rating.',
-      'rating_hint_0': 'Swipe right for stars (1–5)',
-      'rating_hint_low': 'Sorry to hear that — tell us what broke',
-      'rating_hint_mid': 'Thanks. What would make it a 5?',
-      'rating_hint_good': 'Glad it works for you',
-      'rating_hint_great': 'Brilliant — thank you!',
-      'rating_pick_stars': 'Pick your stars to continue',
-      'rating_cta_playstore': 'Rate on Play Store',
-      'rating_cta_feedback': 'Send feedback',
-      'rating_never_ask': "Don't ask again",
-      'rating_later': 'Later',
       'rating_playstore_open_failed': 'Could not open the Play Store',
-      'feedback_title': 'What can we fix?',
-      'feedback_subtitle':
-          'This goes straight to the team — it is not posted publicly.',
-      'feedback_hint': 'Playback issues, missing formats, crashes…',
-      'feedback_not_now': 'Not now',
-      'feedback_sent_snackbar': 'Thanks for the feedback!',
 
       // ---- Ads ----
       'ads_sponsored': 'Sponsored',
       'rewarded_watch': 'Watch ad',
       'rewarded_not_now': 'Not now',
       'rewarded_unlocked': 'Unlocked for the next {minutes} minutes',
-      'rewarded_status_saver_title': 'Save this status',
-      'rewarded_status_saver_body':
-          'Watch a short video ad to unlock saving for the next 30 minutes — '
-          'save as many statuses as you like in that time.',
       'rewarded_incomplete': 'The ad was not finished, so nothing was unlocked.',
       'rewarded_enhance_title': 'Unlock Enhance to 4K',
       'rewarded_enhance_body':
@@ -91,10 +77,26 @@ class MiscStrings {
           'Voice search needs microphone access to hear your command. '
           'You can grant it from Settings.',
       'voice_search_open_settings': 'Open Settings',
+      'voice_search_mic_disclosure_title': 'Use the microphone?',
+      'voice_search_mic_disclosure_body':
+          'Voice search listens only while the mic button is on. Your '
+          "phone's speech service (usually Google) turns what you say into "
+          'text, and may send the audio to Google to do that. Vidnexa does not '
+          'record or store your voice.',
+      'voice_search_mic_disclosure_yes': 'Continue',
+      'voice_search_mic_disclosure_no': 'Not now',
       'voice_search_something_wrong': 'Something went wrong',
       'voice_search_please_try_again': 'Please try again.',
       'voice_search_try_again': 'Try Again',
     },
+    'es': esMisc,
+    'pt': ptMisc,
+    'id': idMisc,
+    'ar': arMisc,
+    'bn': bnMisc,
+    'ru': ruMisc,
+    'tr': trMisc,
+    'vi': viMisc,
     'hi': {
       // ---- Notification screen ----
       'notification_title': 'सूचनाएं',
@@ -116,35 +118,13 @@ class MiscStrings {
       'internet_banner_offline': 'इंटरनेट कनेक्शन नहीं है',
 
       // ---- Rating popup ----
-      'rating_popup_title': 'कृपया Vidnexa Player को रेट करें',
-      'rating_popup_subtitle': 'अपनी ईमानदार रेटिंग से हमें बेहतर बनाने में मदद करें।',
-      'rating_hint_0': 'सितारे देने के लिए दाईं ओर स्वाइप करें (1–5)',
-      'rating_hint_low': 'यह सुनकर खेद है — हमें बताएं क्या गड़बड़ हुई',
-      'rating_hint_mid': 'धन्यवाद। इसे 5 बनाने के लिए क्या चाहिए?',
-      'rating_hint_good': 'खुशी है कि यह आपके लिए ठीक काम कर रहा है',
-      'rating_hint_great': 'शानदार — धन्यवाद!',
-      'rating_pick_stars': 'जारी रखने के लिए सितारे चुनें',
-      'rating_cta_playstore': 'Play Store पर रेट करें',
-      'rating_cta_feedback': 'फ़ीडबैक भेजें',
-      'rating_never_ask': 'दोबारा न पूछें',
-      'rating_later': 'बाद में',
       'rating_playstore_open_failed': 'Play Store नहीं खोला जा सका',
-      'feedback_title': 'हम क्या ठीक कर सकते हैं?',
-      'feedback_subtitle':
-          'यह सीधे टीम तक पहुंचता है — इसे सार्वजनिक रूप से पोस्ट नहीं किया जाता।',
-      'feedback_hint': 'प्लेबैक समस्याएं, गायब फॉर्मेट, क्रैश…',
-      'feedback_not_now': 'अभी नहीं',
-      'feedback_sent_snackbar': 'फ़ीडबैक के लिए धन्यवाद!',
 
       // ---- Ads ----
       'ads_sponsored': 'प्रायोजित',
       'rewarded_watch': 'विज्ञापन देखें',
       'rewarded_not_now': 'अभी नहीं',
       'rewarded_unlocked': 'अगले {minutes} मिनट के लिए अनलॉक हो गया',
-      'rewarded_status_saver_title': 'यह स्टेटस सेव करें',
-      'rewarded_status_saver_body':
-          'अगले 30 मिनट तक सेव करना अनलॉक करने के लिए एक छोटा वीडियो विज्ञापन '
-          'देखें — उतनी देर में जितने चाहें उतने स्टेटस सेव करें।',
       'rewarded_incomplete': 'विज्ञापन पूरा नहीं हुआ, इसलिए कुछ अनलॉक नहीं हुआ।',
       'rewarded_enhance_title': '4K एन्हांस अनलॉक करें',
       'rewarded_enhance_body':
@@ -178,6 +158,13 @@ class MiscStrings {
           'आपका कमांड सुनने के लिए आवाज़ से खोज को माइक्रोफ़ोन एक्सेस चाहिए। '
           'आप इसे सेटिंग्स से दे सकते हैं।',
       'voice_search_open_settings': 'सेटिंग्स खोलें',
+      'voice_search_mic_disclosure_title': 'माइक्रोफ़ोन इस्तेमाल करें?',
+      'voice_search_mic_disclosure_body':
+          'वॉइस सर्च सिर्फ़ तब सुनता है जब माइक बटन चालू हो। आपके फ़ोन की स्पीच '
+          'सर्विस (आमतौर पर Google) आपकी बात को टेक्स्ट में बदलती है, और इसके लिए '
+          'आवाज़ Google को भेज सकती है। Vidnexa आपकी आवाज़ रिकॉर्ड या सेव नहीं करता।',
+      'voice_search_mic_disclosure_yes': 'जारी रखें',
+      'voice_search_mic_disclosure_no': 'अभी नहीं',
       'voice_search_something_wrong': 'कुछ गलत हो गया',
       'voice_search_please_try_again': 'कृपया फिर से प्रयास करें।',
       'voice_search_try_again': 'फिर से प्रयास करें',

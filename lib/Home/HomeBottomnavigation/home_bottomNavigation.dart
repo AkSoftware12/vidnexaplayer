@@ -33,6 +33,7 @@ import '../../NotifyListeners/LanguageProvider/app_strings.dart';
 import '../../NotifyListeners/LanguageProvider/equalizer_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_picker_sheet.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
+import '../../WhatsNew/whats_new.dart';
 import '../../NotifyListeners/UserData/user_data.dart';
 import '../../SplashScreen/splash_screen.dart';
 import '../../StatusSaverScreen/whatsapp_download.dart';
@@ -45,12 +46,26 @@ import '../../features/equalizer/presentation/equalizer_sheet.dart';
 import '../HomeScreen/home2.dart';
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
-import '../YoutubeScreen/playlists_screen.dart';
 
 class HomeBottomNavigation extends StatefulWidget {
   final int bottomIndex;
 
   const HomeBottomNavigation({super.key, this.bottomIndex = 0});
+
+  /// Tab indices, for [goToTab].
+  static const int musicTab = 1;
+  static const int galleryTab = 2;
+  static const int filesTab = 3;
+
+  /// Switches the enclosing bottom bar to [index], as if its button had been
+  /// tapped. Returns false when [context] is not inside one — a screen pushed
+  /// on top of the shell, say — so the caller can fall back to pushing.
+  static bool goToTab(BuildContext context, int index) {
+    final shell = context.findAncestorStateOfType<_HomeBottomNavigationState>();
+    if (shell == null) return false;
+    shell._selectTab(index);
+    return true;
+  }
 
   @override
   State<HomeBottomNavigation> createState() => _HomeBottomNavigationState();
@@ -63,6 +78,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int currentPage = 0;
+
+  /// The Gallery tab's index — named because the app bar also checks it.
+  static const int _galleryTab = HomeBottomNavigation.galleryTab;
   String currentVersion = '';
 
   /// Guards against stacking exit dialogs on rapid back presses.
@@ -460,7 +478,10 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
         key: _scaffoldKey,
         // Assign the key to the Scaffold
         backgroundColor: AppPalette.surface,
-        appBar: AppBar(
+        // The Gallery tab brings its own header (title, search, and the
+        // Photos / Albums / Tools tabs); stacking this one above it would
+        // spend two bars of height on chrome.
+        appBar: currentPage == _galleryTab ? null : AppBar(
           backgroundColor: AppPalette.surface,
           elevation: 0,
           automaticallyImplyLeading: false,
@@ -545,6 +566,9 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                   // already reach for. Hidden once bought: there is nothing
                   // left to sell, and the space is better given back.
                   if (!context.watch<BillingService>().isPremium) ...[
+                    Stack(
+                      clipBehavior: Clip.none,
+                      children: [
                     GestureDetector(
                       onTap: () => PaywallScreen.show(context),
                       child: Container(
@@ -593,6 +617,12 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                         ),
                       ),
                     ),
+                        // The monthly plan is new in this release.
+                        const Positioned(
+                            top: -3, right: -3,
+                            child: NewDot(NewFeature.pro)),
+                      ],
+                    ),
                     const SizedBox(width: 8),
                   ],
 
@@ -620,16 +650,23 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                   const SizedBox(width: 8),
 
                   // 🌐 Language — quick access to the same picker as the drawer.
-                  GestureDetector(
-                    onTap: () => showLanguagePickerSheet(context),
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        borderRadius: BorderRadius.circular(12),
+                  Stack(
+                    children: [
+                      GestureDetector(
+                        onTap: () => showLanguagePickerSheet(context),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          padding: const EdgeInsets.all(8),
+                          child: const Icon(Icons.language_rounded, color: Colors.black),
+                        ),
                       ),
-                      padding: const EdgeInsets.all(8),
-                      child: const Icon(Icons.language_rounded, color: Colors.black),
-                    ),
+                      // Until the picker is opened once after new languages
+                      // shipped.
+                      const Positioned(top: 2, right: 2, child: NewDot(NewFeature.languages)),
+                    ],
                   ),
                   const SizedBox(width: 8),
                   Stack(
@@ -733,15 +770,7 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
             CustomBottomBar(
               initialSelection: widget.bottomIndex,
               key: bottomNavigationKey,
-              onTabChangedListener: (position) {
-                setState(() {
-                  currentPage = position;
-                });
-                // Tab switch koi naya route nahi banata, isliye Firebase ko
-                // naam yahan se bhejna padta hai — warna chaaron tab ek hi
-                // screen ke andar chhup jaate.
-                ScreenAnalytics.instance.setScreen(_tabScreenName(position));
-              },
+              onTabChangedListener: _onTabChanged,
             ),
 
           ],
@@ -761,6 +790,24 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     );
   }
 
+  void _onTabChanged(int position) {
+    setState(() {
+      currentPage = position;
+    });
+    // Tab switch koi naya route nahi banata, isliye Firebase ko
+    // naam yahan se bhejna padta hai — warna chaaron tab ek hi
+    // screen ke andar chhup jaate.
+    ScreenAnalytics.instance.setScreen(_tabScreenName(position));
+  }
+
+  /// A tab change that did not come from the bar itself (see
+  /// [HomeBottomNavigation.goToTab]): moves the bar's highlight too.
+  void _selectTab(int index) {
+    if (index == currentPage) return;
+    bottomNavigationKey.currentState?.select(index);
+    _onTabChanged(index);
+  }
+
   Widget _getPage(int page) {
     switch (page) {
       case 0:
@@ -769,9 +816,11 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     //   return Container();
       case 1:
         return const OfflineMusicTabScreen();
-      case 2:
-        return const YouTubeTopPlaylists();
+      case _galleryTab:
+        return const GalleryHomePage(embedded: true);
       case 3:
+        return const DeviceSpaceScreen(embedded: true);
+      case 4:
         return const UserProfilePage();
       default:
         return const DemoHomeScreen(); // Fallback to HomeScreen
@@ -784,9 +833,11 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     switch (page) {
       case 1:
         return 'OfflineMusicScreen';
-      case 2:
-        return 'YouTubePlaylistsScreen';
+      case _galleryTab:
+        return 'GalleryTabScreen';
       case 3:
+        return 'FilesTabScreen';
+      case 4:
         return 'ProfileScreen';
       case 0:
       default:
@@ -829,6 +880,9 @@ class CustomBottomBarState extends State<CustomBottomBar> {
     _currentIndex = widget.initialSelection;
   }
 
+  /// Highlights [index] without reporting it back — the shell already knows.
+  void select(int index) => setState(() => _currentIndex = index);
+
   @override
   Widget build(BuildContext context) {
     final lang = context.watch<LocaleProvider>().locale.languageCode;
@@ -857,105 +911,63 @@ class CustomBottomBarState extends State<CustomBottomBar> {
           fontWeight: FontWeight.w600,
         )).copyWith(fontFamily: 'OpenSans'),
       items: [
-        BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/home.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
-          label: AppStrings.t(lang, 'nav_home'),
-
-          activeIcon: Container(
-            padding: EdgeInsets.all(5.sp),
-            decoration: BoxDecoration(
-              color: ColorSelect.maineColor,
-              // Grey background for selected icon
-              shape: BoxShape.circle,
-            ),
-            child: SvgPicture.asset(
-              'assets/home.svg',
-              colorFilter:
-              const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-              height: 20,width: 20,
-            ),
-
-            // Icon(Icons.account_circle, color: Colors.white),
-          ),
-        ),
-        // BottomNavigationBarItem(
-        //   icon: SvgPicture.asset('assets/downloader.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
-        //   label: 'Downloader',
-        //   activeIcon: Container(
-        //     padding: EdgeInsets.all(5.sp),
-        //     decoration: BoxDecoration(
-        //       color: ColorSelect.maineColor,
-        //       // Grey background for selected icon
-        //       shape: BoxShape.circle,
-        //     ),
-        //     child: SvgPicture.asset(
-        //       'assets/downloader.svg',
-        //       color: Colors.white,
-        //       height: 20,width: 20,
-        //     ),
-        //
-        //     // Icon(Icons.account_circle, color: Colors.white),
-        //   ),
-        // ),
-
-        BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/music.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
-          label: AppStrings.t(lang, 'nav_music'),
-          activeIcon: Container(
-            padding: EdgeInsets.all(3.sp),
-            decoration: BoxDecoration(
-              color: ColorSelect.maineColor,
-              shape: BoxShape.circle,
-            ),
-            child: SvgPicture.asset(
-              'assets/music.svg',
-              colorFilter:
-              const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-              height: 20,width: 20,
-            ),
-          ),
-        ),
-        BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/online_video.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
-          label: AppStrings.t(lang, 'nav_online'),
-          activeIcon: Container(
-            padding: EdgeInsets.all(3.sp),
-            decoration: BoxDecoration(
-              color: ColorSelect.maineColor,
-              // Grey background for selected icon
-              shape: BoxShape.circle,
-            ),
-            child: SvgPicture.asset(
-              'assets/online_video.svg',
-              colorFilter:
-              const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-              height: 20,width: 20,
-            ),
-          ),
-        ),
-        BottomNavigationBarItem(
-          icon: SvgPicture.asset('assets/account.svg',colorFilter: const ColorFilter.mode(Colors.grey, BlendMode.srcIn),height: 20,width: 20,),
-          label: AppStrings.t(lang, 'nav_profile'),
-          activeIcon: Container(
-            padding: EdgeInsets.all(3.sp),
-            decoration: BoxDecoration(
-              color: ColorSelect.maineColor,
-              // Grey background for selected icon
-              shape: BoxShape.circle,
-            ),
-            child: SvgPicture.asset(
-              'assets/account.svg',
-              colorFilter:
-              const ColorFilter.mode(Colors.white, BlendMode.srcIn),
-              height: 20,width: 20,
-            ),
-
-            // Icon(Icons.account_circle, color: Colors.white),
-          ),
-        ),
+        _navItem(_svg('assets/home.svg'), AppStrings.t(lang, 'nav_home')),
+        _navItem(_svg('assets/music.svg'), AppStrings.t(lang, 'nav_music')),
+        // No SVGs for gallery or files in assets/, so Material icons at the
+        // same 20px.
+        _navItem(_material(Icons.photo_library_rounded),
+            AppStrings.t(lang, 'nav_gallery')),
+        _navItem(_material(Icons.folder_rounded),
+            AppStrings.t(lang, 'nav_files'),
+            feature: NewFeature.files),
+        _navItem(_svg('assets/account.svg'), AppStrings.t(lang, 'nav_profile')),
       ],
     );
   }
+
+  /// One tab. The idle and the selected icon sit in the same-sized circle —
+  /// only its fill changes. The selected one used to gain padding the idle
+  /// one did not have (5sp on Home, 3sp elsewhere), so every tap grew the
+  /// tallest item and the whole bar jumped up or down with it.
+  BottomNavigationBarItem _navItem(
+    Widget Function(Color color) glyph,
+    String label, {
+    NewFeature? feature,
+  }) {
+    Widget circle(Color fill, Color iconColor) {
+      final icon = Container(
+        padding: EdgeInsets.all(4.sp),
+        decoration: BoxDecoration(color: fill, shape: BoxShape.circle),
+        child: glyph(iconColor),
+      );
+      if (feature == null) return icon;
+      // Same footprint either way, so the dot appearing or going never
+      // moves the bar.
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          icon,
+          Positioned(top: -1, right: -1, child: NewDot(feature)),
+        ],
+      );
+    }
+
+    return BottomNavigationBarItem(
+      icon: circle(Colors.transparent, Colors.grey),
+      activeIcon: circle(ColorSelect.maineColor, Colors.white),
+      label: label,
+    );
+  }
+
+  static Widget Function(Color) _svg(String asset) => (color) => SvgPicture.asset(
+        asset,
+        colorFilter: ColorFilter.mode(color, BlendMode.srcIn),
+        height: 20,
+        width: 20,
+      );
+
+  static Widget Function(Color) _material(IconData icon) =>
+      (color) => Icon(icon, color: color, size: 20);
 }
 
 class SettingsScreen extends StatefulWidget {
@@ -1063,13 +1075,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     iconBg: const Color(0xff9333EA),
                     title: t('drawer_all_musics'),
                     subtitle: t('drawer_all_musics_sub'),
+                    // Switches to the Music tab and closes the drawer, rather
+                    // than pushing a second shell with its own bottom bar.
                     onTap: () {
+                      if (HomeBottomNavigation.goToTab(
+                          context, HomeBottomNavigation.musicTab)) {
+                        Navigator.pop(context);
+                        return;
+                      }
                       Navigator.push(
                         context,
                         MaterialPageRoute(
                           settings: const RouteSettings(name: 'OfflineMusicScreen'),
                           builder: (context) => const HomeBottomNavigation(
-                            bottomIndex: 1,
+                            bottomIndex: HomeBottomNavigation.musicTab,
                           ),
                         ),
                       );
@@ -1199,6 +1218,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     iconBg: const Color(0xff0891B2),
                     title: t('drawer_language'),
                     subtitle: t('drawer_language_sub'),
+                    badge: const NewBadge(NewFeature.languages),
                     onTap: () {
                       showLanguagePickerSheet(context, isDark: isNightMode);
                     },
@@ -1241,7 +1261,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     subtitle: t('drawer_privacy_sub'),
                     onTap: () async {
                       final Uri url = Uri.parse(
-                        'https://www.freeprivacypolicy.com/live/3a47e749-0364-44f5-8cc3-559f2cd90336',
+                        'https://vidnexaplayer.com/privacy-policy.html',
                       );
                       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
                         throw 'Could not launch $url';
@@ -1275,7 +1295,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       final Uri emailLaunchUri = Uri(
                         scheme: 'mailto',
                         path: 'vidnexaplayer@gmail.com',
-                        query: 'subject=Help & Support',
+                        query: 'subject=${Uri.encodeComponent('Help & Support')}',
                       );
                       await launchUrl(emailLaunchUri);
                     },
@@ -1433,7 +1453,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   'Premium Member',
                   style: (TextStyle(
                       color: Colors.white70,
-                      fontSize: 9.sp,
+                      fontSize: 10.sp,
                       fontWeight: FontWeight.w600,
                     )).copyWith(fontFamily: 'OpenSans'),
                 ),
@@ -1566,6 +1586,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         required String title,
         required String subtitle,
         required VoidCallback onTap,
+        Widget? badge,
       }) {
     return Container(
       margin: EdgeInsets.only(bottom: 8.h),
@@ -1601,13 +1622,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
           ),
         ),
-        title: Text(
-          title,
-          style: (TextStyle(
-              color: isNightMode ? Colors.white : const Color(0xff111827),
-              fontSize: 11.5.sp,
-              fontWeight: FontWeight.w700,
-            )).copyWith(fontFamily: 'OpenSans'),
+        title: Row(
+          children: [
+            Flexible(
+              child: Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: (TextStyle(
+                    color: isNightMode ? Colors.white : const Color(0xff111827),
+                    fontSize: 11.5.sp,
+                    fontWeight: FontWeight.w700,
+                  )).copyWith(fontFamily: 'OpenSans'),
+              ),
+            ),
+            if (badge != null) ...[const SizedBox(width: 6), badge],
+          ],
         ),
         subtitle: Text(
           subtitle,
@@ -1615,7 +1645,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           overflow: TextOverflow.ellipsis,
           style: (TextStyle(
               color: isNightMode ? Colors.white70 : Colors.grey.shade600,
-              fontSize: 8.5.sp,
+              fontSize: 9.5.sp,
               fontWeight: FontWeight.w500,
             )).copyWith(fontFamily: 'OpenSans'),
         ),
@@ -1656,7 +1686,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             'Version : ${widget.currentVersion}',
             style: (TextStyle(
                 color: isNightMode ? Colors.white70 : Colors.grey.shade700,
-                fontSize: 8.8.sp,
+                fontSize: 9.5.sp,
                 fontWeight: FontWeight.w600,
               )).copyWith(fontFamily: 'RadioCanada'),
           ),

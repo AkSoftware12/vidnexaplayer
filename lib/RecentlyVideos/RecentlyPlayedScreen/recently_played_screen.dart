@@ -155,7 +155,7 @@ class _RecentlyPlayedSectionState extends State<RecentlyPlayedSection> {
                         '${HomeStrings.t(lang, 'home_recently_played_subtitle')} (${_recentEntities.length})',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
-                        style: TextStyle(fontFamily: 'Poppins', fontSize: 7.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 9.5.sp,
                           fontWeight: FontWeight.w400,
                           color: AppPalette.textS,
                         ),

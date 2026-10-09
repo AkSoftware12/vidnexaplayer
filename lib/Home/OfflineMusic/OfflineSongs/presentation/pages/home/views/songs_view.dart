@@ -3,6 +3,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 import 'package:provider/provider.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
 import '../../../../../../../Utils/app_palette.dart';
 import '../../../../../../../NotifyListeners/LanguageProvider/language_provider.dart';
@@ -47,8 +48,12 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
   }
 
 
-  void _showBottomSheet(BuildContext context) {
+  /// Only actions that work. The menu used to list eleven entries (lyrics,
+  /// ringtone maker, lock, …) that all just closed the sheet — dead UI that
+  /// Play's minimum-functionality review treats as broken.
+  void _showBottomSheet(BuildContext context, List<SongModel> songs, int index) {
     final lang = Provider.of<LocaleProvider>(context, listen: false).locale.languageCode;
+    final song = songs[index];
     showModalBottomSheet(
       context: context,
       builder: (BuildContext context) {
@@ -60,7 +65,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               title: Text(MusicStrings.t(lang, 'music_play')),
               onTap: () {
                 Navigator.pop(context);
-                // Add action for 'Play'
+                audio.playSongs(songs, index);
               },
             ),
             ListTile(
@@ -68,48 +73,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               title: Text(MusicStrings.t(lang, 'music_play_next')),
               onTap: () {
                 Navigator.pop(context);
-                // Add action for 'Play Next'
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.library_music),
-              title: Text(MusicStrings.t(lang, 'music_lyrics')),
-              onTap: () {
-                Navigator.pop(context);
-                // Add action for 'Lyrics'
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.cut),
-              title: Text(MusicStrings.t(lang, 'music_ringtone_maker')),
-              trailing: const Icon(Icons.circle, color: Colors.red, size: 10),
-              onTap: () {
-                Navigator.pop(context);
-                // Add action for 'Ringtone Maker'
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.playlist_add),
-              title: Text(MusicStrings.t(lang, 'music_add_to_playlist')),
-              onTap: () {
-                Navigator.pop(context);
-                // Add action for 'Add to playlist'
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.lock),
-              title: Text(MusicStrings.t(lang, 'music_lock')),
-              onTap: () {
-                Navigator.pop(context);
-                // Add action for 'Lock'
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.share),
-              title: Text(MusicStrings.t(lang, 'music_share')),
-              onTap: () {
-                Navigator.pop(context);
-                // Add action for 'Share'
+                audio.enqueue(song, next: true);
               },
             ),
             ListTile(
@@ -117,37 +81,36 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
               title: Text(MusicStrings.t(lang, 'music_add_to_queue')),
               onTap: () {
                 Navigator.pop(context);
-                // Add action for 'Add to Queue'
+                audio.enqueue(song, next: false);
               },
             ),
             ListTile(
-              leading: const Icon(Icons.notifications),
-              title: Text(MusicStrings.t(lang, 'music_set_as_ringtone')),
+              leading: const Icon(Icons.share),
+              title: Text(MusicStrings.t(lang, 'music_share')),
               onTap: () {
                 Navigator.pop(context);
-                // Add action for 'Set as ringtone'
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.delete),
-              title: Text(MusicStrings.t(lang, 'music_delete')),
-              onTap: () {
-                Navigator.pop(context);
-                // Add action for 'Delete'
-              },
-            ),
-            ListTile(
-              leading: const Icon(Icons.info),
-              title: Text(MusicStrings.t(lang, 'music_properties')),
-              onTap: () {
-                Navigator.pop(context);
-                // Add action for 'Properties'
+                _share(song);
               },
             ),
           ],
         );
       },
     );
+  }
+
+  /// Shares the audio file itself, falling back to the title if the file
+  /// can't be attached — same behaviour as the full player's Share.
+  Future<void> _share(SongModel song) async {
+    final text = '${song.title}\n${song.artist ?? ""}';
+    try {
+      if (song.data.isNotEmpty) {
+        await SharePlus.instance.share(
+          ShareParams(files: [XFile(song.data)], text: text, subject: song.title),
+        );
+        return;
+      }
+    } catch (_) {}
+    await SharePlus.instance.share(ShareParams(text: text, subject: song.title));
   }
   @override
   Widget build(BuildContext context) {
@@ -213,7 +176,7 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
                               ),
                               trailing:  GestureDetector(
                                   onTap: () {
-                                    _showBottomSheet(context);
+                                    _showBottomSheet(context, songs, index);
 
                                   },
                                   child: SizedBox(

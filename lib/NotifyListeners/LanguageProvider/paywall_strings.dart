@@ -1,3 +1,11 @@
+import 'translations/vi.dart';
+import 'translations/tr.dart';
+import 'translations/ru.dart';
+import 'translations/bn.dart';
+import 'translations/ar.dart';
+import 'translations/id.dart';
+import 'translations/pt.dart';
+import 'translations/es.dart';
 /// Translation table for the premium paywall (`lib/Billing/paywall_screen.dart`)
 /// and the premium entry points that lead into it.
 ///
@@ -18,20 +26,9 @@ class PaywallStrings {
     'en': {
       // ── Header ─────────────────────────────────────────────────────────
       'paywall_title': 'Vidnexa Premium',
-      'paywall_subtitle': 'Unlock everything. No ads, ever.',
+      'paywall_subtitle': 'Remove every ad from Vidnexa.',
       'paywall_active_title': 'You\'re Premium',
       'paywall_active_subtitle': 'Thanks for supporting Vidnexa.',
-
-      // ── Feature list ───────────────────────────────────────────────────
-      'paywall_feature_no_ads_title': 'Ad-free playback',
-      'paywall_feature_no_ads_sub':
-          'No banners, no interstitials, no interruptions',
-      'paywall_feature_all_title': 'All premium features',
-      'paywall_feature_all_sub': 'Equalizer presets, 4K enhance and more',
-      'paywall_feature_themes_title': 'Exclusive themes',
-      'paywall_feature_themes_sub': 'Premium-only player skins and accents',
-      'paywall_feature_early_title': 'Early access',
-      'paywall_feature_early_sub': 'New features before everyone else',
 
       // ── Plans ──────────────────────────────────────────────────────────
       'paywall_plan_lifetime': 'Lifetime',
@@ -52,13 +49,23 @@ class PaywallStrings {
       'paywall_close': 'Close',
 
       // ── Terms ──────────────────────────────────────────────────────────
-      // Only the yearly variant may mention renewal. Showing "renews
-      // automatically" under a one-time purchase is factually wrong and is a
-      // reliable source of refund requests and 1-star reviews.
+      // Shown under the CTA for the selected plan. Only the subscription
+      // variants may mention renewal: "renews automatically" under the
+      // one-time lifetime purchase is factually wrong.
       'paywall_terms_yearly':
           'Your subscription renews automatically for {price} every year until '
           'cancelled. Cancel any time in Google Play, at least 24 hours before '
           'the renewal date.',
+      'paywall_terms_monthly':
+          'Your subscription renews automatically for {price} every month until '
+          'cancelled. Cancel any time in Google Play, at least 24 hours before '
+          'the renewal date.',
+      // {price} is the live offer price, {full} the standing price every
+      // renewal after the offer is charged at.
+      'paywall_terms_yearly_offer':
+          'Introductory price {price}, then renews automatically at {full} every '
+          'year until cancelled. Cancel any time in Google Play, at least 24 '
+          'hours before the renewal date.',
       'paywall_terms_lifetime':
           'A single payment of {price}. This is not a subscription — nothing '
           'renews and you will not be charged again.',
@@ -93,7 +100,7 @@ class PaywallStrings {
       'paywall_renews_on': 'Renews on {date}',
       'paywall_expires_on': 'Access until {date}',
       'paywall_cancelled_note': 'Cancelled — premium stays active until then.',
-      'paywall_hero_sub': 'Get the ultimate experience with Premium',
+      'paywall_hero_sub': 'No ads anywhere, and no ad to watch before a tool.',
       'paywall_cta': 'Continue with Premium',
       'paywall_plan_monthly': 'Monthly',
       'paywall_plan_monthly_sub': 'Billed every month',
@@ -105,31 +112,26 @@ class PaywallStrings {
       'paywall_privacy_link': 'Privacy Policy',
       'paywall_benefits_title': 'Premium Benefits',
       'paywall_benefit_no_ads': 'Ad-Free Experience',
-      'paywall_benefit_uhd': 'Ultra HD Playback',
-      'paywall_benefit_controls': 'Advanced Video Controls',
-      'paywall_benefit_background': 'Background Playback',
-      'paywall_benefit_all': 'All Premium Features',
-      'paywall_benefit_updates': 'Future Premium Updates',
+      'paywall_benefit_enhance': 'Enhance to 4K without watching an ad',
+      'paywall_benefit_filters': 'Save filtered photos without an ad',
+      'paywall_benefit_support': 'Supports an independent developer',
       'paywall_whats_included': "What's included",
     },
 
+    'es': esPaywall,
+    'pt': ptPaywall,
+    'id': idPaywall,
+    'ar': arPaywall,
+    'bn': bnPaywall,
+    'ru': ruPaywall,
+    'tr': trPaywall,
+    'vi': viPaywall,
     'hi': {
       // ── Header ─────────────────────────────────────────────────────────
       'paywall_title': 'विदनेक्सा प्रीमियम',
-      'paywall_subtitle': 'सब कुछ अनलॉक करें। कोई विज्ञापन नहीं, कभी नहीं।',
+      'paywall_subtitle': 'विदनेक्सा से सभी विज्ञापन हटाएं।',
       'paywall_active_title': 'आप प्रीमियम हैं',
       'paywall_active_subtitle': 'विदनेक्सा का समर्थन करने के लिए धन्यवाद।',
-
-      // ── Feature list ───────────────────────────────────────────────────
-      'paywall_feature_no_ads_title': 'विज्ञापन-मुक्त प्लेबैक',
-      'paywall_feature_no_ads_sub':
-          'कोई बैनर नहीं, कोई इंटरस्टीशियल नहीं, कोई रुकावट नहीं',
-      'paywall_feature_all_title': 'सभी प्रीमियम सुविधाएं',
-      'paywall_feature_all_sub': 'इक्वलाइज़र प्रीसेट, 4K एन्हांस और भी बहुत कुछ',
-      'paywall_feature_themes_title': 'विशेष थीम',
-      'paywall_feature_themes_sub': 'केवल प्रीमियम प्लेयर स्किन और रंग',
-      'paywall_feature_early_title': 'अर्ली एक्सेस',
-      'paywall_feature_early_sub': 'नई सुविधाएं सबसे पहले आपके लिए',
 
       // ── Plans ──────────────────────────────────────────────────────────
       'paywall_plan_lifetime': 'लाइफटाइम',
@@ -153,6 +155,14 @@ class PaywallStrings {
           'आपकी सदस्यता रद्द किए जाने तक हर साल {price} पर स्वतः नवीनीकृत होती '
           'है। नवीनीकरण तिथि से कम से कम 24 घंटे पहले Google Play में कभी भी '
           'रद्द करें।',
+      'paywall_terms_monthly':
+          'आपकी सदस्यता रद्द किए जाने तक हर महीने {price} पर स्वतः नवीनीकृत होती '
+          'है। नवीनीकरण तिथि से कम से कम 24 घंटे पहले Google Play में कभी भी '
+          'रद्द करें।',
+      'paywall_terms_yearly_offer':
+          'शुरुआती कीमत {price}, फिर रद्द किए जाने तक हर साल {full} पर स्वतः '
+          'नवीनीकृत होती है। नवीनीकरण तिथि से कम से कम 24 घंटे पहले Google Play '
+          'में कभी भी रद्द करें।',
       'paywall_terms_lifetime':
           '{price} का एक बार का भुगतान। यह सदस्यता नहीं है — कुछ भी नवीनीकृत '
           'नहीं होता और आपसे दोबारा शुल्क नहीं लिया जाएगा।',
@@ -184,7 +194,7 @@ class PaywallStrings {
       'paywall_renews_on': '{date} को नवीनीकृत होगा',
       'paywall_expires_on': '{date} तक एक्सेस',
       'paywall_cancelled_note': 'रद्द किया गया — तब तक प्रीमियम सक्रिय रहेगा।',
-      'paywall_hero_sub': 'प्रीमियम के साथ बेहतरीन अनुभव पाएं',
+      'paywall_hero_sub': 'कहीं कोई विज्ञापन नहीं, और किसी टूल से पहले विज्ञापन देखने की ज़रूरत नहीं।',
       'paywall_cta': 'प्रीमियम के साथ जारी रखें',
       'paywall_plan_monthly': 'मासिक',
       'paywall_plan_monthly_sub': 'हर महीने बिल',
@@ -196,11 +206,9 @@ class PaywallStrings {
       'paywall_privacy_link': 'गोपनीयता नीति',
       'paywall_benefits_title': 'प्रीमियम लाभ',
       'paywall_benefit_no_ads': 'विज्ञापन-मुक्त अनुभव',
-      'paywall_benefit_uhd': 'अल्ट्रा HD प्लेबैक',
-      'paywall_benefit_controls': 'एडवांस्ड वीडियो कंट्रोल',
-      'paywall_benefit_background': 'बैकग्राउंड प्लेबैक',
-      'paywall_benefit_all': 'सभी प्रीमियम सुविधाएं',
-      'paywall_benefit_updates': 'भविष्य के प्रीमियम अपडेट',
+      'paywall_benefit_enhance': 'बिना विज्ञापन देखे 4K एन्हांस',
+      'paywall_benefit_filters': 'बिना विज्ञापन के फ़िल्टर वाली फ़ोटो सेव करें',
+      'paywall_benefit_support': 'एक स्वतंत्र डेवलपर का समर्थन',
       'paywall_whats_included': 'क्या-क्या मिलेगा',
     },
   };

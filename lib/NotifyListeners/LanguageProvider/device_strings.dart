@@ -1,3 +1,11 @@
+import 'translations/vi.dart';
+import 'translations/tr.dart';
+import 'translations/ru.dart';
+import 'translations/bn.dart';
+import 'translations/ar.dart';
+import 'translations/id.dart';
+import 'translations/pt.dart';
+import 'translations/es.dart';
 /// In-code translation table for the device/file storage, photo album and
 /// WhatsApp status-saver screens. Follows the exact same shape and fallback
 /// behavior as `AppStrings` (see app_strings.dart) but is kept in its own
@@ -23,8 +31,8 @@ class DeviceStrings {
       'device_quick_access': 'Quick Access',
       'device_see_all': 'See All',
       'device_storage_locations': 'Storage Locations',
-      'device_other_locations': 'SD card, USB & cloud',
-      'device_other_locations_sub': 'Browse through the system picker',
+      'device_sd_card': 'SD card',
+      'device_sd_card_sub': 'Browse folders on the card',
 
       // ── Photo album screens ──
       'album_permission_denied': 'Permission denied to access photos',
@@ -330,11 +338,17 @@ class DeviceStrings {
       'guide_appbar_title': 'Instructions',
       'guide_header_title': 'How to Save WhatsApp Status?',
       'guide_header_subtitle':
-          "Follow the steps below to save your friends' statuses easily.",
+          'Save statuses that were shared with you. Only save and re-share '
+          "someone's status with their permission.",
       'guide_title': 'Step-by-Step Guide',
       'guide_quick_access': 'Quick Access',
       'guide_open_whatsapp': 'Open WhatsApp',
       'guide_tip': 'Tip: After viewing a status, come back here and save it.',
+      // Shown on both status-saver screens. WhatsApp is a third-party mark;
+      // Play's impersonation policy needs the app to say it is not theirs.
+      'wa_disclaimer':
+          'Vidnexa is not affiliated with, endorsed or sponsored by WhatsApp '
+          'or Meta. WhatsApp is a trademark of its respective owner.',
       'guide_whatsapp_not_installed': 'WhatsApp is not installed!',
       'guide_step1_title': 'Open WhatsApp',
       'guide_step1_subtitle': 'Use the button below or open WhatsApp manually.',
@@ -347,6 +361,14 @@ class DeviceStrings {
       'guide_step5_title': 'Select & Save',
       'guide_step5_subtitle': 'Choose the status from the list and tap Save.',
     },
+    'es': esDevice,
+    'pt': ptDevice,
+    'id': idDevice,
+    'ar': arDevice,
+    'bn': bnDevice,
+    'ru': ruDevice,
+    'tr': trDevice,
+    'vi': viDevice,
     'hi': {
       // ── Device / storage screen ──
       'device_appbar_title': 'फ़ाइल मैनेजर',
@@ -357,8 +379,8 @@ class DeviceStrings {
       'device_quick_access': 'क्विक एक्सेस',
       'device_see_all': 'सभी देखें',
       'device_storage_locations': 'स्टोरेज लोकेशन',
-      'device_other_locations': 'SD कार्ड, USB और क्लाउड',
-      'device_other_locations_sub': 'सिस्टम पिकर से ब्राउज़ करें',
+      'device_sd_card': 'SD कार्ड',
+      'device_sd_card_sub': 'कार्ड के फ़ोल्डर देखें',
 
       // ── Photo album screens ──
       'album_permission_denied': 'फ़ोटो एक्सेस करने की अनुमति नहीं मिली',
@@ -662,11 +684,15 @@ class DeviceStrings {
       'guide_appbar_title': 'निर्देश',
       'guide_header_title': 'WhatsApp Status कैसे Save करें?',
       'guide_header_subtitle':
-          'नीचे दिए गए स्टेप्स फॉलो करें और आसानी से Status Save करें।',
+          'जो स्टेटस आपके साथ शेयर किए गए हैं उन्हें सेव करें। किसी का स्टेटस '
+          'सिर्फ़ उसकी अनुमति से सेव और दोबारा शेयर करें।',
       'guide_title': 'स्टेप-बाय-स्टेप गाइड',
       'guide_quick_access': 'जल्दी खोलें',
       'guide_open_whatsapp': 'WhatsApp खोलें',
       'guide_tip': 'टिप: Status देखने के बाद यहाँ वापस आएं और Save करें।',
+      'wa_disclaimer':
+          'Vidnexa का WhatsApp या Meta से कोई संबंध नहीं है, न ही उनके द्वारा '
+          'समर्थित या प्रायोजित है। WhatsApp अपने स्वामी का ट्रेडमार्क है।',
       'guide_whatsapp_not_installed': 'WhatsApp इंस्टॉल नहीं है!',
       'guide_step1_title': 'WhatsApp खोलें',
       'guide_step1_subtitle': 'नीचे दिए बटन से या खुद WhatsApp खोलें।',

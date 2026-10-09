@@ -4,7 +4,6 @@ import 'package:flutter_svg/svg.dart';
 import 'package:provider/provider.dart';
 import 'package:videoplayer/Analytics/onboarding_analytics.dart';
 import 'package:videoplayer/HexColorCode/HexColor.dart';
-import 'package:videoplayer/ads/app_open_ad_manager.dart';
 import 'package:videoplayer/OnboardScreen/size_config.dart';
 import 'package:videoplayer/Utils/color.dart';
 import 'package:animate_do/animate_do.dart';
@@ -28,8 +27,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   /// dikhne chahiye, isliye yaad rakhna padta hai.
   bool _skippedAhead = false;
 
-  // NOTE: this is the LIVE production banner unit, despite the old
-  // "✅ TEST ID" comment. It now lives in AdUnits together with the others.
   final List<Color> colors = [
     HexColor('#081740'),
     HexColor('#081740'),
@@ -47,11 +44,6 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
     // aate.
     OnboardingAnalytics.stepViewed(0, contents.length);
   }
-
-  // The banner used to be a field initializer holding its own `BannerAd` that
-  // `dispose()` never released — one leaked native ad per onboarding visit.
-  // `AdaptiveBannerAd` owns and disposes its ad itself.
-  Widget get banner => const AdaptiveBannerAd(bare: true);
 
   @override
   void dispose() {
@@ -407,8 +399,9 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               ],
             ),
           ),
-
-          SizedBox(height: 50.sp, child: Center(child: banner)),
+          // No banner on onboarding. It sat flush under the Next button,
+          // which people tap several times in a row — the accidental-click
+          // placement AdMob acts against.
         ],
       ),
     );

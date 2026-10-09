@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import '../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../Utils/app_palette.dart';
+import '../../ads/app_open_ad_manager.dart';
+import '../../ads/list_native_ad.dart';
 import '../file_browser/file_kind.dart';
 import 'media_list_page.dart';
 import 'media_store.dart';
@@ -17,9 +19,21 @@ import 'media_store.dart';
 /// Tapping a row opens that folder's files in a [MediaListPage] — a separate
 /// screen rather than a panel inside this one, which is the shape asked for.
 class FolderListPage extends StatefulWidget {
-  const FolderListPage({super.key, this.accent = const Color(0xFF6C4DF6)});
+  const FolderListPage({
+    super.key,
+    this.accent = const Color(0xFF6C4DF6),
+    this.volume,
+    this.title,
+  });
 
   final Color accent;
+
+  /// Only this volume's folders (an SD card), when given; every volume
+  /// otherwise.
+  final String? volume;
+
+  /// Replaces the "Folders" heading — the card's own name on an SD card.
+  final String? title;
 
   @override
   State<FolderListPage> createState() => _FolderListPageState();
@@ -38,7 +52,11 @@ class _FolderListPageState extends State<FolderListPage> {
   @override
   void initState() {
     super.initState();
-    final cached = MediaStoreRepo.instance.cachedFolders;
+    // The shared cache holds every volume's folders, so it is no use for a
+    // single SD card.
+    final cached = widget.volume == null
+        ? MediaStoreRepo.instance.cachedFolders
+        : null;
     if (cached != null) {
       _folders = cached;
       _loading = false;
@@ -53,7 +71,10 @@ class _FolderListPageState extends State<FolderListPage> {
   }
 
   Future<void> _load({bool refresh = false}) async {
-    final rows = await MediaStoreRepo.instance.folders(refresh: refresh);
+    final rows = await MediaStoreRepo.instance.folders(
+      refresh: refresh,
+      volume: widget.volume,
+    );
     if (!mounted) return;
     setState(() {
       _folders = rows;
@@ -74,124 +95,140 @@ class _FolderListPageState extends State<FolderListPage> {
     AppPalette.sync(context);
     final rows = _visible;
 
-    return Scaffold(
+    final appBar = AppBar(
       backgroundColor: AppPalette.surface,
-      appBar: AppBar(
-        backgroundColor: AppPalette.surface,
-        elevation: 0,
-        surfaceTintColor: Colors.transparent,
-        foregroundColor: AppPalette.textH,
-        titleSpacing: 0,
-        title: _searchOpen
-            ? TextField(
-                controller: _searchCtrl,
-                autofocus: true,
-                style: TextStyle(fontSize: 14, color: AppPalette.textH),
-                decoration: InputDecoration(
-                  isDense: true,
-                  border: InputBorder.none,
-                  hintText: _t('fb_search_hint'),
-                  hintStyle: TextStyle(fontSize: 14, color: AppPalette.textS),
+      elevation: 0,
+      surfaceTintColor: Colors.transparent,
+      foregroundColor: AppPalette.textH,
+      titleSpacing: 0,
+      title: _searchOpen
+          ? TextField(
+              controller: _searchCtrl,
+              autofocus: true,
+              style: TextStyle(fontSize: 14, color: AppPalette.textH),
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                hintText: _t('fb_search_hint'),
+                hintStyle: TextStyle(fontSize: 14, color: AppPalette.textS),
+              ),
+              onChanged: (v) => setState(() => _query = v.trim()),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(
+                  widget.title ?? _t('fb_tab_folders'),
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: AppPalette.textH,
+                  ),
                 ),
-                onChanged: (v) => setState(() => _query = v.trim()),
-              )
-            : Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
+                if (!_loading)
                   Text(
-                    _t('fb_tab_folders'),
+                    _t('fb_items_count')
+                        .replaceAll('{count}', '${rows.length}'),
                     style: TextStyle(
                       fontFamily: 'Poppins',
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppPalette.textH,
+                      fontSize: 10.5,
+                      color: AppPalette.textS,
                     ),
                   ),
-                  if (!_loading)
-                    Text(
-                      _t('fb_items_count')
-                          .replaceAll('{count}', '${rows.length}'),
-                      style: TextStyle(
-                        fontFamily: 'Poppins',
-                        fontSize: 10.5,
-                        color: AppPalette.textS,
-                      ),
-                    ),
-                ],
+              ],
+            ),
+      actions: [
+        IconButton(
+          tooltip: _t('fb_search_hint'),
+          onPressed: () => setState(() {
+            _searchOpen = !_searchOpen;
+            if (!_searchOpen) {
+              _query = '';
+              _searchCtrl.clear();
+            }
+          }),
+          icon: Icon(_searchOpen ? Icons.close_rounded : Icons.search_rounded),
+        ),
+      ],
+    );
+
+    final list = RefreshIndicator(
+      color: widget.accent,
+      onRefresh: () => _load(refresh: true),
+      child: _loading
+          ? Center(child: CircularProgressIndicator(color: widget.accent))
+          : rows.isEmpty
+          ? ListView(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 32,
+                vertical: 120,
               ),
-        actions: [
-          IconButton(
-            tooltip: _t('fb_search_hint'),
-            onPressed: () => setState(() {
-              _searchOpen = !_searchOpen;
-              if (!_searchOpen) {
-                _query = '';
-                _searchCtrl.clear();
-              }
-            }),
-            icon: Icon(_searchOpen ? Icons.close_rounded : Icons.search_rounded),
+              children: [
+                Icon(
+                  Icons.folder_off_rounded,
+                  size: 44,
+                  color: AppPalette.textS,
+                ),
+                const SizedBox(height: 14),
+                Text(
+                  _query.isEmpty ? _t('fb_no_files') : _t('fb_no_matches'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 13, color: AppPalette.textS),
+                ),
+              ],
+            )
+          : ListView.separated(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+              // One native ad among the rows, after the first few folders.
+              itemCount: rows.length + 1,
+              separatorBuilder: (_, __) => const SizedBox(height: 6),
+              itemBuilder: (context, i) {
+                final adAt =
+                    rows.length < _adAfterRows ? rows.length : _adAfterRows;
+                if (i == adAt) return const ListNativeAd();
+                final folder = rows[i > adAt ? i - 1 : i];
+                return _FolderTile(
+                  folder: folder,
+                  accent: widget.accent,
+                  itemsLabel: _t('fb_items_count'),
+                  onTap: () => _openFolder(folder),
+                );
+              },
+            ),
+    );
+
+    return Scaffold(
+      backgroundColor: AppPalette.surface,
+      appBar: appBar,
+      body: list,
+    );
+  }
+
+  /// Folders shown before the native ad.
+  static const int _adAfterRows = 4;
+
+  /// Gives the frequency-capped interstitial its chance, then opens the
+  /// folder's files.
+  void _openFolder(MediaFolder folder) {
+    AppOpenAdManager().showInterstitialIfAllowed(
+      onContinue: () {
+        if (!mounted) return;
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            settings: const RouteSettings(name: 'FolderFilesScreen'),
+            builder: (_) => MediaListPage(
+              kind: MediaKind.all,
+              title: folder.name,
+              accent: widget.accent,
+              folderPath: folder.path,
+              volume: widget.volume,
+            ),
           ),
-        ],
-      ),
-      body: RefreshIndicator(
-        color: widget.accent,
-        onRefresh: () => _load(refresh: true),
-        child: _loading
-            ? Center(child: CircularProgressIndicator(color: widget.accent))
-            : rows.isEmpty
-                ? ListView(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 120,
-                    ),
-                    children: [
-                      Icon(
-                        Icons.folder_off_rounded,
-                        size: 44,
-                        color: AppPalette.textS,
-                      ),
-                      const SizedBox(height: 14),
-                      Text(
-                        _query.isEmpty
-                            ? _t('fb_no_files')
-                            : _t('fb_no_matches'),
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: AppPalette.textS,
-                        ),
-                      ),
-                    ],
-                  )
-                : ListView.separated(
-                    padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-                    itemCount: rows.length,
-                    separatorBuilder: (_, __) => const SizedBox(height: 6),
-                    itemBuilder: (context, i) {
-                      final folder = rows[i];
-                      return _FolderTile(
-                        folder: folder,
-                        accent: widget.accent,
-                        itemsLabel: _t('fb_items_count'),
-                        onTap: () => Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            settings: const RouteSettings(
-                              name: 'FolderFilesScreen',
-                            ),
-                            builder: (_) => MediaListPage(
-                              kind: MediaKind.all,
-                              title: folder.name,
-                              accent: widget.accent,
-                              folderPath: folder.path,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-      ),
+        );
+      },
     );
   }
 }
@@ -269,10 +306,7 @@ class _FolderTile extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(
-                Icons.chevron_right_rounded,
-                color: AppPalette.textS,
-              ),
+              Icon(Icons.chevron_right_rounded, color: AppPalette.textS),
             ],
           ),
         ),

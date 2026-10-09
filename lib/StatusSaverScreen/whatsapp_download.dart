@@ -15,8 +15,6 @@ import 'package:videoplayer/Utils/color.dart';
 import '../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../ads/app_open_ad_manager.dart';
-import '../ads/rewarded_unlock.dart';
-import '../ads/rewarded_unlock_prompt.dart';
 import '../Utils/animated_progress_indicator.dart';
 import '../Utils/app_palette.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
@@ -757,21 +755,9 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       DeviceStrings.t(lang, isVideo ? 'wa_type_video' : 'wa_type_image');
 
   Future<void> _saveStatus(StatusItem item) async {
-    // Saving is the one thing here that costs anything — it copies the file
-    // out of WhatsApp's folder and into the gallery — so it is what the
-    // rewarded ad buys. One ad opens a 30-minute window for *all* saves, not
-    // one ad per status: charging per file would mean four ads to save four
-    // statuses, which is the kind of pacing that gets an app uninstalled.
-    //
-    // Premium skips this entirely (see ensureRewardedUnlock).
-    final unlocked = await ensureRewardedUnlock(
-      context,
-      feature: RewardedUnlock.statusSaver,
-      titleKey: 'rewarded_status_saver_title',
-      bodyKey: 'rewarded_status_saver_body',
-    );
-    if (!unlocked || !mounted) return;
-
+    // Deliberately no rewarded-ad gate here. A status is someone else's
+    // content; making the user watch an ad to save it would be monetising
+    // third-party content, which Play's IP policy treats as a violation.
     try {
       final file = await item.cacheFile();
       if (file == null) throw DeviceStrings.t(_langCode, 'wa_file_unavailable');
@@ -993,14 +979,30 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
       ),
       body: Padding(
         padding: const EdgeInsets.only(bottom: 50.0),
-        child: TabBarView(
-          controller: _tabController,
-          physics: const BouncingScrollPhysics(),
+        child: Column(
           children: [
-            _buildBody(_allStatuses),
-            _buildBody(_imageStatuses),
-            _buildBody(_videoStatuses),
-            _buildDownloadsTab(),
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
+                physics: const BouncingScrollPhysics(),
+                children: [
+                  _buildBody(_allStatuses),
+                  _buildBody(_imageStatuses),
+                  _buildBody(_videoStatuses),
+                  _buildDownloadsTab(),
+                ],
+              ),
+            ),
+            // Always visible, not tucked into one tab: the screen reads and
+            // saves from WhatsApp's folder, so it must say it is not WhatsApp.
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 4),
+              child: Text(
+                DeviceStrings.t(lang, 'wa_disclaimer'),
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.grey.shade600, fontSize: 10.5),
+              ),
+            ),
           ],
         ),
       ),

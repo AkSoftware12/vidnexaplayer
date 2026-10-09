@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../Billing/billing_service.dart';
+import 'ad_consent.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../NotifyListeners/LanguageProvider/misc_strings.dart';
 import '../Utils/color.dart';
@@ -191,7 +192,7 @@ class AppOpenAdManager with WidgetsBindingObserver {
   ///
   /// Deliberately the same top-level getter the banner and native widgets use,
   /// so there is exactly one definition of "ads are off for this user".
-  bool get _isPremiumUser => _isPremium;
+  bool get _isPremiumUser => _adsOff;
 
   // =========================================================
   // INIT
@@ -238,13 +239,35 @@ class AppOpenAdManager with WidgetsBindingObserver {
   /// Resume listener.
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused) {
+      _backgroundedAt ??= DateTime.now();
+      return;
+    }
     if (state != AppLifecycleState.resumed) return;
+
+    final backgroundedAt = _backgroundedAt;
+    _backgroundedAt = null;
 
     // Coming back from our own fullscreen ad is not a real app resume.
     if (_isShowingAd) return;
 
+    // Only a genuine return to the app earns an App Open ad. A permission
+    // dialog never pauses the app at all, and a quick trip out to the share
+    // sheet, a file picker or the Play purchase sheet comes back well inside
+    // this window — an ad there lands on top of what the user just asked for,
+    // which AdMob treats as an unexpected, disruptive placement.
+    if (backgroundedAt == null ||
+        DateTime.now().difference(backgroundedAt) < _minBackgroundForAd) {
+      return;
+    }
+
     showAdIfAvailable(() {});
   }
+
+  /// When the app last went to the background; null while in the foreground.
+  DateTime? _backgroundedAt;
+
+  static const Duration _minBackgroundForAd = Duration(seconds: 30);
 
   // =========================================================
   // APP OPEN
@@ -661,12 +684,14 @@ class AppOpenAdManager with WidgetsBindingObserver {
       NativeAdCard(margin: margin, template: TemplateType.small);
 }
 
-/// Whether the user has paid ads away.
+/// Whether no ad may be requested: the user has paid ads away, or has not
+/// (yet) given the consent UMP requires in the EEA, UK and Switzerland.
 ///
 /// Read off the singleton rather than through the widget tree because the ad
 /// widgets need it in `initState`, where `context.watch` is illegal. Their
 /// `build` methods still watch the provider so the UI reacts to a purchase.
-bool get _isPremium => BillingService.instance.isPremium;
+bool get _adsOff =>
+    BillingService.instance.isPremium || !AdConsent.instance.canRequestAds;
 
 /// Self-contained banner: loads its own ad, disposes it, and renders nothing
 /// until (and unless) the ad actually loads.
@@ -714,12 +739,13 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
     // (their loaders are called repeatedly from elsewhere) while banners —
     // which only load here, once, in initState — stayed dead for good.
     BillingService.instance.addListener(_onPremiumChanged);
+    AdConsent.instance.addListener(_onPremiumChanged);
 
     // A premium user must not even generate an ad *request*. main.dart skips
     // `MobileAds.initialize()` and the manager's own load paths are gated, but
     // this widget loads its own BannerAd, so without this a subscriber would
     // still see banners.
-    if (_isPremium) return;
+    if (_adsOff) return;
 
     _load();
   }
@@ -735,7 +761,7 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
   void _onPremiumChanged() {
     if (!mounted) return;
 
-    if (_isPremium) {
+    if (_adsOff) {
       _retryTimer?.cancel();
       _ad?.dispose();
       _ad = null;
@@ -761,7 +787,7 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
     // ~30s, and a purchase can complete in that window: [_onPremiumChanged]
     // cancels the timer, but a callback already queued on the event loop still
     // runs. Without this a subscriber could still emit one request.
-    if (_isPremium) return;
+    if (_adsOff) return;
 
     _attempt++;
 
@@ -825,6 +851,7 @@ class _AdaptiveBannerAdState extends State<AdaptiveBannerAd> {
   @override
   void dispose() {
     BillingService.instance.removeListener(_onPremiumChanged);
+    AdConsent.instance.removeListener(_onPremiumChanged);
     _retryTimer?.cancel();
     _ad?.dispose();
     _ad = null;
@@ -962,15 +989,16 @@ class _NativeAdCardState extends State<NativeAdCard> {
     // Attached unconditionally, so this card also recovers when a
     // subscription lapses — see [_AdaptiveBannerAdState.initState].
     BillingService.instance.addListener(_onPremiumChanged);
+    AdConsent.instance.addListener(_onPremiumChanged);
 
     // No ad request at all for a subscriber.
-    if (_isPremium) return;
+    if (_adsOff) return;
 
     // Deferred to the first frame: the template is styled from the active
     // theme, which is not resolvable during initState.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       // Re-checked: a purchase can complete between initState and this frame.
-      if (mounted && !_isPremium) _load();
+      if (mounted && !_adsOff) _load();
     });
   }
 
@@ -983,7 +1011,7 @@ class _NativeAdCardState extends State<NativeAdCard> {
   void _onPremiumChanged() {
     if (!mounted) return;
 
-    if (_isPremium) {
+    if (_adsOff) {
       _retryTimer?.cancel();
       _ad?.dispose();
       _ad = null;
@@ -1003,7 +1031,7 @@ class _NativeAdCardState extends State<NativeAdCard> {
     // The native template needs a themed context, which is only safe after a
     // frame — same reason initState defers its first load.
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_isPremium) _load();
+      if (mounted && !_adsOff) _load();
     });
     setState(() {});
   }
@@ -1011,6 +1039,7 @@ class _NativeAdCardState extends State<NativeAdCard> {
   @override
   void dispose() {
     BillingService.instance.removeListener(_onPremiumChanged);
+    AdConsent.instance.removeListener(_onPremiumChanged);
     _retryTimer?.cancel();
     _ad?.dispose();
     _ad = null;
@@ -1019,7 +1048,7 @@ class _NativeAdCardState extends State<NativeAdCard> {
 
   void _load() {
     // See [_AdaptiveBannerAdState._load].
-    if (_isPremium) return;
+    if (_adsOff) return;
 
     _attempt++;
 

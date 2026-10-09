@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:docman/docman.dart';
 import 'package:material_ui/material_ui.dart';
@@ -14,6 +15,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import '../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../Utils/app_palette.dart';
+import '../../ads/app_open_ad_manager.dart';
 import 'file_kind.dart';
 import 'file_tools.dart';
 
@@ -48,11 +50,77 @@ class _WirelessTransferPageState extends State<WirelessTransferPage> {
 
   bool _starting = false;
   String? _address;
+
+  /// Random path segment every URL must start with, new on each start.
+  ///
+  /// The server listens on the whole LAN; without this anyone on the same
+  /// café or office Wi-Fi who found port 8642 could list and download the
+  /// folder. Only the address shown on this screen carries the code.
+  String _token = '';
+
+  static String _newToken() {
+    const chars = 'abcdefghjkmnpqrstuvwxyz23456789';
+    final rnd = Random.secure();
+    return List.generate(8, (_) => chars[rnd.nextInt(chars.length)]).join();
+  }
   String? _error;
   int _hits = 0;
 
+  /// The folder being shared, chosen on this screen and remembered.
+  DocumentFile? _folder;
+
+  /// Built once: the request counter repaints this screen on every hit, and
+  /// a fresh widget each time would reload the ad.
+  late final Widget _nativeAd = AppOpenAdManager().nativeCompactWidget();
+
   String get _lang => context.read<LocaleProvider>().locale.languageCode;
   String _t(String key) => HomeStrings.t(_lang, key);
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFolder();
+  }
+
+  /// Restores the remembered folder. A grant the user has since revoked, or a
+  /// folder that was deleted, reads as no folder rather than an error.
+  Future<void> _loadFolder() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final saved = prefs.getString(_prefsKey);
+      if (saved == null || saved.isEmpty) return;
+      final folder = await DocumentFile(uri: saved).get();
+      if (folder == null || !folder.exists || !mounted) return;
+      setState(() => _folder = folder);
+    } catch (e) {
+      debugPrint('Wireless: saved folder unreadable — $e');
+    }
+  }
+
+  /// Asks for the folder to share. The picker takes a persisted grant, so the
+  /// choice survives restarts. Returns whether a folder was chosen.
+  Future<bool> _chooseFolder() async {
+    final DocumentFile? picked;
+    try {
+      picked = await DocMan.pick.directory();
+    } catch (e) {
+      debugPrint('Wireless: folder pick failed — $e');
+      return false;
+    }
+    if (picked == null) return false;
+
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_prefsKey, picked.uri);
+
+    // A running server is still serving the old folder's index.
+    await _stop();
+    if (!mounted) return false;
+    setState(() {
+      _folder = picked;
+      _error = null;
+    });
+    return true;
+  }
 
   @override
   void dispose() {
@@ -88,20 +156,24 @@ class _WirelessTransferPageState extends State<WirelessTransferPage> {
 
   Future<void> _start() async {
     if (_starting || _server != null) return;
+
+    // Nothing to share yet: ask for the folder first, then carry on.
+    if (_folder == null && !await _chooseFolder()) return;
+    if (!mounted) return;
+
     setState(() {
       _starting = true;
       _error = null;
     });
 
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final saved = prefs.getString(_prefsKey);
-      if (saved == null || saved.isEmpty) {
+      // Re-read rather than trust the cached handle: the folder may have been
+      // deleted, or the grant revoked, since it was chosen.
+      final root = await _folder!.get();
+      if (root == null || !root.exists) {
+        if (mounted) setState(() => _folder = null);
         throw _t('fb_scan_no_folder');
       }
-
-      final root = await DocumentFile(uri: saved).get();
-      if (root == null || !root.exists) throw _t('fb_scan_no_folder');
       _root = root;
 
       final walk = await FileTools.walk(root);
@@ -110,6 +182,7 @@ class _WirelessTransferPageState extends State<WirelessTransferPage> {
       final ip = await _localIp();
       if (ip == null) throw _t('fb_wifi_needed');
 
+      _token = _newToken();
       final server = await shelf_io.serve(
         _handler,
         InternetAddress.anyIPv4,
@@ -122,7 +195,7 @@ class _WirelessTransferPageState extends State<WirelessTransferPage> {
       }
       setState(() {
         _server = server;
-        _address = 'http://$ip:$_port';
+        _address = 'http://$ip:$_port/$_token/';
         _starting = false;
       });
     } catch (e) {
@@ -146,22 +219,28 @@ class _WirelessTransferPageState extends State<WirelessTransferPage> {
   }
 
   Future<shelf.Response> _handler(shelf.Request request) async {
+    // Anything not under the secret prefix gets the same 404 as a missing
+    // file, so a stranger probing the port learns nothing.
+    final segments = request.url.pathSegments;
+    if (_token.isEmpty || segments.isEmpty || segments.first != _token) {
+      return shelf.Response.notFound('Not found');
+    }
+    final rest = segments.skip(1).where((s) => s.isNotEmpty).toList();
+
     if (mounted) setState(() => _hits++);
 
-    final path = request.url.path;
-
-    if (path.isEmpty || path == 'index.html') {
+    if (rest.isEmpty || (rest.length == 1 && rest.first == 'index.html')) {
       return shelf.Response.ok(
         _indexHtml(),
         headers: {'content-type': 'text/html; charset=utf-8'},
       );
     }
 
-    if (path.startsWith('f/')) {
+    if (rest.length == 2 && rest.first == 'f') {
       // The index position, not a name or a path: nothing the client sends is
       // ever turned into a storage lookup, so there is no traversal to guard
       // against — an out-of-range index is simply a 404.
-      final index = int.tryParse(path.substring(2));
+      final index = int.tryParse(rest[1]);
       if (index == null || index < 0 || index >= _files.length) {
         return shelf.Response.notFound('Not found');
       }
@@ -194,7 +273,7 @@ class _WirelessTransferPageState extends State<WirelessTransferPage> {
       final f = _files[i];
       final name = const HtmlEscape().convert(f.name);
       rows.writeln(
-        '<tr><td><a href="/f/$i">$name</a></td>'
+        '<tr><td><a href="/$_token/f/$i">$name</a></td>'
         '<td class="s">${formatBytes(f.size)}</td></tr>',
       );
     }
@@ -226,6 +305,66 @@ class _WirelessTransferPageState extends State<WirelessTransferPage> {
 ''';
   }
 
+  /// Which folder is shared, with the button that picks or changes it.
+  Widget _folderRow() {
+    final folder = _folder;
+    return Material(
+      color: AppPalette.card,
+      borderRadius: BorderRadius.circular(14.r),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: _starting ? null : _chooseFolder,
+        child: Container(
+          padding: EdgeInsets.symmetric(horizontal: 14.w, vertical: 12.h),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(14.r),
+            border: Border.all(color: AppPalette.border),
+          ),
+          child: Row(
+            children: [
+              Container(
+                height: 38.sp,
+                width: 38.sp,
+                decoration: BoxDecoration(
+                  color: widget.accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(11.r),
+                ),
+                child: Icon(
+                  Icons.folder_rounded,
+                  color: widget.accent,
+                  size: 20.sp,
+                ),
+              ),
+              SizedBox(width: 12.w),
+              Expanded(
+                child: Text(
+                  folder?.name ?? _t('fb_wireless_no_folder'),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontFamily: 'Poppins',
+                    fontSize: 13.sp,
+                    fontWeight: FontWeight.w700,
+                    color: folder == null ? AppPalette.textS : AppPalette.textH,
+                  ),
+                ),
+              ),
+              SizedBox(width: 8.w),
+              Text(
+                folder == null ? _t('fb_pick_folder') : _t('fb_change_folder'),
+                style: TextStyle(
+                  fontSize: 12.sp,
+                  fontWeight: FontWeight.w700,
+                  color: widget.accent,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     AppPalette.sync(context);
@@ -248,7 +387,9 @@ class _WirelessTransferPageState extends State<WirelessTransferPage> {
           ),
         ),
       ),
-      body: Padding(
+      // Scrollable: with the server running, the address block plus the ad
+      // can outgrow a small screen.
+      body: SingleChildScrollView(
         padding: EdgeInsets.all(20.w),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -334,6 +475,8 @@ class _WirelessTransferPageState extends State<WirelessTransferPage> {
                 ],
               ),
             ),
+            SizedBox(height: 12.h),
+            _folderRow(),
             SizedBox(height: 18.h),
             SizedBox(
               height: 48.h,
@@ -366,6 +509,8 @@ class _WirelessTransferPageState extends State<WirelessTransferPage> {
                 ),
               ),
             ),
+            SizedBox(height: 18.h),
+            _nativeAd,
           ],
         ),
       ),

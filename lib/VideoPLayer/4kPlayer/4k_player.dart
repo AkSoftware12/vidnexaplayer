@@ -3340,6 +3340,9 @@ class _FullScreenVideoPlayerSystemVolumeState
                                 SystemUiOverlay.values,
                               );
                             } else {
+                              // Paused first: an interstitial must not play
+                              // over the video's own audio.
+                              _player.pause();
                               appOpenManager.showInterstitialIfAllowed(
                                 onContinue: () {
                                   if (!mounted) return;
@@ -3375,6 +3378,8 @@ class _FullScreenVideoPlayerSystemVolumeState
                           child: _StreamTopBar(
                             title: appBarTitle,
                             onBack: () {
+                              // Paused first, as above.
+                              _player.pause();
                               appOpenManager.showInterstitialIfAllowed(
                                 onContinue: () {
                                   if (!mounted) return;

@@ -12,6 +12,11 @@ import 'package:videoplayer/Utils/color.dart';
 class ThemeProvider extends ChangeNotifier {
   static const String _modeKey = 'themeMode';
   static const String _accentKey = 'themeAccent';
+  static const String _textScaleKey = 'textScale';
+
+  /// The text sizes offered in Profile → Text size. Small steps on purpose:
+  /// the layout was sized for 1.0 and stays intact up to about 1.25.
+  static const List<double> textScales = [0.9, 1.0, 1.1, 1.2];
 
   /// The pre-existing light/dark flag. Read once on upgrade so a user who had
   /// chosen dark keeps it instead of being reset to light.
@@ -23,6 +28,11 @@ class ThemeProvider extends ChangeNotifier {
   ThemeMode get themeMode => _mode;
 
   AccentPreset get accent => _accent;
+
+  double _textScale = 1.0;
+
+  /// The user's app-wide text size, one of [textScales].
+  double get textScale => _textScale;
 
   /// Whether dark is *currently* being shown, system setting included.
   ///
@@ -63,6 +73,11 @@ class ThemeProvider extends ChangeNotifier {
 
       _accent = AccentPreset.fromName(prefs.getString(_accentKey));
       _applyAccent();
+
+      final storedScale = prefs.getDouble(_textScaleKey);
+      if (storedScale != null && textScales.contains(storedScale)) {
+        _textScale = storedScale;
+      }
       notifyListeners();
     } catch (_) {
       // Keep the defaults if prefs are unavailable.
@@ -95,6 +110,19 @@ class ThemeProvider extends ChangeNotifier {
       await prefs.setString(_accentKey, accent.name);
     } catch (_) {
       // Non-fatal.
+    }
+  }
+
+  Future<void> setTextScale(double scale) async {
+    if (_textScale == scale || !textScales.contains(scale)) return;
+    _textScale = scale;
+    notifyListeners();
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setDouble(_textScaleKey, scale);
+    } catch (_) {
+      // Non-fatal: the size still changed for this session.
     }
   }
 

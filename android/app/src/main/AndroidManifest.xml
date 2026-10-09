@@ -8,7 +8,7 @@
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK" />
-    <uses-permission android:name="android.permission.ACCESS_NOTIFICATION_POLICY" />
+    <!-- Vault fingerprint / face unlock (local_auth). -->
     <uses-permission android:name="android.permission.USE_BIOMETRIC"/>
 
     <uses-permission android:name="com.android.vending.BILLING" />
@@ -121,7 +121,8 @@
             android:name=".MainActivity"
             android:launchMode="singleTask"
             android:theme="@style/LaunchTheme"
-            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:supportsPictureInPicture="true"
             android:hardwareAccelerated="true"
             android:enableOnBackInvokedCallback="true"
             android:windowSoftInputMode="adjustResize"

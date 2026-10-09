@@ -238,7 +238,7 @@ class _NotificationCard extends StatelessWidget {
                           ),
                           child: Text(
                             MiscStrings.t(lang, 'notification_new'),
-                            style: TextStyle(fontFamily: 'Poppins', fontSize: 8.5.sp,
+                            style: TextStyle(fontFamily: 'Poppins', fontSize: 9.5.sp,
                               fontWeight: FontWeight.w700,
                               color: Colors.white,
                             ),

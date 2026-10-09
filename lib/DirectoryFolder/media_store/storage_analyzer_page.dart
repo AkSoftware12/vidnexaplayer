@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../Utils/app_palette.dart';
+import '../../ads/list_native_ad.dart';
 import '../file_browser/file_kind.dart';
 import 'media_list_page.dart';
 import 'media_store.dart';
@@ -164,6 +165,10 @@ class _StorageAnalyzerPageState extends State<StorageAnalyzerPage> {
                       value: formatBytes(e.value),
                       fraction: total == 0 ? 0 : e.value / total,
                     ),
+
+                  // Between the two halves of the report: after the
+                  // by-type summary someone came for, before the folder list.
+                  const ListNativeAd(padding: EdgeInsets.only(top: 14)),
 
                   if (_folders.isNotEmpty) ...[
                     const SizedBox(height: 18),

@@ -34,7 +34,7 @@ packages:
     source: hosted
     version: "2.2.0"
   archive:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: archive
       sha256: "6c5bcd986e06b94e3c40244af471750840a3d2341d1f9763a1100a14add517b4"
@@ -193,14 +193,6 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "2.1.0"
-  country_codes:
-    dependency: "direct main"
-    description:
-      name: country_codes
-      sha256: "80e441b8a4bec1e7a24d58955fe769e7c6199ffd025f4509d4172d8d0195dfc4"
-      url: "https://pub.dev"
-    source: hosted
-    version: "3.3.0"
   cross_file:
     dependency: transitive
     description:
@@ -638,7 +630,7 @@ packages:
     source: hosted
     version: "2.0.2"
   http:
-    dependency: "direct main"
+    dependency: transitive
     description:
       name: http
       sha256: "87721a4a50b19c7f1d49001e51409bddc46303966ce89a65af4f4e6004896412"
@@ -765,6 +757,22 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.4.13"
+  in_app_review:
+    dependency: "direct main"
+    description:
+      name: in_app_review
+      sha256: "364db0c160b37fe7fad9cdaa18f968473924b17368869010af902760421b6bf8"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.12"
+  in_app_review_platform_interface:
+    dependency: transitive
+    description:
+      name: in_app_review_platform_interface
+      sha256: fed2c755f2125caa9ae10495a3c163aa7fab5af3585a9c62ef4a6920c5b45f10
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.5"
   intl:
     dependency: "direct main"
     description:
@@ -869,6 +877,46 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.0"
+  local_auth:
+    dependency: "direct main"
+    description:
+      name: local_auth
+      sha256: ecf24edf2283c509ecd217e3595f6f71034b68888d28ad1dae6bfa0857b816ac
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.0.2"
+  local_auth_android:
+    dependency: transitive
+    description:
+      name: local_auth_android
+      sha256: "76c389998fe95cff4352644776ab5775f24ddd58f179dbf3df1b9c268cbbadc4"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
+  local_auth_darwin:
+    dependency: transitive
+    description:
+      name: local_auth_darwin
+      sha256: b1b2d938cc3511512e552d92e782e055b8dc29c83e21c59e6ecfc6bd79ab0744
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.4"
+  local_auth_platform_interface:
+    dependency: transitive
+    description:
+      name: local_auth_platform_interface
+      sha256: f98b8e388588583d3f781f6806e4f4c9f9e189d898d27f0c249b93a1973dd122
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.0"
+  local_auth_windows:
+    dependency: transitive
+    description:
+      name: local_auth_windows
+      sha256: d72b8a441e5e6a679902f87c51529fcce65f442d77598484cf35454c3d733eda
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.0.2"
   logging:
     dependency: transitive
     description:

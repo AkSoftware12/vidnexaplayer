@@ -6,6 +6,7 @@ import 'package:videoplayer/Utils/color.dart';
 import 'app_language.dart';
 import 'app_strings.dart';
 import 'language_provider.dart';
+import '../../WhatsNew/whats_new.dart';
 
 /// Shared "Choose Language" bottom sheet — defaults to whatever
 /// [LocaleProvider] currently holds (English on first launch), lets the user
@@ -17,6 +18,7 @@ import 'language_provider.dart';
 void showLanguagePickerSheet(BuildContext context, {bool isDark = false}) {
   final localeProvider = Provider.of<LocaleProvider>(context, listen: false);
   String pendingCode = localeProvider.locale.languageCode;
+  WhatsNew.instance.markSeen(NewFeature.languages);
 
   showModalBottomSheet(
     context: context,

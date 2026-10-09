@@ -9,6 +9,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../NotifyListeners/LanguageProvider/paywall_strings.dart';
 import 'billing_service.dart';
+import '../WhatsNew/whats_new.dart';
 
 /// The premium paywall.
 ///
@@ -21,20 +22,13 @@ import 'billing_service.dart';
 /// formatted for the user's billing country; a hardcoded `₹249` would be wrong
 /// in the other ~172 countries these products sell in.
 ///
-/// ## The struck-through "compare at" price
+/// ## Struck-through prices
 ///
-/// The crossed-out figure beside each price is **not** a price Play ever
-/// charged. It is a marketing anchor the app owner asked for
-/// ([_kCompareAtMultiplier]), derived from the real price so it stays in the
-/// right currency instead of showing "$1499" to a US buyer.
-///
-/// This is a deliberate product decision, made after the alternative was
-/// offered: Play Console supports real discount offers, and
-/// `BillingService.yearlyOriginalPrice` / `yearlyDiscountPercent` already read
-/// them, so setting a genuine base price plus an offer would produce the same
-/// visual from real data. Until that exists, note that showing a price the
-/// product was never sold at is deceptive pricing under Google Play's policy
-/// and carries suspension risk. Prefer the real-offer path when it is available.
+/// Only ever a real Play discount offer: `BillingService.yearlyOriginalPrice`
+/// / `yearlyDiscountPercent` read the standing base-plan price next to a live
+/// offer. There is deliberately no invented "compare at" figure — showing a
+/// price the product was never sold at is deceptive pricing under Google
+/// Play's policy. To show a discount, create a real offer in Play Console.
 class PaywallScreen extends StatefulWidget {
   const PaywallScreen({super.key});
 
@@ -120,15 +114,6 @@ class _P {
 //  Plan view-model
 // ─────────────────────────────────────────────────────────────────────────────
 
-/// What the real price is multiplied by to produce the struck-through figure.
-///
-/// Chosen so India lands on the numbers the owner asked for: ₹199 → ₹1,499 and
-/// ₹249 → ₹1,899, both snapped to a `…99` ending by [_compareAtAmount]. Every
-/// other currency scales by the same factor rather than showing a rupee amount.
-///
-/// See the class doc on [PaywallScreen] before changing or relying on this.
-const double _kCompareAtMultiplier = 7.53;
-
 enum _PlanKind { monthly, yearly, lifetime }
 
 /// Everything a [_PlanCard] needs, resolved from a real [ProductDetails].
@@ -196,6 +181,7 @@ class _PaywallScreenState extends State<PaywallScreen>
   @override
   void initState() {
     super.initState();
+    WhatsNew.instance.markSeen(NewFeature.pro);
     _billing.addListener(_onBillingChanged);
     if (_billing.yearly == null && _billing.lifetime == null) {
       _billing.loadProducts();
@@ -243,7 +229,8 @@ class _PaywallScreenState extends State<PaywallScreen>
 
   // ── Plans ───────────────────────────────────────────────────────────────
 
-  /// The plans Play actually returned — **Lifetime first**, then Yearly.
+  /// The plans Play actually returned — **Lifetime first**, then Yearly, then
+  /// Monthly.
   ///
   /// Lifetime leads because it is the pre-selected option: the badge, the tick
   /// and the CTA price should all point at the same card without the user
@@ -262,8 +249,6 @@ class _PaywallScreenState extends State<PaywallScreen>
         period: '',
         blurb: _t('paywall_pay_once'),
         badge: _t('paywall_badge_best_value'),
-        originalPrice: _compareAtPrice(lifetime),
-        savingPercent: _compareAtPercent(lifetime),
       ));
     }
 
@@ -274,13 +259,23 @@ class _PaywallScreenState extends State<PaywallScreen>
         title: _t('paywall_plan_yearly'),
         period: _t('paywall_per_year'),
         blurb: _t('paywall_plan_yearly_sub'),
-        // A real Play discount offer wins when one exists; otherwise the
-        // configured compare-at anchor is used. See the class doc.
-        originalPrice:
-            _billing.yearlyOriginalPrice ?? _compareAtPrice(yearly),
-        savingPercent:
-            _billing.yearlyDiscountPercent ?? _compareAtPercent(yearly),
+        // Both null unless Play reports a live discount offer.
+        originalPrice: _billing.yearlyOriginalPrice,
+        savingPercent: _billing.yearlyDiscountPercent,
         footnote: _perMonth(yearly),
+      ));
+    }
+
+    // Last: the cheapest way in, but the most expensive per year — listed
+    // after Yearly so the per-month footnote there reads as the saving.
+    final ProductDetails? monthly = _billing.monthly;
+    if (monthly != null) {
+      out.add(_PlanVm(
+        kind: _PlanKind.monthly,
+        product: monthly,
+        title: _t('paywall_plan_monthly'),
+        period: _t('paywall_per_month_short'),
+        blurb: _t('paywall_plan_monthly_sub'),
       ));
     }
 
@@ -326,27 +321,6 @@ class _PaywallScreenState extends State<PaywallScreen>
     if (prefix.isNotEmpty) return '$prefix$amount';
     if (suffix.isNotEmpty) return '$amount$suffix';
     return null;
-  }
-
-  /// The marketing anchor: the real price scaled up and snapped to a `…99`
-  /// ending, which is what makes ₹199 read as ₹1,499 rather than ₹1,498.47.
-  ///
-  /// NOT a Play price — see the class doc on [PaywallScreen].
-  double _compareAtAmount(ProductDetails p) {
-    final double raw = p.rawPrice * _kCompareAtMultiplier;
-    return ((raw / 100).ceil() * 100) - 1;
-  }
-
-  String? _compareAtPrice(ProductDetails p) {
-    if (p.rawPrice <= 0) return null;
-    return _formatLike(p, _compareAtAmount(p).toStringAsFixed(0));
-  }
-
-  int? _compareAtPercent(ProductDetails p) {
-    if (p.rawPrice <= 0) return null;
-    final double was = _compareAtAmount(p);
-    if (was <= p.rawPrice) return null;
-    return (((was - p.rawPrice) / was) * 100).round();
   }
 
   // ── Actions ─────────────────────────────────────────────────────────────
@@ -641,20 +615,41 @@ class _PaywallScreenState extends State<PaywallScreen>
           ),
           const SizedBox(height: 10),
 
-          // Renewal wording only where it is true. "Cancel anytime" under a
-          // one-time purchase is nonsense and generates refund requests.
-          Text(
-            plan == null || plan.isSubscription
-                ? '${_t('paywall_cancel_anytime_short')} • ${_t('paywall_secure_short')}'
-                : '${_t('paywall_no_renewal_short')} • ${_t('paywall_secure_short')}',
-            textAlign: TextAlign.center,
-            style: _P.t(11, color: _P.textLo),
-          ),
+          // Full terms for the selected plan, next to the button that charges
+          // for it: Play's subscription policy requires the price, the billing
+          // period, that it auto-renews and how to cancel. Renewal wording only
+          // where it is true — never under the one-time lifetime purchase.
+          if (plan != null)
+            Text(
+              _termsFor(plan),
+              textAlign: TextAlign.center,
+              style: _P.t(11, color: _P.textMid, height: 1.4),
+            ),
           const SizedBox(height: 6),
           _legalRow(),
         ],
       ),
     );
+  }
+
+  String _termsFor(_PlanVm plan) {
+    final String price = plan.product.price;
+    switch (plan.kind) {
+      case _PlanKind.lifetime:
+        return _t('paywall_terms_lifetime').replaceAll('{price}', price);
+      case _PlanKind.monthly:
+        return _t('paywall_terms_monthly').replaceAll('{price}', price);
+      case _PlanKind.yearly:
+        // With a live offer the first charge is the offer price and every
+        // renewal after it is the standing price; say both.
+        final String? full = plan.originalPrice;
+        if (full != null) {
+          return _t('paywall_terms_yearly_offer')
+              .replaceAll('{price}', price)
+              .replaceAll('{full}', full);
+        }
+        return _t('paywall_terms_yearly').replaceAll('{price}', price);
+    }
   }
 
   Widget _legalRow() {
@@ -670,14 +665,13 @@ class _PaywallScreenState extends State<PaywallScreen>
         _dot(),
         _linkButton(
           _t('paywall_terms_link'),
-          () => _open('https://play.google.com/about/play-terms/'),
+          () => _open('https://vidnexaplayer.com/terms-of-use.html'),
         ),
         _dot(),
         _linkButton(
           _t('paywall_privacy_link'),
           () => _open(
-            'https://www.freeprivacypolicy.com/live/'
-            '3a47e749-0364-44f5-8cc3-559f2cd90336',
+            'https://vidnexaplayer.com/privacy-policy.html',
           ),
         ),
       ],
@@ -1182,13 +1176,15 @@ class _BenefitsSection extends StatelessWidget {
 
   final String lang;
 
+  /// Only what premium actually changes: [BillingService.isPremium] turns off
+  /// every ad format and skips the rewarded-ad unlocks in
+  /// `rewarded_unlock_prompt.dart`. Everything else is free for everyone, so
+  /// listing it here would be selling features the user already has.
   static const List<(IconData, String)> _items = [
     (Icons.block_rounded, 'paywall_benefit_no_ads'),
-    (Icons.four_k_rounded, 'paywall_benefit_uhd'),
-    (Icons.tune_rounded, 'paywall_benefit_controls'),
-    (Icons.headphones_rounded, 'paywall_benefit_background'),
-    (Icons.auto_awesome_rounded, 'paywall_benefit_all'),
-    (Icons.rocket_launch_rounded, 'paywall_benefit_updates'),
+    (Icons.four_k_rounded, 'paywall_benefit_enhance'),
+    (Icons.filter_vintage_rounded, 'paywall_benefit_filters'),
+    (Icons.favorite_rounded, 'paywall_benefit_support'),
   ];
 
   @override

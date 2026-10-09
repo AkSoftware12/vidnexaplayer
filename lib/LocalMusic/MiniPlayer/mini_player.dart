@@ -41,8 +41,12 @@ class MiniPlayer extends StatelessWidget {
               builder: (context, snap) {
                 final state = snap.data;
 
+                // bottom: false — the mini player sits above the bottom bar,
+                // which already pads for the gesture area. Padding here too
+                // left a gesture-bar-sized gap between the two.
                 return SafeArea(
                   top: false,
+                  bottom: false,
                   child: ClipRRect(
                     child: BackdropFilter(
                       filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
@@ -82,12 +86,12 @@ class MiniPlayer extends StatelessWidget {
                             children: [
                               // ================= PLAYER ROW =================
                               SizedBox(
-                                height: 38.sp,
+                                height: 52,
                                 child: Row(
                                   children: [
                                     SongArtwork(
                                       songId: int.tryParse(mediaItem.id) ?? 0,
-                                      size: 40,
+                                      size: 52,
                                       borderRadius: BorderRadius.circular(0),
                                     ),
                                     // ✅ safer parse (avoid crash)
@@ -108,7 +112,7 @@ class MiniPlayer extends StatelessWidget {
                                             style:  TextStyle(
                                               color: Colors.white,
                                               fontWeight: FontWeight.w600,
-                                              fontSize: 10.sp,
+                                              fontSize: 12.5,
                                             ),
                                           ),
                                           Text(
@@ -117,7 +121,7 @@ class MiniPlayer extends StatelessWidget {
                                             overflow: TextOverflow.ellipsis,
                                             style:  TextStyle(
                                               color: Colors.white60,
-                                              fontSize: 8.sp,
+                                              fontSize: 10.5,
                                             ),
                                           ),
                                         ],

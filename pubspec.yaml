@@ -2,7 +2,7 @@ name: videoplayer
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.30+30
+version: 1.0.31+31
 
 environment:
   sdk: ^3.13.0
@@ -23,7 +23,6 @@ dependencies:
   audio_session: ^0.2.2
   on_audio_query_forked: ^2.9.1
   screen_brightness: ^2.1.7
-  country_codes: ^3.1.0
   hive: ^2.2.3
   hive_flutter: ^1.1.0
 
@@ -75,11 +74,14 @@ dependencies:
   device_info_plus: ^12.4.0
   share_plus: ^12.0.2
   flutter_local_notifications: ^22.3.1
-  # ✅ Was imported by Home/YoutubeScreen/playlists_screen.dart but never declared
-  #    (it only resolved transitively — one upstream bump away from breaking).
-  http: ^1.2.2
   # ✅ Salted SHA-256 hashing for the vault PIN (was stored in plaintext).
   crypto: ^3.0.3
+  # ✅ Fingerprint / face unlock for the vault (official flutter.dev plugin).
+  #    Needs MainActivity on AudioServiceFragmentActivity and AppCompat themes.
+  local_auth: ^3.0.2
+  # ✅ Google Play In-App Review sheet for the rating prompt. Replaced a custom
+  #    star sheet that only sent 4-5 star ratings to Play (review gating).
+  in_app_review: ^2.0.12
   # ✅ Internet on/off detection for the connectivity banner.
   connectivity_plus: ^7.3.1
 
@@ -129,10 +131,6 @@ dependencies:
   gal: ^1.9.1
 
   # ✅ File manager
-  #    `archive` is pure Dart, so ZIP create/extract works on the bytes SAF
-  #    hands back without a real filesystem path — which is the only kind of
-  #    handle this app ever has to a user's file.
-  archive: ^4.0.9
   #    Local HTTP server for wireless transfer (phone -> PC over Wi-Fi).
   #    The device's own IP comes from dart:io's NetworkInterface, so no
   #    network-info plugin is needed alongside it.

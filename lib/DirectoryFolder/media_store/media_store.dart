@@ -91,6 +91,37 @@ class MediaFolder {
       );
 }
 
+/// A mounted SD card or USB drive.
+@immutable
+class RemovableVolume {
+  const RemovableVolume({
+    required this.volume,
+    required this.label,
+    required this.total,
+    required this.free,
+  });
+
+  /// MediaStore's name for it — what [MediaStoreRepo.files] and
+  /// [MediaStoreRepo.folders] take to read only this volume.
+  final String volume;
+
+  /// The system's own name for it, already localised ("SD card", "SanDisk").
+  final String label;
+
+  /// Bytes; 0 when the size could not be read.
+  final int total;
+  final int free;
+
+  int get used => (total - free).clamp(0, total);
+
+  static RemovableVolume fromMap(Map<Object?, Object?> map) => RemovableVolume(
+        volume: map['volume'] as String? ?? '',
+        label: map['label'] as String? ?? '',
+        total: (map['total'] as num?)?.toInt() ?? 0,
+        free: (map['free'] as num?)?.toInt() ?? 0,
+      );
+}
+
 /// The buckets the file manager offers.
 enum MediaKind {
   all('all'),
@@ -145,12 +176,18 @@ class MediaStoreRepo {
   List<MediaFolder>? get cachedFolders =>
       _fresh(_foldersAt) ? _folders : null;
 
+  /// Rows for [kind] across every volume, or only on [volume] (an SD card's
+  /// MediaStore name, from [volumes]) when given.
+  ///
+  /// Per-volume reads skip the cache: it is keyed by kind alone, and an SD
+  /// card screen is visited rarely enough not to need one of its own.
   Future<List<MediaFile>> files(
     MediaKind kind, {
     int limit = 0,
     bool refresh = false,
+    String? volume,
   }) async {
-    if (!refresh) {
+    if (!refresh && volume == null) {
       final hit = cached(kind);
       if (hit != null) return hit;
     }
@@ -159,6 +196,7 @@ class MediaStoreRepo {
       final raw = await _channel.invokeListMethod<Object?>('query', {
         'kind': kind.wire,
         'limit': limit,
+        'volume': volume,
       });
 
       final rows = (raw ?? const [])
@@ -167,37 +205,80 @@ class MediaStoreRepo {
           .where((f) => f.name.isNotEmpty)
           .toList(growable: false);
 
+      if (volume != null) return rows;
       _files[kind] = rows;
       _filesAt[kind] = DateTime.now();
       return rows;
     } on PlatformException catch (e) {
-      debugPrint('MediaStoreRepo.files($kind) failed: $e');
+      debugPrint('MediaStoreRepo.files($kind, $volume) failed: $e');
+      if (volume != null) return const [];
       // Stale beats empty: a screen that briefly shows the previous list is
       // more useful than one that blanks because a single query failed.
       return _files[kind] ?? const [];
     }
   }
 
-  Future<List<MediaFolder>> folders({bool refresh = false}) async {
-    if (!refresh) {
+  /// Folders across every volume, or only on [volume] when given — cached
+  /// only in the first case, as with [files].
+  Future<List<MediaFolder>> folders({
+    bool refresh = false,
+    String? volume,
+  }) async {
+    if (!refresh && volume == null) {
       final hit = cachedFolders;
       if (hit != null) return hit;
     }
 
     try {
-      final raw = await _channel.invokeListMethod<Object?>('folders');
+      final raw = await _channel.invokeListMethod<Object?>(
+        'folders',
+        {'volume': volume},
+      );
       final rows = (raw ?? const [])
           .whereType<Map<Object?, Object?>>()
           .map(MediaFolder.fromMap)
           .where((f) => f.path.isNotEmpty)
           .toList(growable: false);
 
+      if (volume != null) return rows;
       _folders = rows;
       _foldersAt = DateTime.now();
       return rows;
     } on PlatformException catch (e) {
-      debugPrint('MediaStoreRepo.folders failed: $e');
+      debugPrint('MediaStoreRepo.folders($volume) failed: $e');
+      if (volume != null) return const [];
       return _folders ?? const [];
+    }
+  }
+
+  /// Copies an app-private file out to shared storage (Music/Vidnexa/ for
+  /// audio, Download/Vidnexa/ otherwise) and returns that folder, or null
+  /// when it could not.
+  Future<String?> saveToShared(String path, String name) async {
+    try {
+      return await _channel.invokeMethod<String>('saveToShared', {
+        'path': path,
+        'name': name,
+      });
+    } on PlatformException catch (e) {
+      debugPrint('MediaStoreRepo.saveToShared failed: $e');
+      return null;
+    }
+  }
+
+  /// Mounted SD cards and USB drives. Empty when there are none, or on
+  /// Android below 11, where a volume cannot report what is needed.
+  Future<List<RemovableVolume>> volumes() async {
+    try {
+      final raw = await _channel.invokeListMethod<Object?>('volumes');
+      return (raw ?? const [])
+          .whereType<Map<Object?, Object?>>()
+          .map(RemovableVolume.fromMap)
+          .where((v) => v.volume.isNotEmpty)
+          .toList(growable: false);
+    } on PlatformException catch (e) {
+      debugPrint('MediaStoreRepo.volumes failed: $e');
+      return const [];
     }
   }
 

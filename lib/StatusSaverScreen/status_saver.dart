@@ -315,6 +315,17 @@ class _StatusSaverScreenState extends State<StatusSaverScreen>
                   ),
                 ),
 
+                const SizedBox(height: 16),
+                Text(
+                  t('wa_disclaimer'),
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.grey.shade600,
+                    fontSize: 11,
+                    height: 1.4,
+                  ),
+                ),
+
                 const SizedBox(height: 24),
               ],
             ),

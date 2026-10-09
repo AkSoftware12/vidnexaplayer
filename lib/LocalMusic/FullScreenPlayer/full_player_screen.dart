@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'dart:typed_data';
 import 'package:audio_service/audio_service.dart';
 import 'package:material_ui/material_ui.dart';
@@ -6,6 +5,7 @@ import 'package:flutter_colorpicker/flutter_colorpicker.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:just_audio/just_audio.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
+import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
 import 'package:rxdart/rxdart.dart';
 import 'package:share_plus/share_plus.dart';
@@ -1107,27 +1107,33 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
     if (confirmed != true) return;
 
     try {
-      // `song.id` is non-nullable, so `path` never is — only emptiness matters.
-      final path = song.extras?['path']?.toString() ?? song.id;
-      if (path.isEmpty) throw StateError('No file path');
+      // Library songs carry their MediaStore id as the MediaItem id. The old
+      // code did `File(song.id).delete()` — a bare number, never a real path —
+      // so nothing was deleted yet "Deleted" was shown. And on Android 11+ an
+      // app may not delete other apps' media directly anyway; the MediaStore
+      // delete request below shows the system's own confirmation instead.
+      // An "Open with" file has a uri as its id and is not ours to delete.
+      if (int.tryParse(song.id) == null) throw StateError('Not a library song');
 
-      // stop if this one is playing
+      final deleted = await PhotoManager.editor.deleteWithIds([song.id]);
+      // Empty when the user declined the system dialog — not an error.
+      if (!deleted.contains(song.id)) return;
+
       if (audio.currentIndex.value == index) {
         await audio.player.stop();
       }
 
-      // delete file
-      final file = File(path);
-      if (await file.exists()) {
-        await file.delete();
+      // Out of the player's sources as well as the media-session queue; the
+      // old code only edited the queue, leaving the two out of step.
+      final aligned =
+          audio.currentSongs.value.length == audio.handler.queue.value.length;
+      await audio.handler.removeTrack(index);
+      if (aligned && index < audio.currentSongs.value.length) {
+        audio.currentSongs.value = List<SongModel>.from(audio.currentSongs.value)
+          ..removeAt(index);
       }
 
-      // remove from queue (audio_service queue)
-      final q = audio.handler.queue.value;
-      final newQ = [...q]..removeAt(index);
-      audio.handler.updateQueue(newQ);
-
-      // fix currentIndex
+      final newQ = audio.handler.queue.value;
       if (audio.currentIndex.value >= newQ.length) {
         audio.currentIndex.value = (newQ.isEmpty) ? 0 : newQ.length - 1;
       }

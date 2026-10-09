@@ -7,6 +7,8 @@ import 'package:photo_manager/photo_manager.dart';
 import '../../../features/playback/playback_coordinator.dart';
 import '../4k_player.dart';
 import '../../safe_player_dispose.dart';
+import '../../Resume/playback_position_store.dart';
+import 'system_pip.dart';
 
 /// Picture-in-picture style floating player rendered in the app's [Overlay].
 ///
@@ -39,6 +41,9 @@ class FloatingVideoManager {
 
   static bool get isActive => _entry != null;
 
+  /// The floating window's video, for [PipHost] to show in the PiP window.
+  static VideoController? get controller => _controller;
+
   /// Window size in logical pixels — also used to clamp dragging.
   static Size get _windowSize => Size(250.sp, 140.sp);
 
@@ -53,15 +58,21 @@ class FloatingVideoManager {
     });
   }
 
-  /// Keeps the window fully on screen so it can never be dragged out of reach.
-  static void _clampOffset(Size screen) {
+  /// [offset] moved as needed to keep the window fully on [screen], so it can
+  /// never be dragged out of reach.
+  ///
+  /// Returns a value instead of writing [_offset]: the build uses it only for
+  /// display, so a frame laid out at a tiny size (the PiP window, while
+  /// entering or leaving it) can no longer push the saved position into the
+  /// corner for good.
+  static Offset _clamped(Offset offset, Size screen) {
     final w = _windowSize.width;
     final h = _windowSize.height;
     const margin = 4.0;
 
-    _offset = Offset(
-      _offset.dx.clamp(margin, (screen.width - w - margin).clamp(margin, double.infinity)),
-      _offset.dy.clamp(margin, (screen.height - h - margin).clamp(margin, double.infinity)),
+    return Offset(
+      offset.dx.clamp(margin, (screen.width - w - margin).clamp(margin, double.infinity)),
+      offset.dy.clamp(margin, (screen.height - h - margin).clamp(margin, double.infinity)),
     );
   }
 
@@ -102,6 +113,18 @@ class FloatingVideoManager {
       },
     );
 
+    // The full-screen player's own "play the next one" listener died with its
+    // page, so the floating window has to carry the playlist on itself.
+    _completedSub?.cancel();
+    _completedSub = player.stream.completed.listen((completed) {
+      if (!completed) return;
+      // A finished video must not offer to resume next time.
+      if (_currentIndex < _videos.length) {
+        unawaited(PlaybackPositionStore.clear(_videos[_currentIndex].id));
+      }
+      if (_hasNext) unawaited(_playIndex(_currentIndex + 1));
+    });
+
     _playingSub?.cancel();
     _playingSub = player.stream.playing.listen((playing) {
       if (playing) {
@@ -114,21 +137,27 @@ class FloatingVideoManager {
     });
 
     _entry = OverlayEntry(
-      builder: (overlayContext) {
+      builder: (overlayContext) => ValueListenableBuilder<bool>(
+        valueListenable: SystemPip.instance.inPip,
+        builder: (overlayContext, inPip, _) {
         final controller = _controller;
         if (controller == null) return const SizedBox.shrink();
 
+        // In Android's PiP window [PipHost] draws the video full-window over
+        // the whole app, so the small window steps aside.
+        if (inPip) return const SizedBox.shrink();
+
         final screen = MediaQuery.sizeOf(overlayContext);
-        _clampOffset(screen);
+        final shown = _clamped(_offset, screen);
 
         return Positioned(
-          left: _offset.dx,
-          top: _offset.dy,
+          left: shown.dx,
+          top: shown.dy,
           child: GestureDetector(
             onTap: _showControlsTemporarily,
             onPanUpdate: (details) {
-              _offset += details.delta;
-              _clampOffset(screen);
+              _offset = _clamped(
+                  _clamped(_offset, screen) + details.delta, screen);
               _entry?.markNeedsBuild();
             },
             child: Material(
@@ -168,8 +197,16 @@ class FloatingVideoManager {
                             child: Row(
                               mainAxisAlignment: MainAxisAlignment.spaceAround,
                               children: [
+                                _skipButton(
+                                  Icons.skip_previous,
+                                  enabled: _hasPrevious,
+                                  onPressed: () =>
+                                      _playIndex(_currentIndex - 1),
+                                ),
+
                                 // Play / Pause synced with the fullscreen player
                                 IconButton(
+                                  visualDensity: VisualDensity.compact,
                                   icon: Icon(
                                     globalPlayPause.isPlaying
                                         ? Icons.pause
@@ -189,8 +226,16 @@ class FloatingVideoManager {
                                   },
                                 ),
 
+                                _skipButton(
+                                  Icons.skip_next,
+                                  enabled: _hasNext,
+                                  onPressed: () =>
+                                      _playIndex(_currentIndex + 1),
+                                ),
+
                                 // Back to fullscreen
                                 IconButton(
+                                  visualDensity: VisualDensity.compact,
                                   icon: Icon(
                                     Icons.fullscreen,
                                     color: Colors.white,
@@ -203,6 +248,7 @@ class FloatingVideoManager {
 
                                 // Close
                                 IconButton(
+                                  visualDensity: VisualDensity.compact,
                                   icon: Icon(
                                     Icons.close,
                                     color: Colors.white,
@@ -222,11 +268,86 @@ class FloatingVideoManager {
             ),
           ),
         );
-      },
+        },
+      ),
     );
 
     overlay.insert(_entry!);
     _showControlsTemporarily();
+    _armSystemPip(player);
+  }
+
+  static StreamSubscription<bool>? _completedSub;
+
+  /// Guards against a second skip while the next file is still opening.
+  static bool _switching = false;
+
+  /// Previous / next in the window's control row; greyed out at either end of
+  /// the playlist.
+  static Widget _skipButton(
+    IconData icon, {
+    required bool enabled,
+    required VoidCallback onPressed,
+  }) {
+    return IconButton(
+      visualDensity: VisualDensity.compact,
+      icon: Icon(icon, color: enabled ? Colors.white : Colors.white38,
+          size: 20.sp),
+      onPressed: enabled
+          ? () {
+              _showControlsTemporarily();
+              onPressed();
+            }
+          : null,
+    );
+  }
+
+  static bool get _hasNext => _currentIndex < _videos.length - 1;
+  static bool get _hasPrevious => _currentIndex > 0;
+
+  /// Opens video [index] of the playlist in the same player, so the window,
+  /// the PiP hand-off and fullscreen all keep working on the new one.
+  static Future<void> _playIndex(int index) async {
+    final player = _player;
+    if (player == null || _switching) return;
+    if (index < 0 || index >= _videos.length) return;
+
+    _switching = true;
+    try {
+      final file = await _videos[index].file;
+      // Closed or handed back to fullscreen while the file was resolving.
+      if (file == null || !identical(_player, player)) return;
+      _currentIndex = index;
+      await player.open(Media(file.path));
+      _entry?.markNeedsBuild();
+    } catch (_) {
+      // Unreadable file: stay on the current one.
+    } finally {
+      _switching = false;
+    }
+  }
+
+  /// While the floating window is up, leaving the app moves it into Android's
+  /// PiP window instead of losing it.
+  ///
+  /// Always 16:9, the same shape as the in-app window: following the video's
+  /// own shape made portrait videos open a tall window that covered much of
+  /// the home screen.
+  static void _armSystemPip(Player player) {
+    unawaited(SystemPip.instance.setEnabled(true, width: 16, height: 9));
+
+    // The PiP window's own ✕ — the user is done watching, so stop the sound
+    // rather than leave it playing with nothing on screen.
+    SystemPip.instance.onDismissed = () {
+      try {
+        _player?.pause();
+      } catch (_) {}
+    };
+  }
+
+  static void _disarmSystemPip() {
+    SystemPip.instance.onDismissed = null;
+    unawaited(SystemPip.instance.setEnabled(false));
   }
 
   /// Re-opens the fullscreen player, handing over the *live* player instance so
@@ -309,6 +430,11 @@ class FloatingVideoManager {
   static Future<void> hide() => close();
 
   static void _teardownOverlay() {
+    _disarmSystemPip();
+
+    _completedSub?.cancel();
+    _completedSub = null;
+
     _playingSub?.cancel();
     _playingSub = null;
 

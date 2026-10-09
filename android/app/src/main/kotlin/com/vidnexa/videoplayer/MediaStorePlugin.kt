@@ -63,10 +63,20 @@ class MediaStorePlugin(
                         query(
                             kind = call.argument<String>("kind") ?: "all",
                             limit = call.argument<Int>("limit") ?: 0,
+                            volume = call.argument<String>("volume"),
                         ),
                     )
 
-                    "folders" -> result.success(folders())
+                    "folders" -> result.success(folders(call.argument<String>("volume")))
+
+                    "volumes" -> result.success(removableVolumes())
+
+                    "saveToShared" -> result.success(
+                        saveToShared(
+                            path = call.argument<String>("path"),
+                            name = call.argument<String>("name"),
+                        ),
+                    )
 
                     "hashes" -> result.success(
                         hashes(call.argument<List<String>>("uris") ?: emptyList()),
@@ -112,8 +122,8 @@ class MediaStorePlugin(
      *
      * [limit] of 0 means no limit.
      */
-    private fun query(kind: String, limit: Int): List<Map<String, Any?>> {
-        val uri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+    private fun query(kind: String, limit: Int, volume: String?): List<Map<String, Any?>> {
+        val uri = filesUri(volume)
 
         val projection = arrayOf(
             MediaStore.Files.FileColumns._ID,
@@ -168,8 +178,8 @@ class MediaStorePlugin(
      * sends back a few hundred folder rows instead of all 20 000 — the whole
      * point of the rewrite was that the folder screen opens immediately.
      */
-    private fun folders(): List<Map<String, Any?>> {
-        val uri = MediaStore.Files.getContentUri(MediaStore.VOLUME_EXTERNAL)
+    private fun folders(volume: String?): List<Map<String, Any?>> {
+        val uri = filesUri(volume)
         val projection = arrayOf(
             MediaStore.Files.FileColumns.RELATIVE_PATH,
             MediaStore.Files.FileColumns.SIZE,
@@ -312,6 +322,125 @@ class MediaStorePlugin(
         } catch (t: Throwable) {
             // Perfectly normal: a document has no thumbnail, and a file can go
             // away between the listing and the scroll that reaches it.
+            null
+        }
+    }
+
+    /**
+     * The Files collection to read: every volume when [volume] is null, or just
+     * that one (an SD card, say) when it names a MediaStore volume.
+     */
+    private fun filesUri(volume: String?): android.net.Uri =
+        MediaStore.Files.getContentUri(volume ?: MediaStore.VOLUME_EXTERNAL)
+
+    /**
+     * Mounted removable volumes — SD cards and USB drives — with their size.
+     *
+     * Empty when there are none, which is what lets the Storage locations
+     * section disappear on a phone without a card instead of showing a row
+     * that leads nowhere. API 30+ only: that is where a volume reports both
+     * its MediaStore name and its directory (for the size); below it this
+     * returns nothing rather than guessing either.
+     */
+    private fun removableVolumes(): List<Map<String, Any?>> {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) return emptyList()
+
+        val manager = context.getSystemService(Context.STORAGE_SERVICE)
+            as android.os.storage.StorageManager
+
+        return manager.storageVolumes
+            .filter { it.isRemovable && it.state == android.os.Environment.MEDIA_MOUNTED }
+            .mapNotNull { volume ->
+                val name = volume.mediaStoreVolumeName ?: return@mapNotNull null
+                val dir = volume.directory
+                val stat = try {
+                    dir?.let { android.os.StatFs(it.path) }
+                } catch (t: Throwable) {
+                    null
+                }
+                mapOf(
+                    "volume" to name,
+                    "label" to volume.getDescription(context),
+                    "total" to (stat?.totalBytes ?: 0L),
+                    "free" to (stat?.availableBytes ?: 0L),
+                )
+            }
+    }
+
+    /**
+     * Copies an app-private file out to shared storage — Music/Vidnexa/ for
+     * audio, Download/Vidnexa/ for anything else — and returns where it went
+     * (`Download/Vidnexa/`), or null on failure.
+     *
+     * Used by the vault to unhide documents and audio without a "save as"
+     * picker, the way photos and videos already go straight back into the
+     * gallery. From Android 10 an app may add its own files to these
+     * collections with no permission at all; below that it needs the legacy
+     * WRITE_EXTERNAL_STORAGE grant, and a failure there returns null so the
+     * caller can fall back to asking the user where to save.
+     */
+    private fun saveToShared(path: String?, name: String?): String? {
+        if (path.isNullOrEmpty() || name.isNullOrEmpty()) return null
+        val src = java.io.File(path)
+        if (!src.exists()) return null
+
+        val mime = java.net.URLConnection.guessContentTypeFromName(name)
+            ?: android.webkit.MimeTypeMap.getSingleton()
+                .getMimeTypeFromExtension(name.substringAfterLast('.', "").lowercase())
+            ?: "application/octet-stream"
+        val isAudio = mime.startsWith("audio/")
+        val folder = if (isAudio) "Music/Vidnexa/" else "Download/Vidnexa/"
+
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                val collection = if (isAudio) {
+                    MediaStore.Audio.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                } else {
+                    MediaStore.Downloads.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY)
+                }
+                val values = android.content.ContentValues().apply {
+                    put(MediaStore.MediaColumns.DISPLAY_NAME, name)
+                    put(MediaStore.MediaColumns.MIME_TYPE, mime)
+                    put(MediaStore.MediaColumns.RELATIVE_PATH, folder)
+                    put(MediaStore.MediaColumns.IS_PENDING, 1)
+                }
+                val resolver = context.contentResolver
+                val uri = resolver.insert(collection, values) ?: return null
+                try {
+                    resolver.openOutputStream(uri)?.use { out ->
+                        src.inputStream().use { it.copyTo(out) }
+                    } ?: throw java.io.IOException("no output stream")
+                    values.clear()
+                    values.put(MediaStore.MediaColumns.IS_PENDING, 0)
+                    resolver.update(uri, values, null, null)
+                } catch (t: Throwable) {
+                    resolver.delete(uri, null, null)
+                    throw t
+                }
+            } else {
+                @Suppress("DEPRECATION")
+                val base = android.os.Environment.getExternalStoragePublicDirectory(
+                    if (isAudio) android.os.Environment.DIRECTORY_MUSIC
+                    else android.os.Environment.DIRECTORY_DOWNLOADS,
+                )
+                val dir = java.io.File(base, "Vidnexa").apply { mkdirs() }
+                var dest = java.io.File(dir, name)
+                var i = 1
+                while (dest.exists()) {
+                    dest = java.io.File(
+                        dir,
+                        "${name.substringBeforeLast('.')}_$i.${name.substringAfterLast('.', "")}",
+                    )
+                    i++
+                }
+                src.copyTo(dest)
+                android.media.MediaScannerConnection.scanFile(
+                    context, arrayOf(dest.path), arrayOf(mime), null,
+                )
+            }
+            folder
+        } catch (t: Throwable) {
+            Log.w(TAG, "saveToShared failed for $name", t)
             null
         }
     }

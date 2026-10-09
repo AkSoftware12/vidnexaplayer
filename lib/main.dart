@@ -20,6 +20,8 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
+import 'package:videoplayer/VideoPLayer/4kPlayer/FlotingVideo/pip_host.dart';
+import 'package:videoplayer/WhatsNew/whats_new.dart';
 import 'package:videoplayer/Analytics/screen_analytics.dart';
 import 'package:videoplayer/Notification/local_notifications.dart';
 import 'package:videoplayer/Notification/notification_store.dart';
@@ -34,6 +36,7 @@ import 'NotifyListeners/AppBar/app_bar_color.dart';
 import 'NotifyListeners/LanguageProvider/language_provider.dart';
 import 'NotifyListeners/UserData/user_data.dart';
 import 'Billing/billing_service.dart';
+import 'ads/ad_consent.dart';
 import 'ads/app_open_ad_manager.dart';
 import 'app_globals.dart';
 import 'features/equalizer/audio_effects_service.dart';
@@ -181,6 +184,7 @@ Future<void> _initCritical(
   await _guard('preferences', () async {
     await themeProvider.load();
     await localeProvider.load();
+    await WhatsNew.instance.load();
   });
 
   // Synchronous and required before any Player is constructed.
@@ -199,12 +203,8 @@ Future<void> _initCritical(
   await Future.wait([
     // Music screens call AudioServiceInit.handler, so it must be up first.
     _guard('audio_service', AudioServiceInit.init),
-    _guard('hive', () async {
-      await Hive.initFlutter();
-      if (!Hive.isBoxOpen('yt_cache')) {
-        await Hive.openBox('yt_cache');
-      }
-    }),
+    // The equalizer opens its own box; Hive only needs initialising here.
+    _guard('hive', Hive.initFlutter),
     _guard('orientation', () async {
       await SystemChrome.setPreferredOrientations(
         [DeviceOrientation.portraitUp],
@@ -248,27 +248,16 @@ Future<void> _initDeferred() async {
         return;
       }
 
-      await MobileAds.instance.initialize();
-
-      // Device ids that should always receive test ads.
-      //
-      // Find a device's id in logcat — the SDK prints:
-      //   I/Ads: Use RequestConfiguration.Builder().setTestDeviceIds(
-      //            Arrays.asList("XXXXXXXX")) to get test ads on this device.
-      //
-      // Debug builds don't depend on this list (they use AdUnits' test unit
-      // ids), but it still matters for release/profile testing on a handset.
-      MobileAds.instance.updateRequestConfiguration(
-        RequestConfiguration(
-          testDeviceIds: const [
-            '25240AE534A134DAFD363D1E9144746F', // AI Nova 2 Pro
-            'D55A05AC5F182B8B7343029E881273E8', // Samsung SM-A505F
-            '05B5C242534D4508DE3D9FF83044AED8', // (older dev device)
-          ],
-        ),
-      );
-
-      appOpenManager.init();
+      // EEA / UK / Swiss users must answer the UMP consent form before any ad
+      // is requested. Elsewhere this resolves at once with ads allowed. A
+      // later "allow" from Privacy options starts the ad stack then.
+      await AdConsent.instance.gather();
+      if (!AdConsent.instance.canRequestAds) {
+        debugPrint('🛡️ No ad consent — ad SDK not initialised.');
+        AdConsent.instance.addListener(_startAdsOnceConsented);
+        return;
+      }
+      await _startAds();
     }),
 
     // FCM permission prompt + token fetch; nothing on screen waits for it.
@@ -285,6 +274,41 @@ Future<void> _initDeferred() async {
       }
     }),
   ]);
+}
+
+void _startAdsOnceConsented() {
+  if (!AdConsent.instance.canRequestAds) return;
+  AdConsent.instance.removeListener(_startAdsOnceConsented);
+  unawaited(_guard('ads_after_consent', _startAds));
+}
+
+bool _adsStarted = false;
+
+Future<void> _startAds() async {
+  if (_adsStarted) return;
+  _adsStarted = true;
+
+  await MobileAds.instance.initialize();
+
+  // Device ids that should always receive test ads.
+  //
+  // Find a device's id in logcat — the SDK prints:
+  //   I/Ads: Use RequestConfiguration.Builder().setTestDeviceIds(
+  //            Arrays.asList("XXXXXXXX")) to get test ads on this device.
+  //
+  // Debug builds don't depend on this list (they use AdUnits' test unit
+  // ids), but it still matters for release/profile testing on a handset.
+  MobileAds.instance.updateRequestConfiguration(
+    RequestConfiguration(
+      testDeviceIds: const [
+        '25240AE534A134DAFD363D1E9144746F', // AI Nova 2 Pro
+        'D55A05AC5F182B8B7343029E881273E8', // Samsung SM-A505F
+        '05B5C242534D4508DE3D9FF83044AED8', // (older dev device)
+      ],
+    ),
+  );
+
+  appOpenManager.init();
 }
 
 Future<void> _guard(String label, Future<void> Function() body) async {
@@ -334,6 +358,12 @@ class _MyAppState extends State<MyApp> {
           designSize: const Size(360, 690),
           minTextAdapt: true,
           splitScreenMode: true,
+          // `.sp` returns its number unchanged, in logical pixels — the same
+          // physical size on every phone and tablet, and the same scale the
+          // equalizer screen uses with plain numbers. The default scaled it
+          // by screen width, so `12.sp` was ~14 on a typical phone, bigger
+          // on a tablet and smaller on a compact phone.
+          fontSizeResolver: (fontSize, _) => fontSize.toDouble(),
           builder: (_, __) {
             return Consumer2<ThemeProvider, LocaleProvider>(
               builder: (context, theme, localeProvider, _) {
@@ -364,7 +394,24 @@ class _MyAppState extends State<MyApp> {
                     AppPalette.setBrightness(
                       Theme.of(context).brightness == Brightness.dark,
                     );
-                    return child ?? const SizedBox.shrink();
+                    // Text size = the user's choice in Profile → Text size,
+                    // times the system font-size setting clamped to 1.0–1.15
+                    // (it may enlarge text a little, never shrink it), capped
+                    // at 1.25 overall. Unclamped, large system settings
+                    // overflowed the fixed-size cards and rows.
+                    final system = MediaQuery.textScalerOf(context)
+                        .clamp(minScaleFactor: 1.0, maxScaleFactor: 1.15)
+                        .scale(100) / 100;
+                    final factor =
+                        (system * theme.textScale).clamp(0.9, 1.25);
+                    return MediaQuery(
+                      data: MediaQuery.of(context).copyWith(
+                        textScaler: TextScaler.linear(factor),
+                      ),
+                      // PipHost: in Android's PiP window, show only the
+                      // floating video (see FlotingVideo/pip_host.dart).
+                      child: PipHost(child: child ?? const SizedBox.shrink()),
+                    );
                   },
                   // SplashScreen already builds its own Scaffold — wrapping it
                   // in another one nested two Scaffolds.

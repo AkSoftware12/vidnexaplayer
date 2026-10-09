@@ -1,19 +1,22 @@
 package com.vidnexa.videoplayer
 
 import android.content.Intent
+import android.content.res.Configuration
 import android.net.Uri
 import android.os.Bundle
 import android.provider.OpenableColumns
 import android.util.Log
-import com.ryanheise.audioservice.AudioServiceActivity
+import com.ryanheise.audioservice.AudioServiceFragmentActivity
 import com.vidnexa.videoplayer.audiofx.AudioEffectsPlugin
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
-/// Extends [AudioServiceActivity] (not FlutterActivity) so that audio_service's
-/// media session keeps working while this activity is the real launcher entry
-/// point — that is what makes the "getVideoPath" MethodChannel reachable.
-class MainActivity : AudioServiceActivity() {
+/// Extends [AudioServiceFragmentActivity] (not FlutterActivity) so that
+/// audio_service's media session keeps working while this activity is the real
+/// launcher entry point — that is what makes the "getVideoPath" MethodChannel
+/// reachable. The Fragment variant is required by local_auth: its
+/// BiometricPrompt (vault fingerprint unlock) only attaches to a FragmentActivity.
+class MainActivity : AudioServiceFragmentActivity() {
 
     private companion object {
         const val CHANNEL = "open_video_channel"
@@ -42,7 +45,7 @@ class MainActivity : AudioServiceActivity() {
     ///    alive — Android delivers the new intent via `onNewIntent`, and
     ///    nothing would otherwise poll for it again.
     ///  - "Zombie" start: the user swiped the app away from Recents. That
-    ///    only tears down the Activity/Task — `AudioServiceActivity` (via
+    ///    only tears down the Activity/Task — `AudioServiceFragmentActivity` (via
     ///    `provideFlutterEngine`) keeps the Flutter engine and Dart isolate
     ///    alive in the background so audio playback can continue. A fresh
     ///    `MainActivity` then goes through `onCreate` (not `onNewIntent`),
@@ -66,13 +69,36 @@ class MainActivity : AudioServiceActivity() {
     /// [MediaSizePlugin] for why the plugin's own file API cannot be used.
     private var mediaSize: MediaSizePlugin? = null
 
-    /// Storage Access Framework calls the docman plugin does not expose
-    /// (rename, and a cheap name-collision check). See [SafOpsPlugin].
-    private var safOps: SafOpsPlugin? = null
-
     /// Device-wide file index read straight from MediaStore, which is what
     /// replaced the file browser's folder picker. See [MediaStorePlugin].
     private var mediaStore: MediaStorePlugin? = null
+
+    /// Moves the floating video into Android's PiP window when the app is
+    /// left. See [PipController].
+    private var pip: PipController? = null
+
+    override fun onUserLeaveHint() {
+        super.onUserLeaveHint()
+        pip?.onUserLeaveHint()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        pip?.onResume()
+    }
+
+    override fun onStop() {
+        super.onStop()
+        pip?.onStop()
+    }
+
+    override fun onPictureInPictureModeChanged(
+        isInPictureInPictureMode: Boolean,
+        newConfig: Configuration,
+    ) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode, newConfig)
+        pip?.onPictureInPictureModeChanged(isInPictureInPictureMode)
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -144,15 +170,12 @@ class MainActivity : AudioServiceActivity() {
             flutterEngine.dartExecutor.binaryMessenger,
         )
 
-        safOps = SafOpsPlugin(
-            applicationContext,
-            flutterEngine.dartExecutor.binaryMessenger,
-        )
-
         mediaStore = MediaStorePlugin(
             applicationContext,
             flutterEngine.dartExecutor.binaryMessenger,
         )
+
+        pip = PipController(this, flutterEngine.dartExecutor.binaryMessenger)
 
         channel = MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL)
             .apply {
@@ -188,10 +211,10 @@ class MainActivity : AudioServiceActivity() {
         audioEffects = null
         mediaSize?.dispose()
         mediaSize = null
-        safOps?.dispose()
-        safOps = null
         mediaStore?.dispose()
         mediaStore = null
+        pip?.dispose()
+        pip = null
         channel?.setMethodCallHandler(null)
         channel = null
         super.cleanUpFlutterEngine(flutterEngine)

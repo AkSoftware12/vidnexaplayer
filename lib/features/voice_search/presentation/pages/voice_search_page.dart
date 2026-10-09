@@ -68,6 +68,39 @@ class _VoiceSearchViewState extends State<_VoiceSearchView> {
     return locale.languageCode == 'hi' ? 'hi_IN' : 'en_IN';
   }
 
+  /// Explains the microphone before Android's permission prompt appears.
+  ///
+  /// Play's User Data policy wants the purpose, and where the audio goes,
+  /// stated in-app before the request. Skipped once the permission is granted,
+  /// and when it is permanently denied (the controller then shows the
+  /// "open settings" state instead).
+  Future<void> _startListening(VoiceSearchController controller) async {
+    final status = await Permission.microphone.status;
+    if (!mounted) return;
+    if (!status.isGranted && !status.isPermanentlyDenied) {
+      final lang = context.read<LocaleProvider>().locale.languageCode;
+      final ok = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          title: Text(MiscStrings.t(lang, 'voice_search_mic_disclosure_title')),
+          content: Text(MiscStrings.t(lang, 'voice_search_mic_disclosure_body')),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: Text(MiscStrings.t(lang, 'voice_search_mic_disclosure_no')),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: Text(MiscStrings.t(lang, 'voice_search_mic_disclosure_yes')),
+            ),
+          ],
+        ),
+      );
+      if (ok != true || !mounted) return;
+    }
+    await controller.startListening(localeId: _localeIdFor(context));
+  }
+
   @override
   Widget build(BuildContext context) {
     final controller = context.watch<VoiceSearchController>();
@@ -94,7 +127,7 @@ class _VoiceSearchViewState extends State<_VoiceSearchView> {
               if (controller.state == VoiceSearchState.listening) {
                 controller.stopListening();
               } else {
-                controller.startListening(localeId: _localeIdFor(context));
+                _startListening(controller);
               }
             },
           ),
@@ -108,7 +141,7 @@ class _VoiceSearchViewState extends State<_VoiceSearchView> {
                       state: controller.state,
                       errorMessage: controller.errorMessage,
                       mediaKind: controller.lastQuery?.mediaKind,
-                      onRetry: () => controller.startListening(localeId: _localeIdFor(context)),
+                      onRetry: () => _startListening(controller),
                       onOpenSettings: () {
                         openAppSettings();
                       },

@@ -28,7 +28,9 @@ class _BannerSliderState extends State<BannerSlider> {
       children: [
         CarouselSlider(
           options: CarouselOptions(
-            height: 80.sp,
+            // Width-based: a full-width image keeps its aspect ratio on every
+            // screen (`.sp` is a fixed size now and cropped it).
+            height: 80.w,
             autoPlay: true,
             autoPlayInterval: const Duration(seconds: 3),
             autoPlayAnimationDuration: const Duration(milliseconds: 800),

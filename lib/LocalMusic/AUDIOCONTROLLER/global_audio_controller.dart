@@ -243,6 +243,44 @@ class GlobalAudioController {
     unawaited(_prefetchArtwork(playable, mediaItems, startIndex));
   }
 
+  /// "Play next" ([next] true) or "Add to queue" from a song's menu.
+  ///
+  /// With nothing queued yet there is nothing to add to, so [song] just
+  /// starts playing.
+  Future<void> enqueue(SongModel song, {required bool next}) async {
+    final raw = song.uri;
+    final uri = raw == null ? null : Uri.tryParse(raw);
+    if (uri == null) return;
+
+    final queueLength = handler.queue.value.length;
+    if (queueLength == 0 || !hasPlayedOnce.value) {
+      await playSongs([song], 0);
+      return;
+    }
+
+    final item = MediaItem(
+      id: song.id.toString(),
+      title: song.title,
+      artist: song.artist ?? 'Unknown',
+      album: song.album,
+      duration:
+          song.duration == null ? null : Duration(milliseconds: song.duration!),
+    );
+    final at = next ? currentIndex.value + 1 : queueLength;
+
+    // [currentSongs] mirrors the queue only for library playlists; after an
+    // "Open with" file it is empty and must stay that way.
+    final aligned = currentSongs.value.length == queueLength;
+
+    await handler.insertTrack(at, item, AudioSource.uri(uri, tag: item));
+
+    if (aligned) {
+      final songs = List<SongModel>.from(currentSongs.value)
+        ..insert(at.clamp(0, queueLength), song);
+      currentSongs.value = songs;
+    }
+  }
+
   Future<void> _prefetchArtwork(
     List<SongModel> songs,
     List<MediaItem> items,

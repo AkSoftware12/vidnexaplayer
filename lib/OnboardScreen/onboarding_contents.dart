@@ -21,15 +21,16 @@ class CounsellingToolFeature {
   });
 }
 
+// Only features the app actually has. An onboarding screen that promises
+// 8K, downloads or Chromecast the app does not ship is a misleading-claims
+// risk under Play policy, so check the code before adding a line here.
 List<OnboardingContents> contents = [
-
-
    OnboardingContents(
     image: "assets/landing_one.png",
      list:  [
        CounsellingToolFeature(
          title: "Playback Controls",
-         description: "Play, pause, rewind, fast-forward, and frame-by-frame navigation.",
+         description: "Play, pause, seek, rotate and lock the screen while you watch.",
          icon: Icons.play_arrow,
        ),
        CounsellingToolFeature(
@@ -38,62 +39,55 @@ List<OnboardingContents> contents = [
          icon: Icons.volume_up,
        ),
        CounsellingToolFeature(
-         title: "Subtitle Support",
-         description: "Easy loading and customization of subtitles for accessibility.",
-         icon: Icons.closed_caption,
+         title: "Volume Boost",
+         description: "Go past 100% when a video is too quiet.",
+         icon: Icons.volume_up_rounded,
        ),
        CounsellingToolFeature(
-         title: "Quality Selection",
-         description: "Choose video quality from SD to 8K based on your connection.",
-         icon: Icons.settings,
+         title: "Playback Speed Control",
+         description: "Adjust playback speed from 0.5x to 3x.",
+         icon: Icons.speed,
        ),
        CounsellingToolFeature(
-         title: "Adaptive Streaming",
-         description: "Automatically adjusts video quality for smooth playback.",
-         icon: Icons.autorenew,
+         title: "Resume Playback",
+         description: "Pick up videos from where you left off.",
+         icon: Icons.history,
        ),
      ],
   ),
   OnboardingContents(
     image: "assets/landing_two.png",
     list: [
-
-      CounsellingToolFeature(
-        title: "Offline Downloads",
-        description: "Download videos for offline viewing anytime.",
-        icon: Icons.download,
-      ),
-      CounsellingToolFeature(
-        title: "Casting Support",
-        description: "Cast videos to TV or other devices via Chromecast or AirPlay.",
-        icon: Icons.cast,
-      ),
-      CounsellingToolFeature(
-        title: "Playlist Management",
-        description: "Create, edit, and manage playlists for organized viewing.",
-        icon: Icons.playlist_add,
-      ),
-      CounsellingToolFeature(
-        title: "Resume Playback",
-        description: "Automatically resume videos from where you left off.",
-        icon: Icons.history,
-      ),
-      CounsellingToolFeature(
-        title: "Playback Speed Control",
-        description: "Adjust playback speed from 0.5x to 2x for flexible viewing.",
-        icon: Icons.speed,
-      ),
-
-    ],
-  ),
-  OnboardingContents(
-    image: "assets/landing_tree.png",
-    list:  [
       CounsellingToolFeature(
         title: "Picture-in-Picture Mode",
         description: "Watch videos in a floating window while multitasking.",
         icon: Icons.picture_in_picture,
       ),
+      CounsellingToolFeature(
+        title: "Equalizer",
+        description: "Presets, bass boost and dialogue clarity for music and video.",
+        icon: Icons.equalizer,
+      ),
+      CounsellingToolFeature(
+        title: "Offline Music",
+        description: "Play your songs in the background with notification controls.",
+        icon: Icons.music_note,
+      ),
+      CounsellingToolFeature(
+        title: "Private Vault",
+        description: "Keep photos, videos and files behind a PIN or fingerprint.",
+        icon: Icons.lock,
+      ),
+      CounsellingToolFeature(
+        title: "File Manager",
+        description: "Browse, copy, move and zip the files on your phone.",
+        icon: Icons.folder,
+      ),
+    ],
+  ),
+  OnboardingContents(
+    image: "assets/landing_tree.png",
+    list:  [
       CounsellingToolFeature(
         title: "Dark Mode",
         description: "Switch to dark theme for comfortable night viewing.",
@@ -101,20 +95,24 @@ List<OnboardingContents> contents = [
       ),
       CounsellingToolFeature(
         title: "Wide Format Support",
-        description: "Play all formats including MP4, MKV, AVI, and more.",
+        description: "Plays MP4, MKV, AVI and many more formats.",
         icon: Icons.movie,
       ),
       CounsellingToolFeature(
-        title: "Voice Controls",
-        description: "Use voice commands for hands-free playback control.",
+        title: "Voice Search",
+        description: "Find your videos, songs and photos by speaking.",
         icon: Icons.mic,
       ),
       CounsellingToolFeature(
         title: "Gallery",
-        description: "View and manage your favorite photos and videos easily.",
+        description: "View and organise your photos, and find duplicates.",
         icon: Icons.photo_library,
       ),
-
+      CounsellingToolFeature(
+        title: "Play from a Link",
+        description: "Stream a video by pasting its web address.",
+        icon: Icons.link,
+      ),
     ],
   ),
 ];

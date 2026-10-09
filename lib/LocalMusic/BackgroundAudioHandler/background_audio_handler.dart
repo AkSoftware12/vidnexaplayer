@@ -79,6 +79,28 @@ class BackgroundAudioHandler extends BaseAudioHandler
     }
   }
 
+  /// Inserts one track into the live queue without restarting playback.
+  ///
+  /// The media-session queue and the player's sources must stay the same
+  /// length and order, so both change together.
+  Future<void> insertTrack(int index, MediaItem item, AudioSource source) async {
+    final q = List<MediaItem>.from(queue.value);
+    final at = index.clamp(0, q.length);
+    await _player.insertAudioSource(at, source);
+    q.insert(at, item);
+    queue.add(q);
+  }
+
+  /// Removes one track from the live queue — the counterpart of [insertTrack],
+  /// keeping the media-session queue and the player's sources in step.
+  Future<void> removeTrack(int index) async {
+    final q = List<MediaItem>.from(queue.value);
+    if (index < 0 || index >= q.length) return;
+    await _player.removeAudioSourceAt(index);
+    q.removeAt(index);
+    queue.add(q);
+  }
+
   // ---------------- Sleep Timer ----------------
   Future<void> setSleepTimer(Duration? duration) async {
     await cancelSleepTimer();

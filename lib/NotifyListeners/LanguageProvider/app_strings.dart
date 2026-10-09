@@ -1,3 +1,11 @@
+import 'translations/vi.dart';
+import 'translations/tr.dart';
+import 'translations/ru.dart';
+import 'translations/bn.dart';
+import 'translations/ar.dart';
+import 'translations/id.dart';
+import 'translations/pt.dart';
+import 'translations/es.dart';
 /// Tiny in-code translation table for the Bottom Navigation Bar and the
 /// drawer (SettingsScreen) — the two surfaces the language picker currently
 /// covers. Only `en` and `hi` are actually translated; any other locale code
@@ -7,7 +15,8 @@ class AppStrings {
     'en': {
       'nav_home': 'Home',
       'nav_music': 'Music',
-      'nav_online': 'Online',
+      'nav_gallery': 'Gallery',
+      'nav_files': 'Files',
       'nav_profile': 'Profile',
 
       'drawer_main_features': 'Main Features',
@@ -49,10 +58,19 @@ class AppStrings {
       'choose_language': 'Choose Language',
       'apply': 'Apply',
     },
+    'es': esApp,
+    'pt': ptApp,
+    'id': idApp,
+    'ar': arApp,
+    'bn': bnApp,
+    'ru': ruApp,
+    'tr': trApp,
+    'vi': viApp,
     'hi': {
       'nav_home': 'होम',
       'nav_music': 'संगीत',
-      'nav_online': 'ऑनलाइन',
+      'nav_gallery': 'गैलरी',
+      'nav_files': 'फ़ाइलें',
       'nav_profile': 'प्रोफ़ाइल',
 
       'drawer_main_features': 'मुख्य सुविधाएं',

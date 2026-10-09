@@ -258,7 +258,7 @@ class _GroupCard extends StatelessWidget {
                         ? 'gallery_dup_exact'
                         : 'gallery_dup_similar',
                   ),
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 8.5.sp,
+                  style: TextStyle(fontFamily: 'Poppins', fontSize: 9.5.sp,
                     fontWeight: FontWeight.w600,
                     color: group.exact
                         ? Colors.green.shade700

@@ -1,3 +1,11 @@
+import 'translations/vi.dart';
+import 'translations/tr.dart';
+import 'translations/ru.dart';
+import 'translations/bn.dart';
+import 'translations/ar.dart';
+import 'translations/id.dart';
+import 'translations/pt.dart';
+import 'translations/es.dart';
 /// Tiny in-code translation table for the offline-music surfaces (tabs,
 /// album/artist/genre pages, mini player, full-screen player). Mirrors the
 /// pattern used by `AppStrings` but kept as a separate namespace so it can be
@@ -16,7 +24,7 @@ class MusicStrings {
       // Permission card
       'music_permission_required_title': 'Music Permission Required',
       'music_permission_required_desc':
-          'Offline songs show karne ke liye audio/storage permission chahiye.',
+          'Allow access to music and audio so your offline songs can be shown.',
       'music_open_settings': 'Open Settings',
       'music_allow_permission': 'Allow Permission',
 
@@ -72,15 +80,9 @@ class MusicStrings {
       // Songs view — bottom sheet options
       'music_play': 'Play',
       'music_play_next': 'Play Next',
-      'music_lyrics': 'Lyrics',
-      'music_ringtone_maker': 'Ringtone Maker',
-      'music_add_to_playlist': 'Add to playlist',
-      'music_lock': 'Lock',
       'music_share': 'Share',
       'music_add_to_queue': 'Add to Queue',
-      'music_set_as_ringtone': 'Set as ringtone',
       'music_delete': 'Delete',
-      'music_properties': 'Properties',
       'music_no_artist': 'No Artist',
 
       // Full player screen
@@ -108,6 +110,14 @@ class MusicStrings {
       'music_duration_label': 'Duration',
       'music_id_label': 'ID',
     },
+    'es': esMusic,
+    'pt': ptMusic,
+    'id': idMusic,
+    'ar': arMusic,
+    'bn': bnMusic,
+    'ru': ruMusic,
+    'tr': trMusic,
+    'vi': viMusic,
     'hi': {
       // Offline music tabs
       'music_tab_songs': 'गाने',
@@ -174,15 +184,9 @@ class MusicStrings {
       // Songs view — bottom sheet options
       'music_play': 'चलाएं',
       'music_play_next': 'अगला चलाएं',
-      'music_lyrics': 'गीत के बोल',
-      'music_ringtone_maker': 'रिंगटोन मेकर',
-      'music_add_to_playlist': 'प्लेलिस्ट में जोड़ें',
-      'music_lock': 'लॉक करें',
       'music_share': 'शेयर करें',
       'music_add_to_queue': 'कतार में जोड़ें',
-      'music_set_as_ringtone': 'रिंगटोन के रूप में सेट करें',
       'music_delete': 'हटाएं',
-      'music_properties': 'विशेषताएं',
       'music_no_artist': 'कोई कलाकार नहीं',
 
       // Full player screen

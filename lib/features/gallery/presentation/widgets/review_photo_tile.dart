@@ -75,7 +75,7 @@ class ReviewPhotoTile extends StatelessWidget {
                       ),
                       child: Text(
                         keeperLabel ?? '',
-                        style: TextStyle(fontFamily: 'Poppins', fontSize: 8.5.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 9.5.sp,
                           fontWeight: FontWeight.w600,
                           color: Colors.white,
                         ),
@@ -109,7 +109,7 @@ class ReviewPhotoTile extends StatelessWidget {
           ),
           Text(
             '${photo.width} × ${photo.height}',
-            style: TextStyle(fontFamily: 'Poppins', fontSize: 9.sp,
+            style: TextStyle(fontFamily: 'Poppins', fontSize: 10.sp,
               color: Colors.grey.shade500,
             ),
           ),

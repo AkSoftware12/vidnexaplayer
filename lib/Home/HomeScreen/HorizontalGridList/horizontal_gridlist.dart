@@ -174,13 +174,23 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
           color2: Colors.purpleAccent,
           mb: '2.2 GB',
           count: 312,
-          open: (context) => Navigator.push(
-            context,
-            MaterialPageRoute(
-              settings: const RouteSettings(name: 'OfflineMusicScreen'),
-              builder: (context) => const HomeBottomNavigation(bottomIndex: 1),
-            ),
-          ),
+          // Switches to the Music tab. Pushing a HomeBottomNavigation here
+          // stacked a second bottom bar over the first.
+          open: (context) {
+            if (HomeBottomNavigation.goToTab(
+                context, HomeBottomNavigation.musicTab)) {
+              return;
+            }
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                settings: const RouteSettings(name: 'OfflineMusicScreen'),
+                builder: (context) => const HomeBottomNavigation(
+                  bottomIndex: HomeBottomNavigation.musicTab,
+                ),
+              ),
+            );
+          },
         ),
       ];
     });
@@ -197,7 +207,8 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
           child: Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
+              Expanded(
+                child: Row(
                 children: [
                   Container(
                     padding: EdgeInsets.all(6.sp),
@@ -214,11 +225,14 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                   SizedBox(width: 8.sp),
 
                   /// 👉 Title + Subtitle
-                  Column(
+                  Expanded(
+                    child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         HomeStrings.t(lang, 'home_media_categories_title'),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: TextStyle(fontFamily: 'Poppins', fontSize: 14.sp,
                           fontWeight: FontWeight.w600,
                           color: AppPalette.textH,
@@ -226,15 +240,20 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                       ),
                       Text(
                         HomeStrings.t(lang, 'home_media_categories_subtitle'), // 👈 subtitle
-                        style: TextStyle(fontFamily: 'Poppins', fontSize: 7.sp,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 9.5.sp,
                           fontWeight: FontWeight.w400,
                           color: AppPalette.textS,
                         ),
                       ),
                     ],
                   ),
+                  ),
                 ],
               ),
+              ),
+              SizedBox(width: 8.sp),
 
               Container(
                 padding: EdgeInsets.all(5.sp),
@@ -319,11 +338,18 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                               ),
                             ),
                             const Spacer(),
-                            Text(
-                              HomeStrings.t(lang, item.text),
-                              style: TextStyle(fontFamily: 'Poppins', fontSize: 10.sp,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
+                            // One line, shrunk to fit: the card is a fixed
+                            // 80×60 and labels like "Сохранение статусов"
+                            // wrapped onto a second line and overflowed it.
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              child: Text(
+                                HomeStrings.t(lang, item.text),
+                                maxLines: 1,
+                                style: TextStyle(fontFamily: 'Poppins', fontSize: 10.sp,
+                                  fontWeight: FontWeight.w700,
+                                  color: Colors.white,
+                                ),
                               ),
                             ),
                           ],

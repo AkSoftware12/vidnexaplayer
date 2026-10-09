@@ -468,7 +468,7 @@ class _Badge extends StatelessWidget {
         text,
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
-        style: TextStyle(fontFamily: 'Poppins', fontSize: 9.sp,
+        style: TextStyle(fontFamily: 'Poppins', fontSize: 10.sp,
           fontWeight: FontWeight.w700,
           color: color,
         ),

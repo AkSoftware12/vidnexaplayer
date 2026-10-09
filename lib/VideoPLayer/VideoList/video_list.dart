@@ -668,7 +668,7 @@ class PhotoTile extends StatelessWidget {
                       // decide whether to show it.
                       child: Text(
                         _formatDuration(photo.videoDuration),
-                        style: TextStyle(fontFamily: 'Poppins', fontSize: 9.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 10.sp,
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
@@ -998,7 +998,7 @@ class GridviewList extends StatelessWidget {
                       ),
                       child: Text(
                         _formatDuration(photo.videoDuration),
-                        style: TextStyle(fontFamily: 'Poppins', fontSize: 9.sp,
+                        style: TextStyle(fontFamily: 'Poppins', fontSize: 10.sp,
                           color: Colors.white,
                           fontWeight: FontWeight.bold,
                         ),
@@ -1188,7 +1188,7 @@ class _FileSizeBadgeState extends State<_FileSizeBadge> {
       child: Text(
         label,
         style: TextStyle(
-          fontSize: 9.sp,
+          fontSize: 10.sp,
           color: Colors.white,
           fontWeight: FontWeight.w600,
         ),

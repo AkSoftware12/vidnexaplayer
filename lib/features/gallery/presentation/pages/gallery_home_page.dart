@@ -32,7 +32,12 @@ import 'smart_search_page.dart';
 /// thumbnail cache and the same permission result. Album pages push their own
 /// controller but reuse this repository, which is what keeps the cache shared.
 class GalleryHomePage extends StatefulWidget {
-  const GalleryHomePage({super.key});
+  const GalleryHomePage({super.key, this.embedded = false});
+
+  /// True when shown as the Gallery tab of the bottom bar: there is nothing
+  /// to go back to, and the home shell already shows the bottom banner, so
+  /// both the back button and this page's own banner are dropped.
+  final bool embedded;
 
   @override
   State<GalleryHomePage> createState() => _GalleryHomePageState();
@@ -52,13 +57,15 @@ class _GalleryHomePageState extends State<GalleryHomePage> {
           create: (_) => GalleryController(repository: _repository)..init(),
         ),
       ],
-      child: const _GalleryHomeView(),
+      child: _GalleryHomeView(embedded: widget.embedded),
     );
   }
 }
 
 class _GalleryHomeView extends StatefulWidget {
-  const _GalleryHomeView();
+  const _GalleryHomeView({required this.embedded});
+
+  final bool embedded;
 
   @override
   State<_GalleryHomeView> createState() => _GalleryHomeViewState();
@@ -79,7 +86,7 @@ class _GalleryHomeViewState extends State<_GalleryHomeView> {
         backgroundColor: AppPalette.surface,
         appBar: controller.selectionMode
             ? _SelectionAppBar(lang: lang)
-            : _GalleryAppBar(lang: lang),
+            : _GalleryAppBar(lang: lang, showBack: !widget.embedded),
         body: !controller.ready
             ? Center(
                 child: CircularProgressIndicator(color: ColorSelect.maineColor),
@@ -108,7 +115,7 @@ class _GalleryHomeViewState extends State<_GalleryHomeView> {
                       ),
                     ],
                   ),
-        bottomNavigationBar: _adManager.bannerWidget(),
+        bottomNavigationBar: widget.embedded ? null : _adManager.bannerWidget(),
       ),
     );
   }
@@ -121,9 +128,12 @@ class _GalleryHomeViewState extends State<_GalleryHomeView> {
 /// Tools tab — two saturated purples stacked with 14dp between them. Letting
 /// the bar recede leaves exactly one accent surface on screen at a time.
 class _GalleryAppBar extends StatelessWidget implements PreferredSizeWidget {
-  const _GalleryAppBar({required this.lang});
+  const _GalleryAppBar({required this.lang, this.showBack = true});
 
   final String lang;
+
+  /// False on the bottom-bar tab, where there is no screen behind this one.
+  final bool showBack;
 
   @override
   Size get preferredSize => const Size.fromHeight(kToolbarHeight + 58);
@@ -139,14 +149,17 @@ class _GalleryAppBar extends StatelessWidget implements PreferredSizeWidget {
       // Without this the bar tints itself as content scrolls under it, which
       // on a flat header reads as the background changing colour mid-scroll.
       scrolledUnderElevation: 0,
-      titleSpacing: 2.sp,
-      leadingWidth: 54.sp,
-      leading: Center(
-        child: GalleryCircleButton(
-          icon: Icons.arrow_back_rounded,
-          onTap: () => Navigator.maybePop(context),
-        ),
-      ),
+      titleSpacing: showBack ? 2.sp : 16.sp,
+      leadingWidth: showBack ? 54.sp : null,
+      automaticallyImplyLeading: false,
+      leading: showBack
+          ? Center(
+              child: GalleryCircleButton(
+                icon: Icons.arrow_back_rounded,
+                onTap: () => Navigator.maybePop(context),
+              ),
+            )
+          : null,
       title: Text(
         DeviceStrings.t(lang, 'gallery_title'),
         style: TextStyle(fontFamily: 'Poppins', fontSize: 19.sp,

@@ -5,6 +5,7 @@ import 'package:provider/provider.dart';
 import '../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../Utils/app_palette.dart';
+import '../../ads/list_native_ad.dart';
 import '../file_browser/file_kind.dart';
 import 'media_store.dart';
 import 'media_thumb.dart';
@@ -222,18 +223,33 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
                     Expanded(
                       child: ListView.builder(
                         padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
-                        itemCount: _groups.length,
-                        itemBuilder: (context, i) => _Group(
-                          files: _groups[i],
-                          accent: widget.accent,
-                          countLabel: _t('fb_items_count'),
-                        ),
+                        // One native ad among the groups, after the first
+                        // couple (or after the last, if there are fewer).
+                        itemCount: _groups.length + 1,
+                        itemBuilder: (context, i) {
+                          final adAt = _groups.length < _adAfterGroups
+                              ? _groups.length
+                              : _adAfterGroups;
+                          if (i == adAt) {
+                            return const ListNativeAd(
+                              padding: EdgeInsets.only(bottom: 12),
+                            );
+                          }
+                          return _Group(
+                            files: _groups[i > adAt ? i - 1 : i],
+                            accent: widget.accent,
+                            countLabel: _t('fb_items_count'),
+                          );
+                        },
                       ),
                     ),
                   ],
                 ),
     );
   }
+
+  /// Duplicate groups shown before the native ad.
+  static const int _adAfterGroups = 2;
 }
 
 class _Group extends StatelessWidget {

@@ -1,6 +1,14 @@
+import 'translations/vi.dart';
+import 'translations/tr.dart';
+import 'translations/ru.dart';
+import 'translations/bn.dart';
+import 'translations/ar.dart';
+import 'translations/id.dart';
+import 'translations/pt.dart';
+import 'translations/es.dart';
 /// Tiny in-code translation table for the video/streaming surfaces of the
-/// app (YouTube playlists, network stream screen, the 4K player and its
-/// popups, the local video list, and the custom video app bar).
+/// app (network stream screen, the 4K player and its popups, the local
+/// video list, and the custom video app bar).
 ///
 /// Only `en` and `hi` are actually translated; any other locale code falls
 /// back to English until real translations are added for it. Mirrors the
@@ -20,11 +28,6 @@ class VideoStrings {
       'common_info': 'Info',
       'common_share': 'Share',
       'common_loading': 'Loading...',
-
-      // YouTube playlists / playlist videos.
-      'yt_no_playlists_found': 'No playlists found',
-      'yt_loading_videos': 'Loading videos...',
-      'yt_no_videos_found': 'No videos found',
 
       // Network stream screen.
       'stream_please_enter_url': 'Please enter a video URL',
@@ -134,6 +137,14 @@ class VideoStrings {
       'playlist_panel_playing_suffix': 'playing',
       'playlist_tile_playing_badge': 'PLAYING',
     },
+    'es': esVideo,
+    'pt': ptVideo,
+    'id': idVideo,
+    'ar': arVideo,
+    'bn': bnVideo,
+    'ru': ruVideo,
+    'tr': trVideo,
+    'vi': viVideo,
     'hi': {
       'common_ok': 'ठीक है',
       'common_reset': 'रीसेट करें',
@@ -145,10 +156,6 @@ class VideoStrings {
       'common_info': 'जानकारी',
       'common_share': 'साझा करें',
       'common_loading': 'लोड हो रहा है...',
-
-      'yt_no_playlists_found': 'कोई प्लेलिस्ट नहीं मिली',
-      'yt_loading_videos': 'वीडियो लोड हो रहे हैं...',
-      'yt_no_videos_found': 'कोई वीडियो नहीं मिला',
 
       'stream_please_enter_url': 'कृपया वीडियो का URL दर्ज करें',
       'stream_enter_full_url':
