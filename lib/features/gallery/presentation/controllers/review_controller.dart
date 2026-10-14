@@ -51,6 +51,10 @@ abstract class ReviewController extends ChangeNotifier {
   /// Loads the tool's own results. Called by [refresh] once the index is ready.
   Future<void> analyse();
 
+  /// Whether [photoId] may stay selected after a fresh [analyse]. Everything
+  /// may by default; a subclass narrows it to what its results still show.
+  bool isSelectable(String photoId) => true;
+
   /// Writes a one-line summary of the analysis just finished to
   /// [GalleryToolStatsStore], so the Tools tab can show what this tool found
   /// without re-running the scan to find it out.
@@ -68,9 +72,13 @@ abstract class ReviewController extends ChangeNotifier {
     // first time. Either way the tool works from a current index rather than
     // silently reporting on stale data.
     _indexing = signatures.running || await signatures.signedCount() == 0;
+    if (_disposed) return;
     notifyListeners();
 
+    // The signature pass can take minutes; the user may leave meanwhile, and
+    // analysing for a closed screen is wasted work.
     await signatures.ensureSignatures();
+    if (_disposed) return;
     _indexing = false;
     notifyListeners();
 
@@ -116,9 +124,36 @@ abstract class ReviewController extends ChangeNotifier {
     notifyListeners();
 
     await analyse();
+    // Re-analysis can drop or regroup photos, so anything still selected that
+    // the new results no longer offer for deletion is let go — otherwise it
+    // stays counted in the action bar, invisible and undeletable from here.
+    _selected.retainWhere(isSelectable);
     await recordStats();
     _loading = false;
     notifyListeners();
     return deleted.length;
+  }
+
+  /// Set by [dispose]. [refresh] and [deleteSelected] await long work (the
+  /// signature pass, the system delete dialog, re-analysis), and the screen
+  /// can be closed during any of it.
+  bool _disposed = false;
+
+  /// Safety net for every late completion, here and in subclasses' [analyse]:
+  /// notifying a disposed notifier throws "used after being disposed".
+  ///
+  /// [deleteSelected] deliberately keeps going after dispose — the photos are
+  /// already deleted, so re-analysing keeps the Tools tab stats truthful —
+  /// and relies on this to stay silent.
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    super.dispose();
   }
 }

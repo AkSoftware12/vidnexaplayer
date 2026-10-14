@@ -197,10 +197,15 @@ class GalleryRepositoryImpl implements GalleryRepository {
         return false;
       }
       if (words != null && words.isNotEmpty) {
-        final name = photo.fileName.toLowerCase();
+        // Filename and folder together. Camera and messaging apps name files
+        // `IMG_20260912_…`, so a word like "instagram" or "snapchat" — which
+        // no facet table knows — only ever appears in the folder; matching
+        // the name alone returned nothing for it.
+        final haystack = '${photo.fileName} ${photo.relativePath ?? ''}'
+            .toLowerCase();
         // Every word must appear, in any order — spoken and typed queries
         // rarely arrive in filename order.
-        if (!words.every(name.contains)) return false;
+        if (!words.every(haystack.contains)) return false;
       }
 
       if (!query.needsSignatures) return true;
@@ -210,8 +215,13 @@ class GalleryRepositoryImpl implements GalleryRepository {
       // Excluding them is the honest result; including them would be guessing.
       if (signature == null) return false;
 
-      if (query.color != null &&
-          !query.color!.bins.contains(signature.dominantHueBin)) {
+      final color = query.color;
+      if (color == PhotoColor.mono) {
+        if (signature.neutralPercent < PhotoColor.monoNeutralPercent) {
+          return false;
+        }
+      } else if (color != null &&
+          !color.bins.contains(signature.dominantHueBin)) {
         return false;
       }
       if (query.tone == PhotoTone.dark && signature.meanLuma > _darkLuma) {
@@ -448,12 +458,22 @@ class GalleryRepositoryImpl implements GalleryRepository {
     if (photoIds.isEmpty) return const CollageReport(saved: false);
 
     // Paths resolve here, on the root isolate — the worker only reads them.
+    //
+    // One entry per photo, in cell order, even when a photo cannot be read:
+    // an unreadable one becomes '' (which the worker skips, leaving that cell
+    // empty). Dropping it instead shifted every later photo — and every
+    // manual crop, keyed by cell index — into the wrong cell.
     final paths = <String>[];
+    final temporary = <String>[];
     for (final id in photoIds) {
-      final path = await _assets.filePathOf(id);
-      if (path != null) paths.add(path);
+      final source =
+          await _assets.decodablePathOf(id, maxEdge: canvasLongEdge);
+      paths.add(source?.path ?? '');
+      if (source != null && source.temporary) temporary.add(source.path);
     }
-    if (paths.isEmpty) return const CollageReport(saved: false);
+    if (paths.every((path) => path.isEmpty)) {
+      return const CollageReport(saved: false);
+    }
 
     final aspect = template.canvasAspect;
     final canvasWidth =
@@ -482,18 +502,28 @@ class GalleryRepositoryImpl implements GalleryRepository {
       zoom.add(adjustment == null ? 0 : adjustment.zoom);
     }
 
-    final bytes = await compute(
-      renderCollage,
-      CollageRequest(
-        sourcePaths: paths,
-        cells: cells,
-        canvasWidth: canvasWidth,
-        canvasHeight: canvasHeight,
-        focusX: focusX,
-        focusY: focusY,
-        zoom: zoom,
-      ),
-    );
+    final Uint8List? bytes;
+    try {
+      bytes = await compute(
+        renderCollage,
+        CollageRequest(
+          sourcePaths: paths,
+          cells: cells,
+          canvasWidth: canvasWidth,
+          canvasHeight: canvasHeight,
+          focusX: focusX,
+          focusY: focusY,
+          zoom: zoom,
+        ),
+      );
+    } finally {
+      // JPEG stand-ins for HEIC and friends, only needed for this render.
+      for (final path in temporary) {
+        try {
+          await File(path).delete();
+        } catch (_) {}
+      }
+    }
     if (bytes == null) return const CollageReport(saved: false);
     if (!save) return CollageReport(saved: false, previewBytes: bytes);
 

@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/color.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../domain/entities/junk_bucket.dart';
 import '../../domain/repositories/gallery_repository.dart';
 import '../controllers/junk_controller.dart';
@@ -29,7 +29,6 @@ class JunkCleanerPage extends StatefulWidget {
 }
 
 class _JunkCleanerPageState extends State<JunkCleanerPage> {
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   late final JunkController _controller =
       JunkController(repository: widget.repository);
@@ -109,7 +108,7 @@ class _JunkCleanerPageState extends State<JunkCleanerPage> {
             // button. The action bar takes the slot while a selection exists.
             bottomNavigationBar: controller.hasSelection
                 ? DeleteActionBar(controller: controller)
-                : _adManager.bannerWidget(),
+                : const BottomBannerBar(),
           );
         },
       ),

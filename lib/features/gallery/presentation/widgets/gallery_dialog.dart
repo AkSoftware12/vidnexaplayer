@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 
 import '../../../../Utils/color.dart';
+import 'gallery_button.dart';
 
 /// Dialog action buttons with explicit colours.
 ///
@@ -61,28 +62,12 @@ class DialogConfirmButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final background =
-        destructive ? Colors.red.shade600 : ColorSelect.maineColor;
-
-    return ElevatedButton(
+    // Same button as everywhere else in the module, so a dialog's action
+    // matches the screen behind it.
+    return GalleryButton.compact(
+      label: label,
       onPressed: onPressed,
-      style: ElevatedButton.styleFrom(
-        backgroundColor: background,
-        foregroundColor: Colors.white,
-        disabledBackgroundColor: Colors.grey.shade400,
-        disabledForegroundColor: Colors.white70,
-        elevation: 0,
-        padding: EdgeInsets.symmetric(horizontal: 20.sp, vertical: 11.sp),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8.sp),
-        ),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(fontFamily: 'Poppins', fontSize: 12.5.sp,
-          fontWeight: FontWeight.w600,
-        ),
-      ),
+      destructive: destructive,
     );
   }
 }

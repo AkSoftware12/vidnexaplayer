@@ -12,14 +12,14 @@ import 'package:provider/provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:io';
+import 'package:flutter/foundation.dart' show kDebugMode;
 import '../../Billing/billing_service.dart';
 import '../../Billing/paywall_screen.dart';
 import '../../DarkMode/dark_mode.dart';
 import '../../DarkMode/theme_settings_section.dart';
 import '../../DarkMode/text_size_section.dart';
 import '../../Utils/app_palette.dart';
-import '../../ads/ad_consent.dart';
-import '../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../DeviceSpace/device_space.dart';
 import '../../LockScreen/LockScreen/lock_screen.dart';
 import '../../NetWork Stream/stream_video.dart';
@@ -37,6 +37,8 @@ import '../../features/equalizer/audio_effects_service.dart';
 import '../../features/equalizer/domain/eq_models.dart';
 import '../../features/equalizer/presentation/equalizer_sheet.dart';
 import '../HomeBottomnavigation/home_bottomNavigation.dart';
+import '../../Notification/new_media_digest.dart';
+import '../../NotifyListeners/LanguageProvider/home_strings.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
 //  THEME  (Light / White)
@@ -102,7 +104,6 @@ class UserProfilePage extends StatefulWidget {
 
 class _UserProfilePageState extends State<UserProfilePage> with TickerProviderStateMixin {
 
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   final TextEditingController _nameController = TextEditingController();
   File? _pickedImage;
@@ -195,6 +196,7 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
   }
 
   Future<void> _pickImage(StateSetter local, {ImageSource src = ImageSource.gallery}) async {
+    AdsManager.skipNextAppOpen();
     final f = await ImagePicker().pickImage(source: src);
     if (f == null) return;
     final dir   = await getApplicationDocumentsDirectory();
@@ -429,7 +431,7 @@ class _UserProfilePageState extends State<UserProfilePage> with TickerProviderSt
                     // where the ad used to be.
                     if (!context.watch<BillingService>().isPremium) ...[
                       SizedBox(height: 18.sp),
-                      _adManager.nativeWidget(),
+                      const HybridAdSlot(templateType: TemplateType.small, padding: EdgeInsets.zero),
                       SizedBox(height: 15.sp),
                     ],
 
@@ -905,6 +907,29 @@ class _SettingsCard extends StatelessWidget {
                   MaterialPageRoute(builder: (_) => const NotificationScreen(), settings: const RouteSettings(name: 'NotificationScreen')))),
           _Div(),
 
+          // The evening "new photos & videos today" reminder. Android only —
+          // it runs on WorkManager. A tap anywhere on the row flips the switch.
+          if (Platform.isAndroid) ...[
+            ValueListenableBuilder<bool>(
+              valueListenable: NewMediaDigest.enabled,
+              builder: (context, on, _) => GestureDetector(
+                // Debug builds only — see NewMediaDigest.debugRunNow.
+                onLongPress: kDebugMode ? NewMediaDigest.debugRunNow : null,
+                child: _Tile(
+                  icon: Icons.photo_library_outlined,
+                  iColor: const Color(0xFFDB2777), iBg: const Color(0xFFFCE7F3),
+                  title: HomeStrings.t(lang, 'new_media_setting_title'),
+                  sub: HomeStrings.t(lang, 'new_media_setting_sub'),
+                  trailing: Switch(
+                    value: on,
+                    onChanged: NewMediaDigest.setEnabled,
+                  ),
+                  onTap: () => NewMediaDigest.setEnabled(!on)),
+              ),
+            ),
+            _Div(),
+          ],
+
           // _Tile(icon: HeroIcons.paint_brush,
           //     iColor: _T.accent, iBg: _T.accentSoft,
           //     title: t('profile_toolbar_color_title'), sub: t('profile_toolbar_color_sub'),
@@ -942,16 +967,17 @@ class _SettingsCard extends StatelessWidget {
                 final uri = Uri.parse(
                     'https://vidnexaplayer.com/privacy-policy.html');
                 if (await canLaunchUrl(uri)) {
+                  AdsManager.skipNextAppOpen();
                   await launchUrl(uri, mode: LaunchMode.externalApplication);
                 }
               }),
 
           // Required by UMP for users it asked for consent (EEA/UK/CH), and
           // promised by the privacy policy. Hidden everywhere else.
-          ListenableBuilder(
-            listenable: AdConsent.instance,
-            builder: (context, _) {
-              if (!AdConsent.instance.privacyOptionsRequired) {
+          FutureBuilder<bool>(
+            future: AdsManager.privacyOptionsRequired(),
+            builder: (context, snap) {
+              if (snap.data != true) {
                 return const SizedBox.shrink();
               }
               return Column(children: [
@@ -960,7 +986,7 @@ class _SettingsCard extends StatelessWidget {
                     iColor: const Color(0xFF64748B), iBg: const Color(0xFFF1F5F9),
                     title: t('profile_ad_privacy_title'),
                     sub: t('profile_ad_privacy_sub'),
-                    onTap: AdConsent.instance.showPrivacyOptions),
+                    onTap: AdsManager.showPrivacyOptions),
               ]);
             },
           ),
@@ -985,24 +1011,30 @@ class _SettingsCard extends StatelessWidget {
               iColor: const Color(0xFF059669), iBg: const Color(0xFFD1FAE5),
               title: t('profile_feedback_title'), sub: t('profile_feedback_sub'),
               // Same inbox as the drawer's Feedback entry.
-              onTap: () => launchUrl(Uri(
+              onTap: () {
+                AdsManager.skipNextAppOpen();
+                launchUrl(Uri(
                     scheme: 'mailto',
                     path: 'vidnexaplayer@gmail.com',
                     query: 'subject=App Feedback',
-                  ))),
+                  ));
+              }),
           _Div(),
 
           _Tile(icon: Icons.share_rounded,
               iColor: const Color(0xFF2563EB), iBg: const Color(0xFFDBEAFE),
               title: t('profile_share_app_title'), sub: t('profile_share_app_sub'),
               isLast: true,
-              onTap: () => SharePlus.instance.share(
-                ShareParams(
-                  text:
-                      'Check out Vidnexa Video Player: https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer',
-                  subject: 'Download Vidnexa',
-                ),
-              )),
+              onTap: () {
+                AdsManager.skipNextAppOpen();
+                SharePlus.instance.share(
+                  ShareParams(
+                    text:
+                        'Check out Vidnexa Video Player: https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer',
+                    subject: 'Download Vidnexa',
+                  ),
+                );
+              }),
         ],
       ),
     );
@@ -1037,11 +1069,15 @@ class _Tile extends StatelessWidget {
   final VoidCallback onTap;
   final bool isLast;
 
+  /// Replaces the chevron on the right — e.g. a switch for a setting row.
+  final Widget? trailing;
+
   const _Tile({
     this.icon, this.svgAsset,
     required this.iColor, required this.iBg,
     required this.title, required this.sub,
     this.badge, required this.onTap, this.isLast = false,
+    this.trailing,
   });
 
   @override
@@ -1089,7 +1125,8 @@ class _Tile extends StatelessWidget {
                   ],
                 ),
               ),
-              Icon(Icons.arrow_forward_ios_rounded, color: _T.textS, size: 13.sp),
+              trailing ??
+                  Icon(Icons.arrow_forward_ios_rounded, color: _T.textS, size: 13.sp),
             ],
           ),
         ),
@@ -1244,6 +1281,7 @@ class _RateUsTileState extends State<_RateUsTile> {
       'https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer',
     );
     if (await canLaunchUrl(url)) {
+      AdsManager.skipNextAppOpen();
       await launchUrl(url, mode: LaunchMode.externalApplication);
     }
   }
@@ -1351,6 +1389,7 @@ class _HelpSupportSheet extends StatelessWidget {
 
   /// Same inbox and subject as the drawer's Help & Support entry.
   static void _emailSupport() {
+    AdsManager.skipNextAppOpen();
     launchUrl(Uri(
       scheme: 'mailto',
       path: 'vidnexaplayer@gmail.com',

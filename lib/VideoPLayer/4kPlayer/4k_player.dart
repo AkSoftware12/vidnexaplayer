@@ -9,6 +9,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../../Utils/asset_file.dart';
 import 'package:provider/provider.dart';
 import 'package:screen_brightness/screen_brightness.dart';
 import 'package:videoplayer/Utils/color.dart';
@@ -18,7 +19,10 @@ import '../../Home/HomeScreen/home2.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../NotifyListeners/LanguageProvider/video_strings.dart';
 import '../../NotifyListeners/PlayPauseSync/play_pause.dart';
-import '../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
+import '../../ads/rewarded_unlock.dart';
+import '../../ads/rewarded_unlock_prompt.dart';
+import '../../Billing/billing_service.dart';
 import '../../NotifyListeners/LanguageProvider/equalizer_strings.dart';
 import '../../features/equalizer/audio_effects_service.dart';
 import '../../features/playback/playback_coordinator.dart';
@@ -29,8 +33,11 @@ import '../Resume/playback_position_store.dart';
 import '../safe_player_dispose.dart';
 import 'FlotingVideo/floting_video.dart';
 import 'HDR/hdr.dart';
+import 'HDR/hdr_status_badge.dart';
 import 'PopupPlayer/Speed/speed.dart';
 import 'PopupPlayer/Volume/volume.dart';
+import '../../features/cast/cast_controller.dart';
+import '../../features/cast/cast_widgets.dart';
 
 final globalPlayPause = PlayPauseSync();
 
@@ -66,7 +73,6 @@ class FullScreenVideoPlayerFixed extends StatefulWidget {
 class _FullScreenVideoPlayerSystemVolumeState
     extends State<FullScreenVideoPlayerFixed> {
   // Singleton — initialised once in main.dart, never disposed by a screen.
-  final appOpenManager = AppOpenAdManager();
 
   late int _currentIndex;
   late final Player _player;
@@ -103,6 +109,17 @@ class _FullScreenVideoPlayerSystemVolumeState
   bool _isSeeking = false;
 
   bool _isLocked = false;
+
+  /// While locked, the lock icon fades out after [_lockIconDuration] and a tap
+  /// anywhere brings it back — it used to sit in the middle of the video for
+  /// the whole time the screen was locked.
+  bool _lockIconVisible = true;
+  Timer? _lockIconTimer;
+  static const Duration _lockIconDuration = Duration(seconds: 3);
+
+  /// True while the video plays on a Chromecast instead of here.
+  bool _casting = false;
+
   bool _audioOnly = false;
   double _playbackRate = 1.0;
 
@@ -120,6 +137,27 @@ class _FullScreenVideoPlayerSystemVolumeState
   bool _hdrOn = false;
   bool _showHdrOverlay = false;
   bool _hdrChanging = false;
+
+  /// Second line of the HDR badge, and the timers that hide the badge and end
+  /// an ad-bought HDR window.
+  String _hdrBadgeSubtitle = '';
+  Timer? _hdrBadgeTimer;
+
+  /// Bumped on every filter pick; FilterSweep plays once per change.
+  int _filterSweep = 0;
+
+  /// One colour matrix per filter, built once. The video's filter blends
+  /// between matrices (TweenAnimationBuilder in build()), which restarts
+  /// whenever its target changes identity — so the target must be the same
+  /// list object each build, or every rebuild would replay the blend.
+  final Map<String, List<double>> _matrixCache = {};
+  Timer? _hdrExpiryTimer;
+
+  /// Time left in the HDR window, for the top-left chip — null when HDR has
+  /// no limit (premium). A notifier, so the per-second tick rebuilds only the
+  /// chip, not this whole screen.
+  final ValueNotifier<Duration?> _hdrLeft = ValueNotifier<Duration?>(null);
+  Timer? _hdrTicker;
 
   // Track playback position & duration for the progress bar.
   Duration _currentPosition = Duration.zero;
@@ -223,6 +261,28 @@ class _FullScreenVideoPlayerSystemVolumeState
   bool _limiterOn = false;
 
   bool get _isBoosting => _volumeBoost > 100.5;
+
+  /// Always hands Android a stereo stream.
+  ///
+  /// By default mpv opens the AudioTrack with the source's own channel layout.
+  /// E-AC3 / AC3 tracks are 5.1 or 7.1, and many phones accept a multichannel
+  /// AudioTrack and then play it as silence — the decoder is in the bundled
+  /// libmpv, the picture plays, and there is no sound. Downmixing to stereo
+  /// inside mpv avoids that; phone speakers and headphones are stereo anyway,
+  /// and mpv's downmix keeps the centre (dialogue) channel.
+  ///
+  /// The equalizer's mpv backend writes the same value, so binding it later
+  /// does not undo this.
+  Future<void> _configureAudioOutput() async {
+    final p = _player.platform;
+    if (p is! NativePlayer) return;
+    try {
+      await p.setProperty('audio-channels', 'stereo');
+    } catch (e) {
+      // Unknown property on this build — playback must still go ahead.
+      debugPrint('audio-channels=stereo failed: $e');
+    }
+  }
 
   /// mpv clamps `volume` to `volume-max` (default 130), so the ceiling has to
   /// be raised first or anything above 100 would be quietly ignored.
@@ -398,8 +458,15 @@ class _FullScreenVideoPlayerSystemVolumeState
     //    FloatingVideoManager.detach() transfers ownership to us, so we ARE
     //    responsible for disposing it (the old `_ownsPlayer = false` here meant
     //    nobody ever did, leaking a native player per PiP round-trip).
-    if (widget.externalPlayer != null && widget.externalController != null) {
-      _player = widget.externalPlayer!;
+    //    A handed-over player can already be released by the time this page is
+    //    built (Crashlytics: `[Player] has been disposed` from the `play()`
+    //    below). Adopting it would leave a dead screen, so fall through to a
+    //    fresh player that reloads the current video instead.
+    final external = widget.externalPlayer;
+    if (external != null &&
+        widget.externalController != null &&
+        !isPlayerDisposed(external)) {
+      _player = external;
       _controller = widget.externalController!;
       _ownsPlayer = true;
       _isLoading = false;
@@ -407,12 +474,17 @@ class _FullScreenVideoPlayerSystemVolumeState
       WidgetsBinding.instance.addPostFrameCallback((_) async {
         if (!mounted) return;
 
-        if (_hasUrl) {
-          await _playFromUrl(widget.initialUrl!.trim());
-        } else {
-          if (!_player.state.playing) {
+        try {
+          if (_hasUrl) {
+            await _playFromUrl(widget.initialUrl!.trim());
+          } else if (!_player.state.playing) {
             await _player.play();
           }
+        } catch (e) {
+          // Released between initState and this first frame. We call play()
+          // ourselves and await it, so unlike media_kit's internal
+          // widListener this one is catchable.
+          debugPrint('Handed-over player unusable: $e');
         }
       });
     } else {
@@ -421,6 +493,11 @@ class _FullScreenVideoPlayerSystemVolumeState
       _ownsPlayer = true; // ✅ we created it -> safe to dispose
 
       WidgetsBinding.instance.addPostFrameCallback((_) async {
+        if (!mounted) return;
+
+        // Before the first open, so the very first audio track already
+        // decodes to stereo.
+        await _configureAudioOutput();
         if (!mounted) return;
 
         if (_hasUrl) {
@@ -662,7 +739,11 @@ class _FullScreenVideoPlayerSystemVolumeState
   }
 
   void _onScreenTap() {
-    if (_isLocked || _resumePromptOpen) return;
+    if (_isLocked) {
+      _showLockIcon();
+      return;
+    }
+    if (_resumePromptOpen) return;
 
     setState(() => _controlsVisible = !_controlsVisible);
 
@@ -697,7 +778,7 @@ class _FullScreenVideoPlayerSystemVolumeState
     _resumeKey = widget.videos[_currentIndex].id;
     _lastPersistedPosition = Duration.zero;
 
-    final file = await widget.videos[_currentIndex].file;
+    final file = await widget.videos[_currentIndex].fileOrNull;
 
     // The file lookup above can take a while (MediaStore/cloud-backed
     // resolution); if the user backed out of the screen while it was
@@ -1248,6 +1329,114 @@ class _FullScreenVideoPlayerSystemVolumeState
 
   void _toggleLock() {
     setState(() => _isLocked = !_isLocked);
+
+    if (_isLocked) {
+      _hideTimer?.cancel();
+      _showLockIcon();
+    } else {
+      _lockIconTimer?.cancel();
+      // Unlocking is a deliberate tap, so bring the controls straight back.
+      setState(() => _controlsVisible = true);
+      _startHideTimer();
+    }
+  }
+
+  // ── Chromecast ─────────────────────────────────────────────────────────────
+
+  /// What the local player has open — a file path or an http(s) URL — which
+  /// is exactly what the TV needs to be given.
+  String? _currentSource() {
+    final playlist = _player.state.playlist;
+    if (playlist.medias.isEmpty) return null;
+    final index = playlist.index.clamp(0, playlist.medias.length - 1);
+    return playlist.medias[index].uri;
+  }
+
+  /// Picks a TV and moves playback there, from the current position.
+  Future<void> _openCast(String title) async {
+    final cast = CastController.instance;
+    if (!await cast.ensureReady()) {
+      Fluttertoast.showToast(msg: _t('cast_unavailable'));
+      return;
+    }
+    if (!mounted) return;
+
+    _hideTimer?.cancel();
+    final device = await showCastDeviceSheet(context, lang: _lang);
+    if (!mounted) return;
+    if (device == null) {
+      _startHideTimer();
+      return;
+    }
+
+    final source = _currentSource();
+    if (source == null) {
+      Fluttertoast.showToast(msg: _t('cast_load_failed'));
+      return;
+    }
+
+    Fluttertoast.showToast(
+      msg: _t('cast_connecting').replaceAll('{device}', device.friendlyName),
+    );
+    final position = _player.state.position;
+    await _player.pause();
+
+    final failure = await cast.castTo(
+      device,
+      source: source,
+      title: title,
+      position: position,
+    );
+    if (!mounted) {
+      if (failure == null) unawaited(cast.stop());
+      return;
+    }
+    if (failure != null) {
+      Fluttertoast.showToast(
+        msg: _t(switch (failure) {
+          CastFailure.unavailable => 'cast_unavailable',
+          CastFailure.noWifi => 'cast_no_wifi',
+          CastFailure.connectFailed => 'cast_connect_failed',
+          CastFailure.loadFailed => 'cast_load_failed',
+        }),
+      );
+      return;
+    }
+
+    cast.addListener(_onCastChanged);
+    setState(() => _casting = true);
+  }
+
+  /// Back to the phone, picking up where the TV had got to.
+  Future<void> _stopCasting() async {
+    final cast = CastController.instance;
+    cast.removeListener(_onCastChanged);
+    final position = await cast.stop();
+    if (!mounted) return;
+    setState(() => _casting = false);
+    if (position > Duration.zero) await _player.seek(position);
+    await _player.play();
+    _startHideTimer();
+  }
+
+  /// The session ended from the other side — the TV's remote, the Cast
+  /// notification, Wi-Fi dropping. Hand the screen back to the local player,
+  /// paused, rather than leaving a panel for a TV that is no longer there.
+  void _onCastChanged() {
+    final cast = CastController.instance;
+    if (!_casting || cast.isCasting) return;
+    cast.removeListener(_onCastChanged);
+    if (!mounted) return;
+    setState(() => _casting = false);
+    Fluttertoast.showToast(msg: _t('cast_ended'));
+  }
+
+  void _showLockIcon() {
+    _lockIconTimer?.cancel();
+    if (!_lockIconVisible) setState(() => _lockIconVisible = true);
+    _lockIconTimer = Timer(_lockIconDuration, () {
+      if (mounted && _isLocked) setState(() => _lockIconVisible = false);
+    });
   }
 
   Future<void> _takeScreenshot() async {
@@ -1321,24 +1510,218 @@ class _FullScreenVideoPlayerSystemVolumeState
     } catch (_) {}
   }
 
+  /// The HDR button. Turning HDR off is always free; turning it on goes
+  /// through a rewarded ad (see [_unlockHdr]) unless the user is premium or
+  /// already unlocked it within the last window.
   Future<void> toggleHdr() async {
+    // Held for the whole flow, so a double tap cannot open the popup twice.
     if (_hdrChanging) return;
     _hdrChanging = true;
+    try {
+      final turningOn = _selectedFilter != 'hdr';
+      if (turningOn && !await _unlockHdr()) return;
+      if (!mounted) return;
+      await _setHdr(turningOn);
+    } finally {
+      _hdrChanging = false;
+    }
+  }
 
-    // Apply immediately — the old code waited 3 seconds *before* flipping the
-    // filter, which made the button feel broken. The badge still shows briefly.
+  /// Opens the filter bottom sheet (see [FilterPopup]).
+  Future<void> _openFilters() async {
+    _hideTimer?.cancel();
+    final hdrLocked = !BillingService.instance.isPremium &&
+        !await RewardedUnlock.instance.isUnlocked(RewardedUnlock.hdr);
+    if (!mounted) return;
+
+    await FilterPopup.show(
+      context,
+      selectedKey: _selectedFilter,
+      onSelected: _selectFilter,
+      hdrLocked: hdrLocked,
+    );
+    if (mounted) _startHideTimer();
+  }
+
+  /// Filters that need a rewarded ad (or premium): HDR and Warm HDR. They
+  /// share one unlock — a single ad opens [RewardedUnlock.hdrWindow] for both
+  /// — and both end, with the countdown chip, when that window runs out.
+  static const Set<String> _adFilters = {'hdr', 'warm'};
+
+  /// Every filter pick goes through here, so choosing "HDR" or "Warm HDR"
+  /// from the filter list is gated exactly like the HDR button — the list
+  /// used to be a free way around the unlock.
+  Future<void> _selectFilter(String key) async {
+    if (key == 'hdr') {
+      if (_selectedFilter != 'hdr') await toggleHdr();
+      return;
+    }
+    if (key == 'warm') {
+      if (_selectedFilter != 'warm') await _applyWarm();
+      return;
+    }
+    _hdrExpiryTimer?.cancel();
+    _runHdrCountdown(null, active: false);
     setState(() {
-      _hdrOn = !_hdrOn;
-      _selectedFilter = _hdrOn ? 'hdr' : '';
+      _selectedFilter = key;
+      _hdrOn = false;
+      // The change is shown, not announced: a light sweep crosses the video
+      // (FilterSweep) while the colours blend into the new filter (the
+      // TweenAnimationBuilder in build()).
+      _filterSweep++;
+    });
+  }
+
+  /// Warm HDR: behind the same ad as HDR (see [_adFilters]). Once unlocked it
+  /// applies like any filter, plus the HDR window's countdown and expiry.
+  Future<void> _applyWarm() async {
+    if (_hdrChanging) return;
+    _hdrChanging = true;
+    try {
+      if (!await _unlockHdr(
+        previewAsset: 'assets/vidnexa_warm_hdr_preview.webp',
+      )) {
+        return;
+      }
+      DateTime? until;
+      if (!BillingService.instance.isPremium) {
+        until = await RewardedUnlock.instance.unlockedUntil(RewardedUnlock.hdr);
+      }
+      if (!mounted) return;
+      _hdrExpiryTimer?.cancel();
+      setState(() {
+        _selectedFilter = 'warm';
+        _hdrOn = false;
+        _filterSweep++;
+      });
+      if (until != null) _scheduleHdrExpiry(until);
+      _runHdrCountdown(until, active: true);
+    } finally {
+      _hdrChanging = false;
+    }
+  }
+
+  /// Shows the HDR popup — a preview picture ([previewAsset]: the
+  /// Original/HDR comparison, or Warm HDR's own preview), what HDR does, and
+  /// the offer of one rewarded ad — and returns whether it may be turned on.
+  ///
+  /// The video is paused while the popup and the ad are up: both cover it,
+  /// and the ad has its own sound. It resumes afterwards either way.
+  Future<bool> _unlockHdr({
+    String previewAsset = 'assets/vidnexa_hdr_comparison.webp',
+  }) async {
+    if (BillingService.instance.isPremium) return true;
+    if (await RewardedUnlock.instance.isUnlocked(RewardedUnlock.hdr)) {
+      return true;
+    }
+    if (!mounted) return false;
+
+    _hideTimer?.cancel();
+    final wasPlaying = _player.state.playing;
+    if (wasPlaying) await _player.pause();
+    if (!mounted) return false;
+
+    final allowed = await ensureRewardedUnlock(
+      context,
+      feature: RewardedUnlock.hdr,
+      titleKey: 'rewarded_hdr_title',
+      bodyKey: 'rewarded_hdr_body',
+      // A designed picture that carries its own labels, shown as it is.
+      // Both candidates are 2:1.
+      preview: ClipRRect(
+        borderRadius: BorderRadius.circular(14),
+        child: AspectRatio(
+          aspectRatio: 2,
+          child: Image.asset(previewAsset, fit: BoxFit.cover),
+        ),
+      ),
+    );
+
+    if (mounted && wasPlaying) await _player.play();
+    if (mounted) _startHideTimer();
+    return allowed;
+  }
+
+  /// Applies HDR on or off and shows the confirmation badge.
+  ///
+  /// Turning it on for a non-premium user also arms [_scheduleHdrExpiry]: one
+  /// ad buys [RewardedUnlock.hdrWindow] of HDR, so it must actually end then —
+  /// otherwise a single ad would keep it on for as long as the player stayed
+  /// open. [subtitle] overrides the badge's second line (the expiry notice).
+  Future<void> _setHdr(bool on, {String? subtitle}) async {
+    _hdrExpiryTimer?.cancel();
+    DateTime? until;
+    if (on && !BillingService.instance.isPremium) {
+      until = await RewardedUnlock.instance.unlockedUntil(RewardedUnlock.hdr);
+    }
+    if (!mounted) return;
+
+    final String line;
+    if (subtitle != null) {
+      line = subtitle;
+    } else if (!on) {
+      line = _t('player_hdr_off_sub');
+    } else if (until != null) {
+      line = _t('player_hdr_time_left')
+          .replaceAll('{time}', _formatLeft(until.difference(DateTime.now())));
+    } else {
+      line = _t('player_hdr_on_sub');
+    }
+
+    // Applied immediately — the filter is a widget layer, there is nothing to
+    // wait for. The badge only confirms it.
+    setState(() {
+      _hdrOn = on;
+      _selectedFilter = on ? 'hdr' : '';
+      _hdrBadgeSubtitle = line;
+      _filterSweep++;
       _showHdrOverlay = true;
     });
+    if (until != null) _scheduleHdrExpiry(until);
+    _runHdrCountdown(on ? until : null, active: on);
 
-    await Future.delayed(const Duration(milliseconds: 900));
+    _hdrBadgeTimer?.cancel();
+    _hdrBadgeTimer = Timer(
+      // The expiry notice has more to read.
+      Duration(milliseconds: subtitle != null ? 3200 : 1700),
+      () {
+        if (mounted) setState(() => _showHdrOverlay = false);
+      },
+    );
+  }
 
-    if (mounted) {
-      setState(() => _showHdrOverlay = false);
+  /// Drives the top-left chip's countdown to [until]. With [active] but no
+  /// [until] (premium) the chip shows plain "HDR"; inactive stops the tick.
+  void _runHdrCountdown(DateTime? until, {required bool active}) {
+    _hdrTicker?.cancel();
+    _hdrTicker = null;
+    if (!active || until == null) {
+      _hdrLeft.value = null;
+      return;
     }
-    _hdrChanging = false;
+    void tick() {
+      final left = until.difference(DateTime.now());
+      _hdrLeft.value = left.isNegative ? Duration.zero : left;
+    }
+
+    tick();
+    _hdrTicker = Timer.periodic(const Duration(seconds: 1), (_) => tick());
+  }
+
+  /// Turns HDR back off when the window an ad bought runs out.
+  void _scheduleHdrExpiry(DateTime until) {
+    _hdrExpiryTimer?.cancel();
+    final left = until.difference(DateTime.now());
+    _hdrExpiryTimer = Timer(left.isNegative ? Duration.zero : left, () {
+      if (!mounted || !_adFilters.contains(_selectedFilter)) return;
+      _setHdr(false, subtitle: _t('player_hdr_expired'));
+    });
+  }
+
+  /// "4:59" — minutes and seconds left in the HDR window.
+  static String _formatLeft(Duration left) {
+    final seconds = left.inSeconds.clamp(0, 99 * 60);
+    return '${seconds ~/ 60}:${(seconds % 60).toString().padLeft(2, '0')}';
   }
 
   void _openSpeedDialog() {
@@ -1891,14 +2274,30 @@ class _FullScreenVideoPlayerSystemVolumeState
     if (!_hasLocalList) return;
     if (FloatingVideoManager.isActive) return;
 
-    _ownsPlayer = false; // floating owns it now
-    FloatingVideoManager.show(
+    // Hand ownership over only if the window actually took the player; when
+    // show() bails out we must keep it, or nobody ever disposes it.
+    final handedOver = FloatingVideoManager.show(
       context,
       _player,
       _controller,
       widget.videos,
       _currentIndex,
     );
+    if (!handedOver) return;
+    _ownsPlayer = false; // floating owns it now
+
+    // Close this page: the floating window is now the only place the video
+    // lives. Leaving the page open meant two screens shared one player, and
+    // the floating ✕ disposed it underneath this page — whose play/seek then
+    // crashed with `[Player] has been disposed`.
+    final route = ModalRoute.of(context);
+    if (route == null || !route.isActive) return;
+    final navigator = Navigator.of(context);
+    if (route.isCurrent) {
+      navigator.pop();
+    } else {
+      navigator.removeRoute(route);
+    }
   }
 
   @override
@@ -1930,6 +2329,15 @@ class _FullScreenVideoPlayerSystemVolumeState
     _volumeSubscription?.cancel();
 
     _hideTimer?.cancel();
+    _lockIconTimer?.cancel();
+    _hdrBadgeTimer?.cancel();
+    _hdrExpiryTimer?.cancel();
+    _hdrTicker?.cancel();
+    _hdrLeft.dispose();
+    // The cast video is served from this phone by a server tied to this
+    // screen's session, so leaving the player ends the cast as well.
+    CastController.instance.removeListener(_onCastChanged);
+    if (_casting) unawaited(CastController.instance.stop());
     _systemUiTimer?.cancel();
     _brightnessTimer?.cancel();
     _volumeTimer?.cancel();
@@ -2131,12 +2539,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                 label: _t('player_action_filters'),
                                 onTap: () {
                                   Navigator.pop(context);
-                                  FilterPopup.show(
-                                    context,
-                                    selectedKey: _selectedFilter,
-                                    onSelected: (key) =>
-                                        setState(() => _selectedFilter = key),
-                                  );
+                                  _openFilters();
                                 },
                               ),
                               _controlItem(
@@ -2414,12 +2817,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                             label: _t('player_action_filters'),
                             onTap: () {
                               Navigator.pop(context);
-                              FilterPopup.show(
-                                context,
-                                selectedKey: _selectedFilter,
-                                onSelected: (key) =>
-                                    setState(() => _selectedFilter = key),
-                              );
+                              _openFilters();
                             },
                           ),
                           _controlItem(
@@ -2954,9 +3352,27 @@ class _FullScreenVideoPlayerSystemVolumeState
       transform: Matrix4.identity()
         ..translateByDouble(_videoOffset.dx, _videoOffset.dy, 0, 1)
         ..scaleByDouble(_videoScale, _videoScale, _videoScale, 1),
-      child: ColorFiltered(
-        colorFilter: ColorFilter.matrix(
-          _getColorMatrix(_selectedFilter, hdrIntensity: 0.8),
+      // A picked filter blends in over ~half a second instead of snapping,
+      // so the change is seen happening.
+      child: TweenAnimationBuilder<List<double>>(
+        tween: _MatrixTween(
+          end: _matrixCache.putIfAbsent(
+            _selectedFilter,
+            () => _getColorMatrix(_selectedFilter, hdrIntensity: 0.8),
+          ),
+        ),
+        duration: const Duration(milliseconds: 450),
+        curve: Curves.easeOut,
+        builder: (context, matrix, child) => Stack(
+          fit: StackFit.expand,
+          children: [
+            ColorFiltered(
+              colorFilter: ColorFilter.matrix(matrix),
+              child: child,
+            ),
+            // Light sweep across the picture on each filter pick.
+            FilterSweep(trigger: _filterSweep),
+          ],
         ),
         child: Video(
           controller: _controller,
@@ -2983,7 +3399,19 @@ class _FullScreenVideoPlayerSystemVolumeState
         // Only hand over to PiP for local playlists; URL streams have no queue.
         // if (_hasLocalList) _moveToFloating();
       },
-      child: GestureDetector(
+      // While the video is on a TV the phone shows only the cast controls —
+      // outside the gesture layer, so a swipe cannot seek, or change the
+      // brightness or volume of, the paused local player underneath.
+      child: _casting
+          ? Scaffold(
+              backgroundColor: Colors.black,
+              body: CastingPanel(
+                lang: _lang,
+                title: appBarTitle,
+                onStop: _stopCasting,
+              ),
+            )
+          : GestureDetector(
         behavior: HitTestBehavior.translucent,
 
         // ✅ Scale engine (1 finger = pan, 2 finger = zoom)
@@ -3152,154 +3580,54 @@ class _FullScreenVideoPlayerSystemVolumeState
                   ),
                 ),
 
-              // ✅ HDR overlay (same - premium)
-              if (_showHdrOverlay)
-                Positioned.fill(
-                  child: AnimatedOpacity(
-                    opacity: _showHdrOverlay ? 1 : 0,
-                    duration: const Duration(milliseconds: 180),
-                    child: BackdropFilter(
-                      filter: ImageFilter.blur(sigmaX: 8, sigmaY: 8),
-                      child: Container(
-                        color: Colors.black.withValues(alpha:0.45),
-                        alignment: Alignment.center,
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween(begin: 0.85, end: 1),
-                          duration: const Duration(milliseconds: 260),
-                          curve: Curves.easeOutBack,
-                          builder: (context, scale, child) {
-                            return Transform.scale(
-                              scale: scale,
-                              child: child,
-                            );
-                          },
-                          child: Container(
-                            width: 280,
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 22,
-                              vertical: 24,
-                            ),
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(26),
-                              gradient: LinearGradient(
-                                begin: Alignment.topLeft,
-                                end: Alignment.bottomRight,
-                                colors:
-                                _hdrOn
-                                    ? const [
-                                  Color(0xFF0F172A),
-                                  Color(0xFF1E293B),
-                                ]
-                                    : const [
-                                  Color(0xFFFFC857),
-                                  Color(0xFFFF8A00),
-                                ],
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.black.withValues(alpha:0.65),
-                                  blurRadius: 35,
-                                  spreadRadius: 4,
-                                ),
-                              ],
-                              border: Border.all(
-                                color: Colors.white.withValues(alpha:0.12),
-                              ),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                TweenAnimationBuilder<double>(
-                                  tween: Tween(begin: 0, end: 1),
-                                  duration: const Duration(seconds: 1),
-                                  builder: (_, value, child) {
-                                    return Transform.rotate(
-                                      angle: value * 6.28,
-                                      child: child,
-                                    );
-                                  },
-                                  child: Container(
-                                    padding: const EdgeInsets.all(18),
-                                    decoration: BoxDecoration(
-                                      shape: BoxShape.circle,
-                                      gradient: RadialGradient(
-                                        colors: [
-                                          Colors.white.withValues(alpha: 0.35),
-                                          Colors.white.withValues(alpha: 0.05),
-                                        ],
-                                      ),
-                                    ),
-                                    child: Icon(
-                                      Icons.hdr_on_rounded,
-                                      size: 40,
-                                      color:
-                                      _hdrOn
-                                          ? Colors.orangeAccent
-                                          : Colors.black87,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 18),
-                                Text(
-                                  _t('player_hdr_processing'),
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 1.6,
-                                    color:
-                                    _hdrOn
-                                        ? Colors.white70
-                                        : Colors.black87,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  _hdrOn
-                                      ? _t('player_hdr_turning_off')
-                                      : _t('player_hdr_turning_on'),
-                                  textAlign: TextAlign.center,
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.w900,
-                                    color:
-                                    _hdrOn
-                                        ? Colors.white
-                                        : Colors.black,
-                                  ),
-                                ),
-                                const SizedBox(height: 20),
-                                const SizedBox(
-                                  width: 34,
-                                  height: 34,
-                                  child: CupertinoActivityIndicator(
-                                    radius: 20,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+              // While HDR is on: time left, top-left. Slides below the top
+              // bar while the controls are up so it never covers it.
+              if (_adFilters.contains(_selectedFilter))
+                AnimatedPositioned(
+                  duration: const Duration(milliseconds: 220),
+                  curve: Curves.easeOut,
+                  left: 12,
+                  top: _controlsVisible && !_isLocked
+                      ? (isLandscape ? 0.0 : 40.sp) + 56 + 18
+                      : MediaQuery.of(context).padding.top + 12,
+                  child: HdrTimerChip(left: _hdrLeft),
                 ),
 
-              // lock overlay (same)
+              // HDR on/off confirmation — small, centred, and the picture
+              // stays visible behind it. See HdrStatusBadge.
+              Positioned.fill(
+                child: HdrStatusBadge(
+                  visible: _showHdrOverlay,
+                  on: _hdrOn,
+                  title: _t(_hdrOn ? 'player_hdr_on' : 'player_hdr_off'),
+                  subtitle: _hdrBadgeSubtitle,
+                ),
+              ),
+
+              // lock overlay — fades out after a few seconds. Once hidden it
+              // ignores pointers, so a tap falls through to `_onScreenTap`,
+              // which brings it back.
               if (_isLocked)
                 Center(
-                  child: GestureDetector(
-                    onTap: _toggleLock,
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: const BoxDecoration(
-                        color: Colors.black54,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.lock,
-                        color: Colors.green,
-                        size: 60,
+                  child: IgnorePointer(
+                    ignoring: !_lockIconVisible,
+                    child: AnimatedOpacity(
+                      opacity: _lockIconVisible ? 1 : 0,
+                      duration: const Duration(milliseconds: 250),
+                      child: GestureDetector(
+                        onTap: _toggleLock,
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: const BoxDecoration(
+                            color: Colors.black54,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.lock,
+                            color: Colors.green,
+                            size: 60,
+                          ),
+                        ),
                       ),
                     ),
                   ),
@@ -3343,8 +3671,8 @@ class _FullScreenVideoPlayerSystemVolumeState
                               // Paused first: an interstitial must not play
                               // over the video's own audio.
                               _player.pause();
-                              appOpenManager.showInterstitialIfAllowed(
-                                onContinue: () {
+                              InterstitialManager.instance.showIfEligible(
+                                onDone: () {
                                   if (!mounted) return;
                                   ScreenBrightness()
                                       .resetApplicationScreenBrightness()
@@ -3373,15 +3701,17 @@ class _FullScreenVideoPlayerSystemVolumeState
                           isLandscape: isLandscape,
                           videos: widget.videos,
                           onBackPressedMore: openControlsSheetSmart,
+                          onCast: () => _openCast(appBarTitle),
                         )
                             : Container(
                           child: _StreamTopBar(
                             title: appBarTitle,
+                            onCast: () => _openCast(appBarTitle),
                             onBack: () {
                               // Paused first, as above.
                               _player.pause();
-                              appOpenManager.showInterstitialIfAllowed(
-                                onContinue: () {
+                              InterstitialManager.instance.showIfEligible(
+                                onDone: () {
                                   if (!mounted) return;
                                   ScreenBrightness()
                                       .resetApplicationScreenBrightness()
@@ -3427,15 +3757,7 @@ class _FullScreenVideoPlayerSystemVolumeState
                                     icon: const Icon(Icons.color_lens),
                                     color: Colors.white,
                                     onPressed: () {
-                                      FilterPopup.show(
-                                        context,
-                                        selectedKey: _selectedFilter,
-                                        onSelected: (key) {
-                                          setState(
-                                                () => _selectedFilter = key,
-                                          );
-                                        },
-                                      );
+                                      _openFilters();
                                     },
                                   ),
                                 ],
@@ -3676,7 +3998,10 @@ class _StreamTopBar extends StatelessWidget {
   final String title;
   final VoidCallback onBack;
 
-  const _StreamTopBar({required this.title, required this.onBack});
+  /// Opens the Chromecast picker. Null hides the button.
+  final VoidCallback? onCast;
+
+  const _StreamTopBar({required this.title, required this.onBack, this.onCast});
 
   @override
   Widget build(BuildContext context) {
@@ -3705,8 +4030,32 @@ class _StreamTopBar extends StatelessWidget {
               ),
             ),
           ),
+          if (onCast != null)
+            Card(
+              color: Colors.white10,
+              child: IconButton(
+                onPressed: onCast,
+                icon: const Icon(Icons.cast_rounded, color: Colors.white),
+              ),
+            ),
         ],
       ),
+    );
+  }
+}
+/// Blends one 4x5 colour matrix into another, entry by entry — what lets a
+/// newly picked filter fade in over the old one.
+class _MatrixTween extends Tween<List<double>> {
+  _MatrixTween({required List<double> end}) : super(end: end);
+
+  @override
+  List<double> lerp(double t) {
+    final from = begin ?? end!;
+    final to = end!;
+    return List<double>.generate(
+      to.length,
+      (i) => from[i] + (to[i] - from[i]) * t,
+      growable: false,
     );
   }
 }

@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
@@ -29,11 +30,64 @@ class _PhotoViewerPageState extends State<PhotoViewerPage> {
   late final PageController _pageController;
   late int _index;
 
+  /// File lookups, shared by the pages and the neighbour prefetch so each
+  /// photo's file is resolved once. On Android 10+ that lookup copies the
+  /// photo into the cache before it can be opened, which for a large photo is
+  /// most of the wait — doing it for the next page while this one is on
+  /// screen is what makes a swipe land on a ready image.
+  final Map<String, Future<File?>> _files = {};
+
+  /// How far from the current page a lookup is kept before it is dropped.
+  static const int _keepRadius = 2;
+
   @override
   void initState() {
     super.initState();
     _index = widget.initialIndex;
     _pageController = PageController(initialPage: _index);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _prefetchAround(_index);
+    });
+  }
+
+  Future<File?> _fileFor(GalleryController controller, String photoId) =>
+      _files.putIfAbsent(photoId, () => controller.originalFile(photoId));
+
+  /// Longest side, in pixels, a page decodes to. Twice the screen leaves room
+  /// to zoom; above 4096 a photo costs far more to decode and hold than any
+  /// phone screen can show, which is what made 50–200 MP photos crawl in.
+  int _decodeCap(BuildContext context) {
+    final media = MediaQuery.of(context);
+    final screen = media.size.longestSide * media.devicePixelRatio;
+    return (screen * 2).clamp(2048, 4096).round();
+  }
+
+  /// Resolves the neighbours' files and decodes them into the image cache,
+  /// and forgets lookups that have scrolled well out of range.
+  void _prefetchAround(int index) {
+    final controller = context.read<GalleryController>();
+    final photos = controller.photos;
+    if (photos.isEmpty) return;
+
+    final keep = <String>{
+      for (var i = index - _keepRadius; i <= index + _keepRadius; i++)
+        if (i >= 0 && i < photos.length) photos[i].id,
+    };
+    _files.removeWhere((id, _) => !keep.contains(id));
+
+    final cap = _decodeCap(context);
+    for (final neighbour in [index + 1, index - 1]) {
+      if (neighbour < 0 || neighbour >= photos.length) continue;
+      final id = photos[neighbour].id;
+      _fileFor(controller, id).then((file) {
+        if (file == null || !mounted) return;
+        precacheImage(
+          _ViewerImage.providerFor(file, cap),
+          context,
+          onError: (_, __) {}, // the page shows its own error if it recurs
+        );
+      });
+    }
   }
 
   @override
@@ -114,6 +168,7 @@ class _PhotoViewerPageState extends State<PhotoViewerPage> {
     }
 
     final position = (_index + 1).clamp(1, photos.length);
+    final decodeCap = _decodeCap(context);
 
     return Scaffold(
       backgroundColor: Colors.black,
@@ -144,7 +199,10 @@ class _PhotoViewerPageState extends State<PhotoViewerPage> {
       body: PhotoViewGallery.builder(
         pageController: _pageController,
         itemCount: photos.length,
-        onPageChanged: (index) => setState(() => _index = index),
+        onPageChanged: (index) {
+          setState(() => _index = index);
+          _prefetchAround(index);
+        },
         backgroundDecoration: const BoxDecoration(color: Colors.black),
         builder: (context, index) {
           final photo = photos[index];
@@ -160,6 +218,8 @@ class _PhotoViewerPageState extends State<PhotoViewerPage> {
               // cannot look the controller up for itself.
               controller: controller,
               photoId: photo.id,
+              file: _fileFor(controller, photo.id),
+              decodeCap: decodeCap,
             ),
           );
         },
@@ -170,9 +230,14 @@ class _PhotoViewerPageState extends State<PhotoViewerPage> {
 
 /// One full-resolution page.
 ///
-/// Resolves its file exactly once in `initState`. The viewer rebuilds
-/// constantly while swiping, and resolving inside `build` — which the old
-/// gallery did before it was fixed — re-reads from MediaStore on every frame.
+/// Its file lookup is handed in by the page, which resolves each photo once
+/// and shares it with the neighbour prefetch. The viewer rebuilds constantly
+/// while swiping, and resolving inside `build` — which the old gallery did
+/// before it was fixed — re-reads from MediaStore on every frame.
+///
+/// Until the full image is decoded it shows the grid's thumbnail, which is
+/// already in memory, instead of a spinner on black — so a large photo
+/// appears at once and sharpens, rather than appearing only when done.
 ///
 /// [controller] arrives as an argument rather than through the context for the
 /// same reason [PhotoThumbnail] takes its repository: `photo_view` wraps this
@@ -183,32 +248,49 @@ class _ViewerImage extends StatefulWidget {
     super.key,
     required this.controller,
     required this.photoId,
+    required this.file,
+    required this.decodeCap,
   });
 
   final GalleryController controller;
   final String photoId;
+  final Future<File?> file;
+
+  /// Longest side to decode to; see `_PhotoViewerPageState._decodeCap`.
+  final int decodeCap;
+
+  /// The provider a page displays — shared with the prefetch so a precached
+  /// neighbour is a cache hit, which needs the identical key.
+  ///
+  /// `fit` inside a square works whichever way round the photo is, and never
+  /// upscales, so photos already under the cap decode exactly as before.
+  static ImageProvider providerFor(File file, int cap) => ResizeImage(
+        FileImage(file),
+        width: cap,
+        height: cap,
+        policy: ResizeImagePolicy.fit,
+      );
 
   @override
   State<_ViewerImage> createState() => _ViewerImageState();
 }
 
 class _ViewerImageState extends State<_ViewerImage> {
-  late Future<File?> _file;
+  late final Future<Uint8List?> _thumbnail;
 
   @override
   void initState() {
     super.initState();
-    _file = widget.controller.originalFile(widget.photoId);
+    // The grid's own size, so this is normally a hit in its thumbnail cache.
+    _thumbnail = widget.controller.thumbnail(widget.photoId);
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final lang = context.watch<LocaleProvider>().locale.languageCode;
-
-    return FutureBuilder<File?>(
-      future: _file,
+  Widget _placeholder() {
+    return FutureBuilder<Uint8List?>(
+      future: _thumbnail,
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
+        final bytes = snapshot.data;
+        if (bytes == null) {
           return Center(
             child: SizedBox(
               width: 24.sp,
@@ -219,6 +301,27 @@ class _ViewerImageState extends State<_ViewerImage> {
               ),
             ),
           );
+        }
+        return Image.memory(
+          bytes,
+          fit: BoxFit.contain,
+          width: double.infinity,
+          height: double.infinity,
+          gaplessPlayback: true,
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final lang = context.watch<LocaleProvider>().locale.languageCode;
+
+    return FutureBuilder<File?>(
+      future: widget.file,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _placeholder();
         }
 
         final file = snapshot.data;
@@ -244,11 +347,18 @@ class _ViewerImageState extends State<_ViewerImage> {
           );
         }
 
-        return Image.file(
-          file,
+        return Image(
+          image: _ViewerImage.providerFor(file, widget.decodeCap),
           fit: BoxFit.contain,
           width: double.infinity,
           height: double.infinity,
+          gaplessPlayback: true,
+          // Thumbnail until the first frame is ready. A precached neighbour
+          // arrives synchronously and skips straight to the full image.
+          frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+            if (wasSynchronouslyLoaded || frame != null) return child;
+            return _placeholder();
+          },
           errorBuilder: (_, __, ___) => Center(
             child: Icon(
               Icons.error_outline,

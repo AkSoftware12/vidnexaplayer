@@ -3,6 +3,10 @@
 
     <uses-permission android:name="com.google.android.gms.permission.AD_ID"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Added by workmanager_android for foreground workers; none are used
+         (see the SystemForegroundService entry below). -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SHORT_SERVICE"
+        tools:node="remove" />
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
@@ -183,6 +187,43 @@
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
+
+        <!-- FCM defaults for pushes the SYSTEM draws (app in background or
+             killed). Without these, those pushes went to FCM's own
+             "Miscellaneous" fallback channel — default importance, so no
+             heads-up banner — and used the full-colour launcher icon, which
+             Android renders as a white square. The channel id matches
+             LocalNotifications._channel, which also carries foreground
+             pushes, so all three app states now look the same. -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="vidnexa_push" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notification" />
+
+        <!-- Chromecast (flutter_chrome_cast / Google Cast SDK). The options
+             provider is the plugin's; the Cast SDK itself is only started on
+             the first tap of the player's Cast button. The notification
+             service gives the cast session its lock-screen / shade controls
+             and reuses the FOREGROUND_SERVICE_MEDIA_PLAYBACK permission
+             already declared for audio_service. -->
+        <meta-data
+            android:name="com.google.android.gms.cast.framework.OPTIONS_PROVIDER_CLASS_NAME"
+            android:value="com.felnanuke.google_cast.GoogleCastOptionsProvider" />
+
+        <service
+            android:name="com.google.android.gms.cast.framework.media.MediaNotificationService"
+            android:exported="false"
+            android:foregroundServiceType="mediaPlayback" />
+
+        <!-- workmanager_android declares a `shortService` foreground service
+             for workers that promote themselves to the foreground. The only
+             worker here (the new-media reminder) never does, so the type is
+             removed rather than shipped unused. -->
+        <service
+            android:name="androidx.work.impl.foreground.SystemForegroundService"
+            tools:remove="android:foregroundServiceType" />
 
     </application>
 </manifest>

@@ -8,12 +8,13 @@ import 'package:in_app_purchase_android/billing_client_wrappers.dart';
 import 'package:in_app_purchase_android/in_app_purchase_android.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 /// The app's single Google Play Billing layer.
 ///
 /// A [ChangeNotifier] singleton rather than a per-subtree provider: the ad
 /// manager and `main()` both have to read the entitlement from outside the
-/// widget tree (`AppOpenAdManager` is not a widget, and the ad SDK is
+/// widget tree (`AdsManager` is not a widget, and the ad SDK is
 /// initialised before `runApp`'s tree exists), so a value that only lives in an
 /// `InheritedWidget` would be unreachable from exactly the two call sites that
 /// matter most. It is still registered in main.dart's `MultiProvider` via
@@ -534,6 +535,7 @@ class BillingService extends ChangeNotifier with WidgetsBindingObserver {
 
     try {
       // Both products go through buyNonConsumable — see [purchaseLifetime].
+      AdsManager.skipNextAppOpen();
       final bool started = await _iap.buyNonConsumable(
         purchaseParam: PurchaseParam(productDetails: product),
       );
@@ -791,6 +793,7 @@ class BillingService extends ChangeNotifier with WidgetsBindingObserver {
       '?sku=$kSubscriptionId&package=$pkg',
     );
     try {
+      AdsManager.skipNextAppOpen();
       return await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (error) {
       debugPrint('BillingService: manage subscriptions failed: $error');

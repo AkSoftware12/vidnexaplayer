@@ -45,11 +45,14 @@ class MiscStrings {
       'rewarded_not_now': 'Not now',
       'rewarded_unlocked': 'Unlocked for the next {minutes} minutes',
       'rewarded_incomplete': 'The ad was not finished, so nothing was unlocked.',
+      'rewarded_unavailable': 'No ad available right now. Please try again in a moment.',
       'rewarded_enhance_title': 'Unlock Enhance to 4K',
       'rewarded_enhance_body':
           'Watch a short video ad and 4K enhance is unlocked for the next '
           '{minutes} minutes — enhance as many photos as you like in that '
           'time. You can close this and keep using everything else.',
+      'rewarded_hdr_title': 'Unlock HDR for your videos',
+      'rewarded_hdr_body': 'Richer colours, brighter dark scenes and punchier contrast — see the difference above. It enhances the picture on this screen; it does not turn the file into true HDR. Watch one short video ad to use HDR for {minutes} minutes. You can turn it off any time.',
       'rewarded_filters_title': 'Unlock saving filtered photos',
       'rewarded_filters_body':
           'Watch a short video ad and saving filtered photos is unlocked for '
@@ -126,11 +129,14 @@ class MiscStrings {
       'rewarded_not_now': 'अभी नहीं',
       'rewarded_unlocked': 'अगले {minutes} मिनट के लिए अनलॉक हो गया',
       'rewarded_incomplete': 'विज्ञापन पूरा नहीं हुआ, इसलिए कुछ अनलॉक नहीं हुआ।',
+      'rewarded_unavailable': 'अभी कोई विज्ञापन उपलब्ध नहीं है। थोड़ी देर बाद फिर कोशिश करें।',
       'rewarded_enhance_title': '4K एन्हांस अनलॉक करें',
       'rewarded_enhance_body':
           'एक छोटा वीडियो विज्ञापन देखें और अगले {minutes} मिनट के लिए 4K '
           'एन्हांस अनलॉक हो जाएगा — उतनी देर में जितनी चाहें उतनी फ़ोटो '
           'एन्हांस करें। इसे बंद करके बाकी सब कुछ वैसे ही इस्तेमाल कर सकते हैं।',
+      'rewarded_hdr_title': 'अपने वीडियो के लिए HDR अनलॉक करें',
+      'rewarded_hdr_body': 'ज़्यादा गहरे रंग, अंधेरे सीन में ज़्यादा रोशनी और बेहतर कंट्रास्ट — ऊपर फ़र्क देखें। यह स्क्रीन पर तस्वीर को बेहतर बनाता है; फ़ाइल को असली HDR में नहीं बदलता। एक छोटा वीडियो विज्ञापन देखें और {minutes} मिनट तक HDR इस्तेमाल करें। इसे कभी भी बंद कर सकते हैं।',
       'rewarded_filters_title': 'फ़िल्टर वाली फ़ोटो सेव करना अनलॉक करें',
       'rewarded_filters_body':
           'एक छोटा वीडियो विज्ञापन देखें और अगले {minutes} मिनट के लिए '

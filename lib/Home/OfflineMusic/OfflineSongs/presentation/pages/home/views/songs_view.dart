@@ -8,6 +8,7 @@ import '../../../../../../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.
 import '../../../../../../../Utils/app_palette.dart';
 import '../../../../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../../../../NotifyListeners/LanguageProvider/music_strings.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 
 
@@ -104,12 +105,14 @@ class _SongsViewState extends State<SongsView> with SingleTickerProviderStateMix
     final text = '${song.title}\n${song.artist ?? ""}';
     try {
       if (song.data.isNotEmpty) {
+        AdsManager.skipNextAppOpen();
         await SharePlus.instance.share(
           ShareParams(files: [XFile(song.data)], text: text, subject: song.title),
         );
         return;
       }
     } catch (_) {}
+    AdsManager.skipNextAppOpen();
     await SharePlus.instance.share(ShareParams(text: text, subject: song.title));
   }
   @override

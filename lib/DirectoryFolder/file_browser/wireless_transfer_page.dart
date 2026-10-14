@@ -15,7 +15,7 @@ import 'package:shelf/shelf_io.dart' as shelf_io;
 import '../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../Utils/app_palette.dart';
-import '../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import 'file_kind.dart';
 import 'file_tools.dart';
 
@@ -71,7 +71,8 @@ class _WirelessTransferPageState extends State<WirelessTransferPage> {
 
   /// Built once: the request counter repaints this screen on every hit, and
   /// a fresh widget each time would reload the ad.
-  late final Widget _nativeAd = AppOpenAdManager().nativeCompactWidget();
+  late final Widget _nativeAd =
+      const HybridAdSlot(templateType: TemplateType.small, padding: EdgeInsets.zero);
 
   String get _lang => context.read<LocaleProvider>().locale.languageCode;
   String _t(String key) => HomeStrings.t(_lang, key);

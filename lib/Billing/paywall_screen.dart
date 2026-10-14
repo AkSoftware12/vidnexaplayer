@@ -10,6 +10,7 @@ import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../NotifyListeners/LanguageProvider/paywall_strings.dart';
 import 'billing_service.dart';
 import '../WhatsNew/whats_new.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 /// The premium paywall.
 ///
@@ -357,6 +358,7 @@ class _PaywallScreenState extends State<PaywallScreen>
 
   Future<void> _open(String url) async {
     try {
+      AdsManager.skipNextAppOpen();
       await launchUrl(Uri.parse(url), mode: LaunchMode.externalApplication);
     } catch (_) {
       // A missing browser is not worth an error dialog on a paywall.

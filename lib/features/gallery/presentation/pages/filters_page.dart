@@ -8,13 +8,14 @@ import 'package:provider/provider.dart';
 import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/color.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../../../ads/rewarded_unlock.dart';
 import '../../../../ads/rewarded_unlock_prompt.dart';
 import '../../domain/entities/photo_entity.dart';
 import '../../domain/entities/photo_filter.dart';
 import '../../domain/repositories/gallery_repository.dart';
 import 'photo_picker_page.dart';
+import '../widgets/gallery_button.dart';
 
 /// One-tap looks plus manual brightness, contrast, saturation and warmth.
 ///
@@ -32,7 +33,6 @@ class FiltersPage extends StatefulWidget {
 }
 
 class _FiltersPageState extends State<FiltersPage> {
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   /// Slider moves arrive far faster than a render finishes. Coalescing them
   /// means the isolate renders the value the finger landed on, not every value
@@ -47,6 +47,22 @@ class _FiltersPageState extends State<FiltersPage> {
   List<Uint8List?> _strip = const [];
   bool _rendering = false;
   bool _saving = false;
+
+  /// Photo, filter and adjustments the last successful save wrote. While the
+  /// editor still shows exactly that, Save is off — tapping it again used to
+  /// write the same picture to the gallery a second time. Adjustments are
+  /// compared by identity: every slider move builds a new object.
+  (String, PhotoFilter, FilterAdjustments)? _saved;
+
+  bool get _isSaved {
+    final photo = _photo;
+    final saved = _saved;
+    return photo != null &&
+        saved != null &&
+        saved.$1 == photo.id &&
+        saved.$2 == _filter &&
+        identical(saved.$3, _adjustments);
+  }
 
   Timer? _debounceTimer;
 
@@ -146,14 +162,21 @@ class _FiltersPageState extends State<FiltersPage> {
     final messenger = ScaffoldMessenger.of(context);
     setState(() => _saving = true);
 
+    // Captured before the await: the sliders stay live while this runs, and
+    // what counts as "saved" is what was written, not what is on screen now.
+    final filter = _filter;
+    final adjustments = _adjustments;
     final saved = await widget.repository.saveFilteredPhoto(
       photoId: photo.id,
-      filter: _filter,
-      adjustments: _adjustments,
+      filter: filter,
+      adjustments: adjustments,
     );
 
     if (!mounted) return;
-    setState(() => _saving = false);
+    setState(() {
+      _saving = false;
+      if (saved) _saved = (photo.id, filter, adjustments);
+    });
 
     // A SnackBar rather than a line of text wedged between the sliders and the
     // button: at full resolution this takes seconds, and the one-line status
@@ -233,7 +256,7 @@ class _FiltersPageState extends State<FiltersPage> {
               ),
           ],
         ),
-        bottomNavigationBar: _adManager.bannerWidget(),
+        bottomNavigationBar: const BottomBannerBar(),
         body: _photo == null
             ? const Center(child: CircularProgressIndicator())
             : Column(
@@ -287,36 +310,13 @@ class _FiltersPageState extends State<FiltersPage> {
                   ),
                   Padding(
                     padding: EdgeInsets.all(12.sp),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _saving || !_isDirty ? null : _save,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ColorSelect.maineColor,
-                          foregroundColor: Colors.white,
-                          disabledBackgroundColor: Colors.grey.shade700,
-                          disabledForegroundColor: Colors.white54,
-                          padding: EdgeInsets.symmetric(vertical: 13.sp),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10.sp),
-                          ),
-                        ),
-                        child: _saving
-                            ? SizedBox(
-                                width: 18.sp,
-                                height: 18.sp,
-                                child: const CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                DeviceStrings.t(lang, 'gallery_filter_save'),
-                                style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                    child: GalleryButton(
+                      label: DeviceStrings.t(
+                        lang,
+                        _isSaved ? 'gallery_tool_saved' : 'gallery_filter_save',
                       ),
+                      busy: _saving,
+                      onPressed: !_isDirty || _isSaved ? null : _save,
                     ),
                   ),
                 ],

@@ -29,7 +29,7 @@ import 'package:videoplayer/Utils/color.dart';
 import '../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../Utils/video_thumb.dart';
-import '../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 class AlbumScreen extends StatefulWidget {
   const AlbumScreen({super.key});
@@ -40,7 +40,6 @@ class AlbumScreen extends StatefulWidget {
 
 class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStateMixin {
 
-  final appOpenManager = AppOpenAdManager();
 
   List<AssetPathEntity> _albums = [];
   bool _isLoading = true;
@@ -131,7 +130,7 @@ class _AlbumScreenState extends State<AlbumScreen> with SingleTickerProviderStat
         ),
       ),
 
-      bottomNavigationBar:appOpenManager.bannerWidget(),
+      bottomNavigationBar:const BottomBannerBar(),
 
     );
   }
@@ -470,6 +469,7 @@ class _FullScreenPhotoState extends State<FullScreenPhoto> {
 
     if (confirm == true) {
       try {
+        AdsManager.skipNextAppOpen();
         final result = await PhotoManager.editor.deleteWithIds([_photos[_currentIndex].id]);
         // The delete is a platform-channel call and the user can leave the
         // viewer while the system delete dialog is up. Everything below

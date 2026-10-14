@@ -42,6 +42,13 @@ class PhotoSignatureService {
   /// a handful in parallel anyway.
   static const _thumbnailConcurrency = 8;
 
+  /// The same two limits for a background pass — one the app started on its
+  /// own while the user is scrolling the grid. The grid's thumbnails come out
+  /// of the same platform decoder pool, and a full-speed pass starved them.
+  /// See [_foreground].
+  static const _backgroundThumbnailConcurrency = 3;
+  static const _backgroundWorkerCount = 1;
+
   /// Worker isolates decoding batches at the same time.
   ///
   /// The pixel work (`img.decodeImage` plus the hash/blur/colour passes) is
@@ -60,8 +67,21 @@ class PhotoSignatureService {
   final ValueNotifier<SignatureProgress> progress =
       ValueNotifier<SignatureProgress>(SignatureProgress.idle);
 
-  bool _running = false;
-  bool get running => _running;
+  /// The pass in progress, if any. Every caller during a pass gets this same
+  /// future — it used to get an immediate 0 instead, so a tool opened while a
+  /// scan was running went on to analyse a half-built index as if complete.
+  Future<int>? _current;
+  bool get running => _current != null;
+
+  /// Whether the running pass goes at full speed. A background pass starts
+  /// slow; the moment anything the user is waiting on asks for the index, it
+  /// is raised for the rest of the run. Read per group, so it takes effect
+  /// mid-pass.
+  bool _foreground = false;
+
+  int get _activeWorkers => _foreground ? _workerCount : _backgroundWorkerCount;
+  int get _activeThumbnailConcurrency =>
+      _foreground ? _thumbnailConcurrency : _backgroundThumbnailConcurrency;
 
   Future<int> signedCount() => _database.count();
 
@@ -73,10 +93,23 @@ class PhotoSignatureService {
   /// Signs whatever is new or changed since the last pass.
   ///
   /// Never throws — a failure here must not take down whichever screen asked
-  /// for it. Returns the number of photos actually signed this run.
-  Future<int> ensureSignatures() async {
-    if (_running) return 0;
-    _running = true;
+  /// for it. Returns the number of photos actually signed this run. If a pass
+  /// is already running, returns that pass's result once it finishes.
+  ///
+  /// [background] is for passes the app starts on its own (see
+  /// `GalleryController`): they run at reduced speed so scrolling stays
+  /// smooth. Callers must only use it once read permission is granted, so it
+  /// never puts up a permission prompt nobody asked for.
+  Future<int> ensureSignatures({bool background = false}) {
+    if (!background) _foreground = true;
+    final current = _current;
+    if (current != null) return current;
+
+    _foreground = !background;
+    return _current = _run();
+  }
+
+  Future<int> _run() async {
     progress.value = SignatureProgress.idle.copyWith(running: true);
 
     try {
@@ -139,20 +172,26 @@ class PhotoSignatureService {
       // worker. Running them in lockstep left whichever side was idle doing
       // nothing, so the next group's thumbnails are pulled while the current
       // group is still being decoded.
-      final groupSize = _batchSize * _workerCount;
+      //
+      // One group = one batch per worker. The group size is re-read each turn
+      // because a background pass can be raised to full speed mid-run.
       Future<List<SignatureBatchRequest>>? prefetch;
+      var prefetchEnd = 0;
+      var start = 0;
 
-      for (var start = 0; start < pending.length; start += groupSize) {
-        final end = (start + groupSize).clamp(0, pending.length);
+      while (start < pending.length) {
+        final end = prefetch != null
+            ? prefetchEnd
+            : (start + _batchSize * _activeWorkers).clamp(0, pending.length);
 
         final requests = await (prefetch ??
             _buildRequests(pending.sublist(start, end), fileSizes));
 
-        final nextStart = end;
-        if (nextStart < pending.length) {
-          final nextEnd = (nextStart + groupSize).clamp(0, pending.length);
+        if (end < pending.length) {
+          prefetchEnd =
+              (end + _batchSize * _activeWorkers).clamp(0, pending.length);
           prefetch =
-              _buildRequests(pending.sublist(nextStart, nextEnd), fileSizes);
+              _buildRequests(pending.sublist(end, prefetchEnd), fileSizes);
         } else {
           prefetch = null;
         }
@@ -170,6 +209,7 @@ class PhotoSignatureService {
         }
 
         progress.value = progress.value.copyWith(done: end);
+        start = end;
       }
 
       if (kDebugMode) {
@@ -177,7 +217,7 @@ class PhotoSignatureService {
         debugPrint(
           '🖼️ signature scan: $signed photos in ${ms}ms '
           '(${(ms / (signed == 0 ? 1 : signed)).toStringAsFixed(1)}ms each, '
-          '$_workerCount workers)',
+          '$_activeWorkers workers at the end)',
         );
       }
 
@@ -187,7 +227,10 @@ class PhotoSignatureService {
       debugPrintStack(stackTrace: stackTrace);
       return 0;
     } finally {
-      _running = false;
+      // Cleared before the notifier fires, so a listener reacting to
+      // "finished" already sees `running` as false.
+      _current = null;
+      _foreground = false;
       progress.value = progress.value.copyWith(running: false);
     }
   }
@@ -195,7 +238,7 @@ class PhotoSignatureService {
   /// Drops every signature and signs the library from scratch. For a "rescan"
   /// action, or after the thresholds these scores feed are retuned.
   Future<int> rebuild() async {
-    if (_running) return 0;
+    if (running) return 0;
     final known = await _database.signedFingerprints();
     await _database.deleteByIds(known.keys);
     return ensureSignatures();
@@ -236,8 +279,9 @@ class PhotoSignatureService {
     return requests;
   }
 
-  /// Reads thumbnail bytes for [group], [_thumbnailConcurrency] photos at a
-  /// time, pairing each with its size from the prefetched [fileSizes] map.
+  /// Reads thumbnail bytes for [group], a few photos at a time (fewer during
+  /// a background pass), pairing each with its size from the prefetched
+  /// [fileSizes] map.
   ///
   /// This loop used to be strictly sequential — and each turn also awaited a
   /// size lookup that copied the photo to disk. That is why a large library
@@ -248,9 +292,10 @@ class PhotoSignatureService {
     Map<String, int> fileSizes,
   ) async {
     final loaded = <_LoadedThumbnail>[];
+    final concurrency = _activeThumbnailConcurrency;
 
-    for (var start = 0; start < group.length; start += _thumbnailConcurrency) {
-      final end = (start + _thumbnailConcurrency).clamp(0, group.length);
+    for (var start = 0; start < group.length; start += concurrency) {
+      final end = (start + concurrency).clamp(0, group.length);
       final slice = group.sublist(start, end);
 
       final results = await Future.wait(

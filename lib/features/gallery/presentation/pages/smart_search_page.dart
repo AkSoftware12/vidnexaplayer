@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/color.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../domain/entities/gallery_query.dart';
 import '../../domain/repositories/gallery_repository.dart';
 import '../controllers/photo_search_controller.dart';
@@ -27,7 +27,6 @@ class SmartSearchPage extends StatefulWidget {
 }
 
 class _SmartSearchPageState extends State<SmartSearchPage> {
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   late final PhotoSearchController _controller =
       PhotoSearchController(repository: widget.repository);
@@ -64,7 +63,7 @@ class _SmartSearchPageState extends State<SmartSearchPage> {
                 ),
               ),
             ),
-            bottomNavigationBar: _adManager.bannerWidget(),
+            bottomNavigationBar: const BottomBannerBar(),
             body: Column(
               children: [
                 _SearchField(
@@ -78,7 +77,7 @@ class _SmartSearchPageState extends State<SmartSearchPage> {
                 // sitting in that rhythm collects accidental clicks.
                 Padding(
                   padding: EdgeInsets.fromLTRB(12.sp, 4.sp, 12.sp, 8.sp),
-                  child: _adManager.nativeCompactWidget(),
+                  child: const HybridAdSlot(templateType: TemplateType.small, padding: EdgeInsets.zero),
                 ),
                 Expanded(
                   child: _Results(controller: controller, lang: lang),
@@ -297,7 +296,12 @@ class _Results extends StatelessWidget {
               ),
               SizedBox(height: 6.sp),
               Text(
-                DeviceStrings.t(lang, 'gallery_search_limits'),
+                DeviceStrings.t(
+                  lang,
+                  controller.indexing
+                      ? 'gallery_search_indexing'
+                      : 'gallery_search_limits',
+                ),
                 textAlign: TextAlign.center,
                 style: TextStyle(fontFamily: 'Poppins', fontSize: 10.5.sp,
                   color: Colors.grey.shade500,
@@ -317,7 +321,12 @@ class _Results extends StatelessWidget {
             alignment: Alignment.centerLeft,
             child: Text(
               DeviceStrings.t(lang, 'gallery_search_count')
-                  .replaceAll('{count}', '${controller.results.length}'),
+                      .replaceAll('{count}', '${controller.results.length}') +
+                  // Colour/brightness results are partial until the index
+                  // catches up; the list refreshes itself when it does.
+                  (controller.indexing
+                      ? ' · ${DeviceStrings.t(lang, 'gallery_search_indexing')}'
+                      : ''),
               style: TextStyle(fontFamily: 'Poppins', fontSize: 11.sp,
                 color: Colors.grey.shade600,
               ),

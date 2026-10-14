@@ -14,6 +14,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../Home/HomeBottomnavigation/home_bottomNavigation.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../NotifyListeners/LanguageProvider/profile_strings.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 class PermissionPage extends StatefulWidget {
   const PermissionPage({super.key});
@@ -174,6 +175,7 @@ class _PermissionPageState extends State<PermissionPage> with TickerProviderStat
     );
 
     if (open == true) {
+      AdsManager.skipNextAppOpen();
       await openAppSettings();
     }
   }

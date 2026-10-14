@@ -13,6 +13,7 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../DirectoryFolder/media_store/media_store.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 /// What a vault entry is, which decides how it is previewed, opened and put
 /// back.
@@ -323,6 +324,7 @@ class VaultService {
 
     List<String> deleted;
     try {
+      AdsManager.skipNextAppOpen();
       deleted = await PhotoManager.editor.deleteWithIds(copied.keys.toList());
     } catch (_) {
       deleted = const [];
@@ -488,6 +490,7 @@ class VaultService {
 
   Future<bool> _restoreToPickedLocation(VaultItem item) async {
     try {
+      AdsManager.skipNextAppOpen();
       final path = await FilePicker.saveFile(
         fileName: item.name,
         bytes: await item.file.readAsBytes(),

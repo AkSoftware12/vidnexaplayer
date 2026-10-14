@@ -17,7 +17,7 @@ import '../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../Utils/app_palette.dart';
-import '../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../WhatsNew/whats_new.dart';
 
 /// Accents for the Quick Access cards.
@@ -106,7 +106,6 @@ class DeviceSpaceScreen extends StatefulWidget {
 }
 
 class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
-  final appOpenManager = AppOpenAdManager();
 
   double _totalDiskSpaceGB = 0;
   double _freeDiskSpaceGB = 0;
@@ -197,8 +196,8 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
   /// Pushes [route] once the interstitial has had its chance. The ad manager
   /// caps how often one actually shows, so most taps navigate immediately.
   void _go(Route<void> route) {
-    appOpenManager.showInterstitialIfAllowed(
-      onContinue: () {
+    InterstitialManager.instance.showIfEligible(
+      onDone: () {
         if (mounted) Navigator.push(context, route);
       },
     );
@@ -351,7 +350,7 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
                 ),
 
                 const SizedBox(height: 16),
-                appOpenManager.nativeWidget(),
+                const HybridAdSlot(templateType: TemplateType.small, padding: EdgeInsets.zero),
 
                 const SizedBox(height: 16),
                 _SectionHeader(
@@ -537,7 +536,7 @@ class _DeviceSpaceScreenState extends State<DeviceSpaceScreen> {
               ],
             ),
       bottomNavigationBar:
-          widget.embedded ? null : appOpenManager.bannerWidget(),
+          widget.embedded ? null : const BottomBannerBar(),
     );
   }
 }

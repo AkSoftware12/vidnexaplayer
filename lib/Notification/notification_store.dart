@@ -28,6 +28,37 @@ class NotificationStore {
   /// without every screen having to poll.
   final ValueNotifier<int> unreadCount = ValueNotifier<int>(0);
 
+  /// Fires when the user taps a push; the home shell listens and opens the
+  /// notification list.
+  final ValueNotifier<int> openListRequests = ValueNotifier<int>(0);
+
+  /// A tap that launched the app arrives before the home shell exists (the
+  /// splash screen is still up), so the request is also held until taken.
+  bool _openListPending = false;
+
+  /// One tap is reported more than once — by `onMessageOpenedApp`, and by the
+  /// `getInitialMessage` re-check on resume, where the Android plugin hands
+  /// the same message out twice (from its own copy first, then again from the
+  /// activity's intent, and only the second marks it consumed). That second
+  /// copy can come after a newer tap, so every handled id is remembered, not
+  /// just the last; otherwise an old push would reopen the list on a later
+  /// resume. Taps per session are few, so the set stays tiny.
+  final Set<String> _openedIds = <String>{};
+
+  void requestOpenList([String? messageId]) {
+    if (messageId != null && !_openedIds.add(messageId)) return;
+    _openListPending = true;
+    openListRequests.value++;
+  }
+
+  /// True once per tap; the home shell calls this on start and on each
+  /// [openListRequests] change.
+  bool takeOpenListRequest() {
+    final pending = _openListPending;
+    _openListPending = false;
+    return pending;
+  }
+
   /// Saves a delivered message. Safe to call from either isolate.
   ///
   /// Ignores duplicates by id: one push can arrive at the background handler
@@ -59,7 +90,12 @@ class NotificationStore {
       final raw = prefs.getStringList(_key) ?? <String>[];
 
       final existing = _decodeAll(raw);
-      if (existing.any((item) => item.id == entry.id)) return;
+      if (existing.any((item) => item.id == entry.id)) {
+        // Still publish: the usual duplicate is a background push the other
+        // isolate stored, and this isolate's badge has not counted it yet.
+        _publishUnread(existing);
+        return;
+      }
 
       final updated = [entry, ...existing];
       if (updated.length > _maxStored) {

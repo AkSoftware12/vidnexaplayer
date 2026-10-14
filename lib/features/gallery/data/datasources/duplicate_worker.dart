@@ -120,7 +120,14 @@ bool _looksExact(List<PhotoSignature> cluster) {
   if (first.fileSizeBytes == null) return false;
   for (final other in cluster.skip(1)) {
     if (other.fileSizeBytes != first.fileSizeBytes) return false;
-    if (other.width != first.width || other.height != first.height) return false;
+    // Either way round: rows signed before photos carried EXIF-rotated
+    // dimensions hold the raw ones, so a copy indexed before and one after
+    // that change differ only by the swap. Size, hash and the SHA-256
+    // verification still have to agree.
+    final sameDims = (other.width == first.width &&
+            other.height == first.height) ||
+        (other.width == first.height && other.height == first.width);
+    if (!sameDims) return false;
     if (PhotoSignature.hammingDistance(first.dHash, other.dHash) != 0) {
       return false;
     }

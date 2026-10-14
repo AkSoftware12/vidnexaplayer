@@ -16,7 +16,6 @@ import 'package:flutter_localizations/flutter_localizations.dart'
 import 'package:flutter_portal/flutter_portal.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:hive_flutter/adapters.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:provider/provider.dart';
@@ -24,6 +23,7 @@ import 'package:videoplayer/VideoPLayer/4kPlayer/FlotingVideo/pip_host.dart';
 import 'package:videoplayer/WhatsNew/whats_new.dart';
 import 'package:videoplayer/Analytics/screen_analytics.dart';
 import 'package:videoplayer/Notification/local_notifications.dart';
+import 'package:videoplayer/Notification/new_media_digest.dart';
 import 'package:videoplayer/Notification/notification_store.dart';
 import 'package:videoplayer/Utils/app_palette.dart';
 import 'package:videoplayer/video_intent_service.dart';
@@ -36,14 +36,9 @@ import 'NotifyListeners/AppBar/app_bar_color.dart';
 import 'NotifyListeners/LanguageProvider/language_provider.dart';
 import 'NotifyListeners/UserData/user_data.dart';
 import 'Billing/billing_service.dart';
-import 'ads/ad_consent.dart';
-import 'ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import 'app_globals.dart';
 import 'features/equalizer/audio_effects_service.dart';
-
-/// The single app-wide ad manager. Screens use `AppOpenAdManager()` which
-/// returns this same instance; only main.dart is allowed to `init()` it.
-final AppOpenAdManager appOpenManager = AppOpenAdManager();
 
 /// App-wide Analytics handle. Screens import this from main.dart to log their
 /// own events, e.g. `analytics.logEvent(name: 'video_played', ...)`.
@@ -196,21 +191,61 @@ Future<void> _initCritical(
   // be made with the flag already in hand. It is a single SharedPreferences
   // read, so it costs the same as the theme load above it.
   await _guard('billing_cache', BillingService.instance.loadCachedEntitlement);
+  // Purchase, restore and expiry all flip BillingService.isPremium; the ad
+  // stack follows it from here (the splash seeds the initial value).
+  BillingService.instance.addListener(
+    () => AdsManager.setPremium(BillingService.instance.isPremium),
+  );
   _guardSync('media_kit', MediaKit.ensureInitialized);
 
   // These are independent of each other, so run them concurrently instead of
   // one after another.
   await Future.wait([
-    // Music screens call AudioServiceInit.handler, so it must be up first.
-    _guard('audio_service', AudioServiceInit.init),
+    // Music screens call AudioServiceInit.handler, so it must be up first —
+    // but never at the cost of the first frame. On Android, AudioService.init
+    // only completes once the plugin's MediaBrowser is connected, which is not
+    // guaranteed when this isolate was booted headless (see
+    // [_lockPortraitOnceVisible]). The init keeps going after the timeout and
+    // sets the handler if it completes; music screens check isReady.
+    _guard(
+      'audio_service',
+      () => AudioServiceInit.init().timeout(const Duration(seconds: 3)),
+    ),
     // The equalizer opens its own box; Hive only needs initialising here.
     _guard('hive', Hive.initFlutter),
-    _guard('orientation', () async {
-      await SystemChrome.setPreferredOrientations(
-        [DeviceOrientation.portraitUp],
-      );
-    }),
   ]);
+
+  _lockPortraitOnceVisible();
+}
+
+/// Locks portrait, but only once an Activity is on screen.
+///
+/// This isolate can start with no Activity at all: when a push arrives with
+/// the app closed, audio_service boots main() headless from its media service.
+/// SystemChrome calls are answered by the Activity's PlatformPlugin, and
+/// without one the embedding drops the call without replying — the Future
+/// never completes. This used to be awaited before runApp, so runApp never
+/// ran and tapping the notification showed only the navy window background
+/// (release build on a real device: Dart printed nothing after the engine
+/// was warmed). Not awaited for the same reason.
+void _lockPortraitOnceVisible() {
+  void lock() => unawaited(
+    _guard('orientation', () async {
+      await SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    }),
+  );
+
+  if (WidgetsBinding.instance.lifecycleState == AppLifecycleState.resumed) {
+    lock();
+    return;
+  }
+  late final AppLifecycleListener listener;
+  listener = AppLifecycleListener(
+    onResume: () {
+      listener.dispose();
+      lock();
+    },
+  );
 }
 
 /// Runs after the first frame. Nothing here blocks the UI.
@@ -229,39 +264,16 @@ Future<void> _initDeferred() async {
     // picks up a purchase that settled while the app was closed.
     _guard('billing', BillingService.instance.init),
 
-    _guard('ads', () async {
-      // Premium users never reach the ad SDK at all.
-      //
-      // Checked here, before initialize(), rather than at each show site: the
-      // SDK starts fetching creatives and collecting an advertising id the
-      // moment it is initialised, so a paying user would still pay the
-      // battery, bandwidth and privacy cost of an ad stack they never see.
-      //
-      // The value read here is the *cached* one — the `billing` guard beside
-      // this is still re-verifying against Play. Both directions of a stale
-      // cache are safe: a mid-session purchase is covered by AppOpenAdManager
-      // re-checking on every load/show path, and a lapsed subscription simply
-      // goes one more session without ads. Erring toward fewer ads is the only
-      // acceptable direction to be wrong in.
-      if (BillingService.instance.isPremium) {
-        debugPrint('🛡️ Premium user — ad SDK not initialised.');
-        return;
-      }
-
-      // EEA / UK / Swiss users must answer the UMP consent form before any ad
-      // is requested. Elsewhere this resolves at once with ads allowed. A
-      // later "allow" from Privacy options starts the ad stack then.
-      await AdConsent.instance.gather();
-      if (!AdConsent.instance.canRequestAds) {
-        debugPrint('🛡️ No ad consent — ad SDK not initialised.');
-        AdConsent.instance.addListener(_startAdsOnceConsented);
-        return;
-      }
-      await _startAds();
-    }),
-
     // FCM permission prompt + token fetch; nothing on screen waits for it.
     _guard('notifications', NotificationService().initNotifications),
+
+    // The daily "new photos & videos today" reminder. LocalNotifications is
+    // initialised here too (it is idempotent) so a tap on the reminder that
+    // launched the app is routed even if the FCM setup above bails out early.
+    _guard('new_media_digest', () async {
+      await LocalNotifications.init();
+      await NewMediaDigest.init();
+    }),
 
     // Restores the saved EQ and attaches it to the music player's audio
     // session. Deferred: nothing on the first frame depends on it, and the
@@ -274,41 +286,6 @@ Future<void> _initDeferred() async {
       }
     }),
   ]);
-}
-
-void _startAdsOnceConsented() {
-  if (!AdConsent.instance.canRequestAds) return;
-  AdConsent.instance.removeListener(_startAdsOnceConsented);
-  unawaited(_guard('ads_after_consent', _startAds));
-}
-
-bool _adsStarted = false;
-
-Future<void> _startAds() async {
-  if (_adsStarted) return;
-  _adsStarted = true;
-
-  await MobileAds.instance.initialize();
-
-  // Device ids that should always receive test ads.
-  //
-  // Find a device's id in logcat — the SDK prints:
-  //   I/Ads: Use RequestConfiguration.Builder().setTestDeviceIds(
-  //            Arrays.asList("XXXXXXXX")) to get test ads on this device.
-  //
-  // Debug builds don't depend on this list (they use AdUnits' test unit
-  // ids), but it still matters for release/profile testing on a handset.
-  MobileAds.instance.updateRequestConfiguration(
-    RequestConfiguration(
-      testDeviceIds: const [
-        '25240AE534A134DAFD363D1E9144746F', // AI Nova 2 Pro
-        'D55A05AC5F182B8B7343029E881273E8', // Samsung SM-A505F
-        '05B5C242534D4508DE3D9FF83044AED8', // (older dev device)
-      ],
-    ),
-  );
-
-  appOpenManager.init();
 }
 
 Future<void> _guard(String label, Future<void> Function() body) async {
@@ -370,7 +347,11 @@ class _MyAppState extends State<MyApp> {
                 return MaterialApp(
                   debugShowCheckedModeBanner: false,
                   navigatorKey: navigatorKey,
-                  navigatorObservers: [routeObserver, analyticsObserver],
+                  navigatorObservers: [
+                    routeObserver,
+                    analyticsObserver,
+                    AdRouteObserver(),
+                  ],
                   title: 'Vidnexa Video Player',
 
                   theme: theme.lightTheme,
@@ -430,6 +411,20 @@ class NotificationService {
   final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
 
   Future<void> initNotifications() async {
+    // Listeners first, permission and token after.
+    //
+    // This used to run the other way round, which left three holes: on a
+    // first launch (Android 13+) nothing listened for pushes until the user
+    // answered the permission dialog; offline, the token retries below held
+    // them back for several more seconds; and if requestPermission or getToken
+    // threw, the catch skipped the listeners entirely, so for that session a
+    // foreground push never showed and a tapped one never reached the list.
+    try {
+      await _registerListeners();
+    } catch (e) {
+      debugPrint('❌ FCM listeners failed: $e');
+    }
+
     try {
       // ✅ Request permission (Android 13+ and iOS)
       final settings = await _firebaseMessaging.requestPermission(
@@ -443,61 +438,99 @@ class NotificationService {
         debugPrint('✅ Permission status: ${settings.authorizationStatus}');
       }
 
-      // ✅ Get token safely (SERVICE_NOT_AVAILABLE won't crash)
-      final token = await _retryGetToken();
-      if (kDebugMode) {
-        debugPrint('✅ FCM Token: $token');
-      }
-
       // ✅ Token refresh
       _firebaseMessaging.onTokenRefresh.listen((newToken) {
         if (kDebugMode) debugPrint('🔁 FCM Token refreshed: $newToken');
         // TODO: send to backend or save prefs
       });
 
-      // ✅ Foreground message
-      // Foreground pushes get no tray banner from Android, so the app has to
-      // draw one itself. Without this a push that arrives while the app is
-      // open is completely invisible.
-      await LocalNotifications.init();
-
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        if (kDebugMode) {
-          debugPrint('📩 Foreground message: ${message.messageId}');
-          debugPrint('📩 Title: ${message.notification?.title}');
-          debugPrint('📩 Data: ${message.data}');
-        }
-        // Foreground pushes never reach the background handler, so this is
-        // the only place they get stored.
-        NotificationStore.instance.add(message);
-        LocalNotifications.show(message);
-      });
-
-      // ✅ When user taps notification & opens app
-      FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-        if (kDebugMode) {
-          debugPrint('👉 Notification opened: ${message.messageId}');
-          debugPrint('👉 Data: ${message.data}');
-        }
-        NotificationStore.instance.add(message);
-      });
-
-      // ✅ If app was terminated and opened by notification
-      final initialMessage = await _firebaseMessaging.getInitialMessage();
-      if (initialMessage != null) {
-        if (kDebugMode) {
-          debugPrint('🚀 Opened from terminated: ${initialMessage.messageId}');
-        }
-        // Duplicate-safe: the background handler may already have stored this
-        // one. NotificationStore.add ignores an id it has seen.
-        await NotificationStore.instance.add(initialMessage);
+      // ✅ Get token safely (SERVICE_NOT_AVAILABLE won't crash)
+      final token = await _retryGetToken();
+      // A release build can opt in with --dart-define=LOG_FCM_TOKEN=true, for
+      // sending console test pushes to it. Off by default: store builds never
+      // write the token to logcat.
+      if (kDebugMode || const bool.fromEnvironment('LOG_FCM_TOKEN')) {
+        debugPrint('✅ FCM Token: $token');
       }
-
-      // Seed the bell badge from whatever arrived while the app was closed.
-      await NotificationStore.instance.refreshUnreadCount();
     } catch (e) {
       debugPrint('❌ FCM init failed: $e');
       // Don't crash app
+    }
+  }
+
+  Future<void> _registerListeners() async {
+    // Pushes that land while the app sits in the background go to the
+    // background isolate, which writes them to storage behind this isolate's
+    // back. Re-read on every return so the bell badge is not left stale when
+    // the user comes back through the launcher instead of the notification.
+    AppLifecycleListener(
+      onResume: () {
+        NotificationStore.instance.refreshUnreadCount();
+        _checkLaunchMessage();
+      },
+    );
+
+    // ✅ Foreground message
+    // Foreground pushes get no tray banner from Android, so the app has to
+    // draw one itself (LocalNotifications.show). Without this a push that
+    // arrives while the app is open is completely invisible.
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      if (kDebugMode) {
+        debugPrint('📩 Foreground message: ${message.messageId}');
+        debugPrint('📩 Title: ${message.notification?.title}');
+        debugPrint('📩 Data: ${message.data}');
+      }
+      // Foreground pushes never reach the background handler, so this is
+      // the only place they get stored.
+      NotificationStore.instance.add(message);
+      LocalNotifications.show(message);
+    });
+
+    // ✅ When user taps notification & opens app
+    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
+      if (kDebugMode) {
+        debugPrint('👉 Notification opened: ${message.messageId}');
+        debugPrint('👉 Data: ${message.data}');
+      }
+      NotificationStore.instance.add(message);
+      NotificationStore.instance.requestOpenList(message.messageId);
+    });
+
+    // Creates the push channel. show() would do it lazily, but the channel
+    // has to exist before the next background push, which Android posts to
+    // it directly (default_notification_channel_id in the manifest).
+    await LocalNotifications.init();
+
+    // ✅ If app was terminated and opened by notification
+    await _checkLaunchMessage();
+
+    // Seed the bell badge from whatever arrived while the app was closed.
+    await NotificationStore.instance.refreshUnreadCount();
+  }
+
+  /// Handles a push tap that launched the activity.
+  ///
+  /// Runs at start-up and again on every resume. The resume pass is for the
+  /// case the start-up one cannot see: a push that arrives while the app is
+  /// closed makes audio_service boot the main isolate *before* any activity
+  /// exists, so getInitialMessage() at start-up finds nothing. The tap then
+  /// creates the activity on that already-running engine, the plugin stores
+  /// the message for getInitialMessage() without firing onMessageOpenedApp,
+  /// and only a later call picks it up. The plugin hands each message out
+  /// once, and requestOpenList ignores an id it has already handled.
+  Future<void> _checkLaunchMessage() async {
+    try {
+      final message = await _firebaseMessaging.getInitialMessage();
+      if (message == null) return;
+      if (kDebugMode) {
+        debugPrint('🚀 Launch message: ${message.messageId}');
+      }
+      // Duplicate-safe: the background handler may already have stored this
+      // one. NotificationStore.add ignores an id it has seen.
+      await NotificationStore.instance.add(message);
+      NotificationStore.instance.requestOpenList(message.messageId);
+    } catch (e) {
+      debugPrint('⚠️ getInitialMessage failed: $e');
     }
   }
 

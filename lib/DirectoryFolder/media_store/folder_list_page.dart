@@ -4,8 +4,7 @@ import 'package:provider/provider.dart';
 import '../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../Utils/app_palette.dart';
-import '../../ads/app_open_ad_manager.dart';
-import '../../ads/list_native_ad.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../file_browser/file_kind.dart';
 import 'media_list_page.dart';
 import 'media_store.dart';
@@ -45,6 +44,7 @@ class _FolderListPageState extends State<FolderListPage> {
   String _query = '';
   bool _searchOpen = false;
   final TextEditingController _searchCtrl = TextEditingController();
+  final FeedAdController _feedAds = FeedAdController();
 
   String get _lang => context.read<LocaleProvider>().locale.languageCode;
   String _t(String key) => HomeStrings.t(_lang, key);
@@ -67,6 +67,7 @@ class _FolderListPageState extends State<FolderListPage> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _feedAds.dispose();
     super.dispose();
   }
 
@@ -181,14 +182,19 @@ class _FolderListPageState extends State<FolderListPage> {
             )
           : ListView.separated(
               padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-              // One native ad among the rows, after the first few folders.
-              itemCount: rows.length + 1,
+              // Native ads among the rows at the FeedAds positions.
+              itemCount: FeedAds.itemCount(rows.length),
               separatorBuilder: (_, __) => const SizedBox(height: 6),
               itemBuilder: (context, i) {
-                final adAt =
-                    rows.length < _adAfterRows ? rows.length : _adAfterRows;
-                if (i == adAt) return const ListNativeAd();
-                final folder = rows[i > adAt ? i - 1 : i];
+                if (FeedAds.isAd(i)) {
+                  return HybridAdSlot(
+                    controller: _feedAds,
+                    slotKey: i,
+                    templateType: TemplateType.small,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                  );
+                }
+                final folder = rows[FeedAds.contentIndex(i)];
                 return _FolderTile(
                   folder: folder,
                   accent: widget.accent,
@@ -206,14 +212,11 @@ class _FolderListPageState extends State<FolderListPage> {
     );
   }
 
-  /// Folders shown before the native ad.
-  static const int _adAfterRows = 4;
-
   /// Gives the frequency-capped interstitial its chance, then opens the
   /// folder's files.
   void _openFolder(MediaFolder folder) {
-    AppOpenAdManager().showInterstitialIfAllowed(
-      onContinue: () {
+    InterstitialManager.instance.showIfEligible(
+      onDone: () {
         if (!mounted) return;
         Navigator.push(
           context,

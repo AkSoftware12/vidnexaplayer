@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../NotifyListeners/LanguageProvider/misc_strings.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 /// Asks for a Play rating through Google's In-App Review API.
 ///
@@ -58,6 +59,7 @@ class RatingPopup {
       _requestedThisSession = true;
       await prefs.setInt(_kLastShownMs, nowMs);
       await prefs.setInt(_kLaunchCount, 0);
+      AdsManager.skipNextAppOpen();
       await review.requestReview();
     } catch (e) {
       debugPrint('In-app review request failed: $e');
@@ -68,6 +70,7 @@ class RatingPopup {
   static Future<void> openStore(BuildContext context) async {
     bool opened = false;
     try {
+      AdsManager.skipNextAppOpen();
       opened = await launchUrl(
         Uri.parse(playStoreUrl),
         mode: LaunchMode.externalApplication,

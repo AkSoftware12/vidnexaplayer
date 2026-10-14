@@ -37,9 +37,19 @@ enum PhotoColor {
   cyan({5, 6}),
   blue({6, 7, 8}),
   purple({8, 9}),
-  pink({10, 11});
+  pink({10, 11}),
+
+  /// Black-and-white / greyscale. Has no hue bin — a monochrome photo is
+  /// deliberately given none — so it is matched on the share of neutral
+  /// pixels instead; see [monoNeutralPercent].
+  mono(<int>{});
 
   const PhotoColor(this.bins);
+
+  /// Neutral share at or above which a photo counts as black-and-white.
+  /// Not 100: sensor noise and JPEG artefacts tint a few pixels of any
+  /// greyscale shot.
+  static const int monoNeutralPercent = 90;
 
   final Set<int> bins;
 

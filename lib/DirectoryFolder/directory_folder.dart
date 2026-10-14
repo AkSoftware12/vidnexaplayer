@@ -3,12 +3,14 @@ import 'package:file_manager/file_manager.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../Utils/asset_file.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:provider/provider.dart';
 import '../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../Utils/safe_storage.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 /// Folder browser.
 ///
@@ -87,6 +89,7 @@ class _DirectoryFolderState extends State<DirectoryFolder> {
       setState(() => _loading = true);
       await _resolveRoots();
     } else {
+      AdsManager.skipNextAppOpen();
       await openAppSettings();
     }
   }
@@ -289,7 +292,7 @@ class _DirectoryFolderState extends State<DirectoryFolder> {
       );
 
       for (final asset in assets) {
-        final file = await asset.file;
+        final file = await asset.fileOrNull;
         if (file?.path == path) {
           return asset;
         }

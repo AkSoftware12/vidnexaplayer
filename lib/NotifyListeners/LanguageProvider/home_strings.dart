@@ -54,6 +54,7 @@ class HomeStrings {
       'home_cat_music': 'Music',
       'home_cat_status_saver': 'Status Saver',
       'home_cat_network': 'Network',
+      'home_cat_vault': 'Private Vault',
 
       // ComingSoon/coming_soon.dart
       'coming_soon_go_back': 'Go Back',
@@ -96,6 +97,15 @@ class HomeStrings {
       'fb_items_count': '{count} items',
       'fb_downloads': 'Downloads',
       'fb_no_files': 'Nothing here yet',
+      'new_media_title': 'New on your phone today',
+      'new_media_photos': 'Photos: {count}',
+      'new_media_videos': 'Videos: {count}',
+      'new_media_tap': 'tap to view them in Vidnexa',
+      'new_media_setting_title': 'Daily new-media reminder',
+      'new_media_setting_sub': 'Up to 4 times a day, when you add new photos or videos',
+      'pdf_open_with': 'Open with another app',
+      'pdf_failed': 'Couldn\'t open this PDF. It may be password-protected or damaged.',
+      'pdf_page': 'Page {page} of {total}',
       'fb_open_failed': 'No app on this device can open this file',
       'fb_copied': 'Copied',
 
@@ -196,6 +206,7 @@ class HomeStrings {
       'home_cat_music': 'संगीत',
       'home_cat_status_saver': 'स्टेटस सेवर',
       'home_cat_network': 'नेटवर्क',
+      'home_cat_vault': 'प्राइवेट वॉल्ट',
 
       // ComingSoon/coming_soon.dart
       'coming_soon_go_back': 'वापस जाएं',
@@ -238,6 +249,15 @@ class HomeStrings {
       'fb_items_count': '{count} आइटम',
       'fb_downloads': 'डाउनलोड',
       'fb_no_files': 'यहाँ अभी कुछ नहीं है',
+      'new_media_title': 'आज आपके फ़ोन में नया',
+      'new_media_photos': 'फ़ोटो: {count}',
+      'new_media_videos': 'वीडियो: {count}',
+      'new_media_tap': 'Vidnexa में देखने के लिए टैप करें',
+      'new_media_setting_title': 'रोज़ नई मीडिया की याद',
+      'new_media_setting_sub': 'नई फ़ोटो या वीडियो जुड़ने पर दिन में 4 बार तक सूचना',
+      'pdf_open_with': 'दूसरे ऐप से खोलें',
+      'pdf_failed': 'यह PDF नहीं खुल सकी। शायद यह पासवर्ड से सुरक्षित है या खराब है।',
+      'pdf_page': 'पेज {page} / {total}',
       'fb_open_failed': 'इस फ़ाइल को खोलने वाला कोई ऐप नहीं है',
       'fb_copied': 'कॉपी हो गया',
 

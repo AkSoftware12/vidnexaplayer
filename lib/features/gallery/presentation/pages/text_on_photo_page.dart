@@ -10,12 +10,13 @@ import 'package:provider/provider.dart';
 import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/color.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../domain/entities/photo_entity.dart';
 import '../../domain/entities/text_overlay.dart';
 import '../../domain/repositories/gallery_repository.dart';
 import '../controllers/text_editor_controller.dart';
 import '../widgets/gallery_dialog.dart';
+import '../widgets/gallery_button.dart';
 import '../widgets/text_overlay_item.dart';
 import 'photo_picker_page.dart';
 
@@ -37,7 +38,6 @@ class TextOnPhotoPage extends StatefulWidget {
 }
 
 class _TextOnPhotoPageState extends State<TextOnPhotoPage> {
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   /// Longest edge this will export.
   ///
@@ -56,6 +56,24 @@ class _TextOnPhotoPageState extends State<TextOnPhotoPage> {
   bool _saving = false;
   bool _capturing = false;
   String? _status;
+
+  /// Photo and text layers the last successful save wrote. While the editor
+  /// still shows exactly those, Save is off — tapping it again used to write a
+  /// duplicate. Layers are immutable and every edit replaces one, so identity
+  /// is enough to tell "unchanged" apart from "edited".
+  String? _savedPhotoId;
+  List<TextOverlay> _savedOverlays = const [];
+
+  bool get _isSaved {
+    final photo = _photo;
+    if (photo == null || _savedPhotoId != photo.id) return false;
+    final current = _controller.overlays;
+    if (current.length != _savedOverlays.length) return false;
+    for (var i = 0; i < current.length; i++) {
+      if (!identical(current[i], _savedOverlays[i])) return false;
+    }
+    return true;
+  }
 
   @override
   void initState() {
@@ -122,6 +140,9 @@ class _TextOnPhotoPageState extends State<TextOnPhotoPage> {
     _controller.select(null);
     await WidgetsBinding.instance.endOfFrame;
 
+    // The layers this save captures — taken now, since they can still be
+    // dragged while the image is rasterised and written.
+    final overlays = _controller.overlays;
     Uint8List? bytes;
     try {
       final boundary = _boundaryKey.currentContext?.findRenderObject()
@@ -157,6 +178,10 @@ class _TextOnPhotoPageState extends State<TextOnPhotoPage> {
     setState(() {
       _saving = false;
       _capturing = false;
+      if (saved) {
+        _savedPhotoId = photo.id;
+        _savedOverlays = overlays;
+      }
       _status = DeviceStrings.t(
         lang,
         saved ? 'gallery_text_saved' : 'gallery_text_failed',
@@ -194,7 +219,7 @@ class _TextOnPhotoPageState extends State<TextOnPhotoPage> {
               ),
           ],
         ),
-        bottomNavigationBar: _adManager.bannerWidget(),
+        bottomNavigationBar: const BottomBannerBar(),
         body: photo == null || file == null
             ? const Center(child: CircularProgressIndicator())
             : Column(
@@ -255,33 +280,16 @@ class _TextOnPhotoPageState extends State<TextOnPhotoPage> {
                     ),
                   Padding(
                     padding: EdgeInsets.all(12.sp),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed: _saving ? null : _save,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ColorSelect.maineColor,
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(vertical: 13.sp),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10.sp),
-                          ),
+                    // Rebuilt with the layers, so editing after a save turns
+                    // the button back on.
+                    child: Consumer<TextEditorController>(
+                      builder: (context, _, __) => GalleryButton(
+                        label: DeviceStrings.t(
+                          lang,
+                          _isSaved ? 'gallery_tool_saved' : 'gallery_text_save',
                         ),
-                        child: _saving
-                            ? SizedBox(
-                                width: 18.sp,
-                                height: 18.sp,
-                                child: const CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                DeviceStrings.t(lang, 'gallery_text_save'),
-                                style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                        busy: _saving,
+                        onPressed: _isSaved ? null : _save,
                       ),
                     ),
                   ),

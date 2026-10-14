@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/color.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../domain/entities/duplicate_group.dart';
 import '../../domain/repositories/gallery_repository.dart';
 import '../controllers/duplicate_controller.dart';
@@ -28,7 +28,10 @@ class DuplicateFinderPage extends StatefulWidget {
 }
 
 class _DuplicateFinderPageState extends State<DuplicateFinderPage> {
-  final AppOpenAdManager _adManager = AppOpenAdManager();
+  /// The "Select identical" bulk action in the app bar. Hidden for now; the
+  /// controller still supports it, so flipping this brings it back.
+  static const bool _showSelectIdentical = false;
+
 
   late final DuplicateController _controller =
       DuplicateController(repository: widget.repository);
@@ -71,12 +74,17 @@ class _DuplicateFinderPageState extends State<DuplicateFinderPage> {
                 ),
               ),
               actions: [
-                if (controller.groupCount > 0)
+                if (_showSelectIdentical && controller.groupCount > 0)
                   TextButton(
                     onPressed: () =>
                         controller.selectAllRedundant(exactOnly: true),
                     child: Text(
-                      DeviceStrings.t(lang, 'gallery_dup_select_exact'),
+                      DeviceStrings.t(
+                        lang,
+                        controller.allRedundantSelected
+                            ? 'gallery_dup_deselect_exact'
+                            : 'gallery_dup_select_exact',
+                      ),
                       style: TextStyle(fontFamily: 'Poppins', fontSize: 11.sp,
                         fontWeight: FontWeight.w600,
                         color: Colors.white,
@@ -110,7 +118,7 @@ class _DuplicateFinderPageState extends State<DuplicateFinderPage> {
             // clicks happen, and this screen deletes files permanently.
             bottomNavigationBar: controller.hasSelection
                 ? DeleteActionBar(controller: controller)
-                : _adManager.bannerWidget(),
+                : const BottomBannerBar(),
           );
         },
       ),
@@ -299,7 +307,21 @@ class _GroupCard extends StatelessWidget {
                     selected: controller.isSelected(photo.id),
                     isKeeper: controller.isKeeper(group, photo.id),
                     keeperLabel: DeviceStrings.t(lang, 'gallery_dup_keep'),
-                    onTap: () => controller.toggle(photo.id),
+                    onTap: () {
+                      // Selecting the last unselected copy would delete the
+                      // photo outright, so say why the tap did nothing.
+                      if (!controller.canSelect(photo.id)) {
+                        ScaffoldMessenger.of(context)
+                          ..hideCurrentSnackBar()
+                          ..showSnackBar(SnackBar(
+                            duration: const Duration(seconds: 2),
+                            content: Text(DeviceStrings.t(
+                                lang, 'gallery_dup_keep_one')),
+                          ));
+                        return;
+                      }
+                      controller.toggle(photo.id);
+                    },
                   ),
                 );
               },

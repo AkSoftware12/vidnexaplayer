@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:intl/intl.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../../../../Utils/asset_file.dart';
 import 'package:provider/provider.dart';
 
 import '../../../../DirectoryFolder/directory_folder.dart' show FullScreenImageViewer;
@@ -176,7 +177,7 @@ class VoiceSearchResultTile extends StatelessWidget {
 
   Future<void> _openPhoto(BuildContext context) async {
     final asset = await AssetEntity.fromId(video.id);
-    final file = await asset?.file;
+    final file = await asset?.fileOrNull;
     if (asset == null || file == null || !await file.exists()) {
       _reportStale(context, 'voice_search_photo_unavailable');
       return;

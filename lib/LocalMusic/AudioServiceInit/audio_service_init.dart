@@ -25,10 +25,17 @@ class AudioServiceInit {
     return h;
   }
 
-  /// Safe to call more than once — subsequent calls are no-ops.
-  static Future<void> init() async {
-    if (_handler != null) return;
+  /// The in-flight init, shared, so a caller that stopped waiting (main.dart
+  /// times out on it) and a later caller never start AudioService.init twice.
+  static Future<void>? _initializing;
 
+  /// Safe to call more than once — subsequent calls are no-ops.
+  static Future<void> init() {
+    if (_handler != null) return Future.value();
+    return _initializing ??= _init().whenComplete(() => _initializing = null);
+  }
+
+  static Future<void> _init() async {
     _handler = await AudioService.init(
       builder: BackgroundAudioHandler.new,
       config: const AudioServiceConfig(

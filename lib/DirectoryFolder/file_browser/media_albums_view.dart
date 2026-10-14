@@ -1,11 +1,13 @@
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../../Utils/asset_file.dart';
 
 import '../../Utils/app_palette.dart';
 import '../../Utils/video_thumb.dart';
 import '../../VideoPLayer/4kPlayer/4k_player.dart';
 import '../directory_folder.dart' show FullScreenImageViewer;
+import 'package:videoplayer/ads/ads_manager.dart';
 
 /// Album (folder) list for one media type, read through MediaStore.
 ///
@@ -111,6 +113,7 @@ class _MediaAlbumsViewState extends State<MediaAlbumsView> {
         actionLabel: widget.grantLabel,
         accent: widget.accent,
         onAction: () async {
+          AdsManager.skipNextAppOpen();
           await PhotoManager.openSetting();
           await _load();
         },
@@ -376,7 +379,7 @@ class _MediaAlbumGridState extends State<MediaAlbumGrid> {
 
     // Images need a real path for the in-app viewer. `file` can be null when
     // the row survives in MediaStore but the file behind it is gone.
-    final file = await asset.file;
+    final file = await asset.fileOrNull;
     if (!mounted || file == null) return;
     Navigator.push(
       context,

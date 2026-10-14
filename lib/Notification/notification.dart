@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/app_palette.dart';
 import 'package:videoplayer/Utils/color.dart';
 
-import '../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../NotifyListeners/LanguageProvider/misc_strings.dart';
 import 'notification_detail.dart';
@@ -27,7 +27,6 @@ class NotificationScreen extends StatefulWidget {
 
 class _NotificationScreenState extends State<NotificationScreen> {
   // Singleton — initialised once in main.dart, never disposed by a screen.
-  final appOpenManager = AppOpenAdManager();
 
   List<AppNotification> _items = const [];
   bool _loading = true;
@@ -147,7 +146,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
                   },
                 ),
               ),
-      bottomNavigationBar: appOpenManager.bannerWidget(),
+      bottomNavigationBar: const BottomBannerBar(),
     );
   }
 }

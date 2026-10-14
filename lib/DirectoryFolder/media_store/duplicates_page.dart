@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../Utils/app_palette.dart';
-import '../../ads/list_native_ad.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../file_browser/file_kind.dart';
 import 'media_store.dart';
 import 'media_thumb.dart';
@@ -39,6 +39,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
   bool _loading = true;
   bool _cancelled = false;
   String _status = '';
+  final FeedAdController _feedAds = FeedAdController();
 
   String get _lang => context.read<LocaleProvider>().locale.languageCode;
   String _t(String key) => HomeStrings.t(_lang, key);
@@ -52,6 +53,7 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
   @override
   void dispose() {
     _cancelled = true;
+    _feedAds.dispose();
     super.dispose();
   }
 
@@ -223,20 +225,20 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
                     Expanded(
                       child: ListView.builder(
                         padding: const EdgeInsets.fromLTRB(14, 10, 14, 24),
-                        // One native ad among the groups, after the first
-                        // couple (or after the last, if there are fewer).
-                        itemCount: _groups.length + 1,
+                        // Native ads among the groups at the FeedAds
+                        // positions.
+                        itemCount: FeedAds.itemCount(_groups.length),
                         itemBuilder: (context, i) {
-                          final adAt = _groups.length < _adAfterGroups
-                              ? _groups.length
-                              : _adAfterGroups;
-                          if (i == adAt) {
-                            return const ListNativeAd(
-                              padding: EdgeInsets.only(bottom: 12),
+                          if (FeedAds.isAd(i)) {
+                            return HybridAdSlot(
+                              controller: _feedAds,
+                              slotKey: i,
+                              templateType: TemplateType.small,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
                             );
                           }
                           return _Group(
-                            files: _groups[i > adAt ? i - 1 : i],
+                            files: _groups[FeedAds.contentIndex(i)],
                             accent: widget.accent,
                             countLabel: _t('fb_items_count'),
                           );
@@ -247,9 +249,6 @@ class _DuplicatesPageState extends State<DuplicatesPage> {
                 ),
     );
   }
-
-  /// Duplicate groups shown before the native ad.
-  static const int _adAfterGroups = 2;
 }
 
 class _Group extends StatelessWidget {

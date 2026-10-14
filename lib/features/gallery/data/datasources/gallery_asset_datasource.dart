@@ -2,9 +2,10 @@ import 'dart:collection';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:flutter/foundation.dart' show ValueChanged;
+import 'package:flutter/foundation.dart' show ValueChanged, debugPrint;
 import 'package:flutter/services.dart' show MethodCall, MethodChannel;
 import 'package:photo_manager/photo_manager.dart';
+import '../../../../Utils/asset_file.dart';
 
 import '../../domain/entities/gallery_permission.dart';
 import '../../domain/entities/photo_album.dart';
@@ -150,17 +151,26 @@ class GalleryAssetDatasource {
     final asset = await _resolveAsset(photoId);
     if (asset == null) return null;
 
-    final bytes = await asset.thumbnailDataWithSize(
-      ThumbnailSize.square(pixelSize),
-      quality: 82,
-    );
+    // _resolveAsset can answer from its cache for a photo deleted since, and
+    // photo_manager then throws instead of returning null. Every caller treats
+    // null as "no thumbnail", so the missing photo becomes that.
+    final Uint8List? bytes;
+    try {
+      bytes = await asset.thumbnailDataWithSize(
+        ThumbnailSize.square(pixelSize),
+        quality: 82,
+      );
+    } catch (e) {
+      debugPrint('thumbnail: no thumbnail for $photoId: $e');
+      return null;
+    }
     if (bytes != null) _thumbnails.put(key, bytes);
     return bytes;
   }
 
   Future<File?> originalFile(String photoId) async {
     final asset = await _resolveAsset(photoId);
-    return asset?.file;
+    return asset?.fileOrNull;
   }
 
   /// Resolves one photo's metadata by id, for tools that start from the
@@ -209,6 +219,66 @@ class GalleryAssetDatasource {
   Future<String?> filePathOf(String photoId) async {
     final file = await originalFile(photoId);
     return file?.path;
+  }
+
+  /// Formats the pure-Dart `image` package can decode on a worker isolate.
+  static const _workerDecodable = {'jpg', 'jpeg', 'png', 'webp', 'gif', 'bmp'};
+
+  /// A path the image workers can actually decode, for [photoId].
+  ///
+  /// The original file when its format is one `package:image` reads. Anything
+  /// else — HEIC/HEIF from most current phones, AVIF, DNG — used to reach the
+  /// worker as-is, fail to decode, and leave its collage cell blank. Those are
+  /// rendered to a JPEG by the platform instead (which does read them), no
+  /// larger than [maxEdge] on the long side, and written to the temp
+  /// directory; `temporary` tells the caller to delete it afterwards.
+  Future<({String path, bool temporary})?> decodablePathOf(
+    String photoId, {
+    required int maxEdge,
+  }) async {
+    final asset = await _resolveAsset(photoId);
+    if (asset == null) return null;
+
+    final mime = asset.mimeType?.toLowerCase() ?? '';
+    final title = asset.title?.toLowerCase() ?? '';
+    final ext = title.contains('.') ? title.split('.').last : '';
+    final decodable = _workerDecodable.contains(ext) ||
+        _workerDecodable.any((format) => mime == 'image/$format');
+    if (decodable) {
+      final file = await asset.fileOrNull;
+      if (file != null) return (path: file.path, temporary: false);
+    }
+
+    final width = asset.orientatedWidth;
+    final height = asset.orientatedHeight;
+    final longEdge = width > height ? width : height;
+    final scale = longEdge > maxEdge && longEdge > 0 ? maxEdge / longEdge : 1.0;
+    // A photo deleted after it was picked makes this throw
+    // `PlatformException(201, Failed to find the asset …)` rather than return
+    // null. Uncaught, one missing photo left the whole collage spinning; as
+    // null it is just an empty cell, which the caller already handles.
+    final Uint8List? bytes;
+    try {
+      bytes = await asset.thumbnailDataWithSize(
+        ThumbnailSize(
+          (width * scale).round().clamp(1, maxEdge),
+          (height * scale).round().clamp(1, maxEdge),
+        ),
+        format: ThumbnailFormat.jpeg,
+        quality: 95,
+      );
+    } catch (e) {
+      debugPrint('decodablePathOf: no thumbnail for $photoId: $e');
+      return null;
+    }
+    if (bytes == null || bytes.isEmpty) return null;
+
+    final safeId = photoId.replaceAll(RegExp(r'[^A-Za-z0-9_-]'), '_');
+    final file = File(
+      '${Directory.systemTemp.path}/vidnexa_decodable_${safeId}_$maxEdge.jpg',
+    );
+    await file.writeAsBytes(bytes, flush: true);
+    return (path: file.path, temporary: true);
   }
 
   /// Larger thumbnail for the signature pass, deliberately **not** cached.
@@ -352,8 +422,13 @@ class GalleryAssetDatasource {
         id: asset.id,
         fileName: asset.title ?? '',
         relativePath: asset.relativePath,
-        width: asset.width,
-        height: asset.height,
+        // As displayed, not as stored: MediaStore reports the sensor's
+        // dimensions and keeps EXIF rotation in a separate column, so a phone
+        // portrait read as 4000×3000 "landscape". Every decoder this app uses
+        // applies that rotation, so shape matching (collage cells, the
+        // portrait/landscape search, crop aspect) has to as well.
+        width: asset.orientatedWidth,
+        height: asset.orientatedHeight,
         createdAt: asset.createDateTime,
         modifiedAt: asset.modifiedDateTime,
         mimeType: asset.mimeType,

@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:material_ui/material_ui.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../../Utils/asset_file.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:path/path.dart' as path;
 import 'package:provider/provider.dart';
@@ -10,8 +11,7 @@ import '../../NotifyListeners/LanguageProvider/video_strings.dart';
 import '../../Utils/app_palette.dart';
 import '../../Utils/color.dart';
 import '../../Utils/video_thumb.dart';
-import '../../ads/app_open_ad_manager.dart';
-import '../../main.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../4kPlayer/4k_player.dart';
 import '../4kPlayer/FlotingVideo/floting_video.dart';
 import '../Resume/watch_progress_bar.dart';
@@ -36,7 +36,6 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
     with SingleTickerProviderStateMixin {
 
   // Singleton — initialised once in main.dart, never disposed by a screen.
-  final appOpenManager = AppOpenAdManager();
 
   bool _isGridView = false;
 
@@ -48,6 +47,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
 
   List<AssetEntity> _photos = [];
   bool _isLoading = true;
+  final FeedAdController _feedAds = FeedAdController();
   late AnimationController _controller;
   late Animation<double> _fadeAnimation;
 
@@ -68,6 +68,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
     // `super.dispose()` must come LAST — the old order tore down the State
     // first and then touched it, which trips a framework assertion.
     _controller.dispose();
+    _feedAds.dispose();
     super.dispose();
   }
 
@@ -205,15 +206,25 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
                   opacity: _fadeAnimation,
                   child: _isGridView ? _buildGridView() : _buildListView(),
                 ),
-      bottomNavigationBar: appOpenManager.bannerWidget(),
+      bottomNavigationBar: const BottomBannerBar(),
     );
   }
 
   Widget _buildListView() {
     return ListView.builder(
       padding: const EdgeInsets.all(8),
-      itemCount: _photos.length,
-      itemBuilder: (context, index) {
+      // Native ads among the videos at the FeedAds positions.
+      itemCount: FeedAds.itemCount(_photos.length),
+      itemBuilder: (context, i) {
+        if (FeedAds.isAd(i)) {
+          return HybridAdSlot(
+            controller: _feedAds,
+            slotKey: i,
+            templateType: TemplateType.small,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          );
+        }
+        final index = FeedAds.contentIndex(i);
         return PhotoTile(
           photo: _photos[index],
           photos: _photos,
@@ -222,7 +233,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             _showVideoInfo(_photos[index]);
           },
           onDelete: () async {
-            final file = await _photos[index].file;
+            final file = await _photos[index].fileOrNull;
             if (!context.mounted) return;
             if (file == null) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -238,7 +249,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             // trip; the tile can be gone by the time it completes (list
             // reloaded, screen popped), and touching this context afterwards
             // is the async-gap half of the plugin-init crashes.
-            final file = await _photos[index].file;
+            final file = await _photos[index].fileOrNull;
             if (!context.mounted) return;
             if (file != null) {
               _shareVideo(context, file.path);
@@ -269,7 +280,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
           photos: _photos,
           initialIndex: index,
           onDelete: () async {
-            final file = await _photos[index].file;
+            final file = await _photos[index].fileOrNull;
             if (!context.mounted) return;
             if (file == null) {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -290,7 +301,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
             // trip; the tile can be gone by the time it completes (list
             // reloaded, screen popped), and touching this context afterwards
             // is the async-gap half of the plugin-init crashes.
-            final file = await _photos[index].file;
+            final file = await _photos[index].fileOrNull;
             if (!context.mounted) return;
             if (file != null) {
               _shareVideo(context, file.path);
@@ -363,10 +374,11 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
       final assets = await p.getAssetListRange(start: 0, end: total);
 
       for (final asset in assets) {
-        final file = await asset.file;
+        final file = await asset.fileOrNull;
         if (file != null && file.path == videoPath) {
           if (!context.mounted) return;
           try {
+            AdsManager.skipNextAppOpen();
             final result = await PhotoManager.editor.deleteWithIds([asset.id]);
             if (!context.mounted) return;
             if (result.isNotEmpty) {
@@ -425,6 +437,7 @@ class _VideoFolderScreenState extends State<VideoFolderScreen>
 
       // share_plus 11: the static `Share.*` helpers are deprecated in favour of
       // the `SharePlus.instance` + `ShareParams` API.
+      AdsManager.skipNextAppOpen();
       await SharePlus.instance.share(
         ShareParams(
           files: [shareFile],
@@ -590,8 +603,8 @@ class PhotoTile extends StatelessWidget {
     String t(String key) => VideoStrings.t(lang, key);
     return GestureDetector(
       onTap: () {
-        appOpenManager.showInterstitialIfAllowed(
-          onContinue: () {
+        InterstitialManager.instance.showIfEligible(
+          onDone: () {
             FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
             Navigator.push(
               context,
@@ -714,8 +727,8 @@ class PhotoTile extends StatelessWidget {
                     ],
                   ).then((value) async {
                     if (value == "play") {
-                      appOpenManager.showInterstitialIfAllowed(
-                        onContinue: () {
+                      InterstitialManager.instance.showIfEligible(
+                        onDone: () {
                           FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
 
                           Navigator.push(
@@ -918,8 +931,8 @@ class GridviewList extends StatelessWidget {
     String t(String key) => VideoStrings.t(lang, key);
     return GestureDetector(
       onTap: () {
-        appOpenManager.showInterstitialIfAllowed(
-          onContinue: () {
+        InterstitialManager.instance.showIfEligible(
+          onDone: () {
             FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
             Navigator.push(
               context,
@@ -1047,8 +1060,8 @@ class GridviewList extends StatelessWidget {
                         ],
                       ).then((value) async {
                         if (value == "play") {
-                          appOpenManager.showInterstitialIfAllowed(
-                            onContinue: () {
+                          InterstitialManager.instance.showIfEligible(
+                            onDone: () {
                               FloatingVideoManager.hide(); // ya close/remove/stop jo method tumhare manager me ho
 
                               Navigator.push(

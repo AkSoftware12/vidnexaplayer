@@ -166,6 +166,13 @@ dependencies {
     // different version from this file resolves the whole graph to the forced
     // one and breaks the plugin at runtime (NoSuchMethodError). Billing 8 is
     // what Google Play requires from 31 Aug 2026, so v8 is already compliant.
+    // The Unity mediation adapter ships WITHOUT the Unity Ads SDK, so it must be
+    // added explicitly or R8 fails with "Missing class com.unity3d.ads.*".
+    // Keep the SDK version matched to the adapter (adapter 4.21.0.x -> SDK 4.21.0).
+    implementation 'com.unity3d.ads:unity-ads:4.21.0'
+    implementation 'com.google.ads.mediation:unity:4.21.0.0'
+    implementation 'com.google.ads.mediation:inmobi:10.+'
+
 
 
 

@@ -16,6 +16,9 @@ class CustomVideoAppBar extends StatelessWidget {
   final int currentIndex;
   final ValueChanged<int>? onVideoSelected;
 
+  /// Opens the Chromecast picker. Null hides the button.
+  final VoidCallback? onCast;
+
   const CustomVideoAppBar({
     super.key,
     required this.title,
@@ -25,6 +28,7 @@ class CustomVideoAppBar extends StatelessWidget {
     this.currentIndex = 0,
     this.onVideoSelected,
     required this.onBackPressedMore,
+    this.onCast,
   });
 
   @override
@@ -93,6 +97,15 @@ class CustomVideoAppBar extends StatelessWidget {
                     ],
                   ),
                 ),
+                if (onCast != null) ...[
+                  SizedBox(width: 10.w),
+                  _glassIcon(
+                    icon: Icons.cast_rounded,
+                    tooltip: t('cast_title'),
+                    onTap: onCast!,
+                    size: isLandscape ? 34 : 40,
+                  ),
+                ],
                 SizedBox(width: 10.w),
                 _glassIcon(
                   icon: Icons.playlist_play_rounded,

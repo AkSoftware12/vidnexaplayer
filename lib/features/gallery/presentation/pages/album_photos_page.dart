@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/color.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../domain/entities/photo_album.dart';
 import '../../domain/repositories/gallery_repository.dart';
 import '../controllers/gallery_controller.dart';
@@ -34,7 +34,6 @@ class AlbumPhotosPage extends StatefulWidget {
 }
 
 class _AlbumPhotosPageState extends State<AlbumPhotosPage> {
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   @override
   Widget build(BuildContext context) {
@@ -85,7 +84,7 @@ class _AlbumPhotosPageState extends State<AlbumPhotosPage> {
                         ),
                       )
                     : const PhotoGrid(),
-            bottomNavigationBar: _adManager.bannerWidget(),
+            bottomNavigationBar: const BottomBannerBar(),
           );
         },
       ),

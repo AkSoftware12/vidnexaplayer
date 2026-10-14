@@ -68,3 +68,14 @@ void disposePlayerSafely(Player player) {
     }
   });
 }
+
+/// Whether [player] has already been released, so any call on it would throw
+/// `Assertion failed: "[Player] has been disposed"`.
+///
+/// media_kit has no public `isDisposed`, but its native implementation keeps a
+/// public `disposed` flag. Only meaningful on native platforms; elsewhere this
+/// reports false.
+bool isPlayerDisposed(Player player) {
+  final platform = player.platform;
+  return platform is NativePlayer && platform.disposed;
+}

@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/app_palette.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../domain/entities/gallery_tool.dart';
 import '../../domain/repositories/gallery_repository.dart';
 import '../pages/collage_page.dart';
@@ -34,7 +34,6 @@ class ToolsTab extends StatefulWidget {
 
 class _ToolsTabState extends State<ToolsTab> {
   final GalleryToolStatsStore _stats = GalleryToolStatsStore.instance;
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   /// Photos on the device, for the smart-search badge. A MediaStore count, so
   /// cheap — unlike the duplicate and junk figures, which are quoted from the
@@ -98,7 +97,7 @@ class _ToolsTabState extends State<ToolsTab> {
             // banner already owns the bottom edge, and stacking a second ad
             // right above it would put two on screen at once.
             SizedBox(height: 16.sp),
-            _adManager.nativeWidget(),
+            const HybridAdSlot(templateType: TemplateType.small, padding: EdgeInsets.zero),
             _SectionLabel(text: DeviceStrings.t(lang, 'gallery_tools_create')),
             for (final tool in create) ...[
               _ToolRow(
@@ -189,10 +188,10 @@ class _ToolsTabState extends State<ToolsTab> {
     // Opening a tool is the one deliberate, low-frequency action on this tab,
     // which makes it the right hook for an interstitial. The manager's own
     // caps decide whether one actually shows — every 4th action, 60s apart, 5
-    // a day — and [onContinue] runs either way, so a capped tap is
+    // a day — and [onDone] runs either way, so a capped tap is
     // indistinguishable from no ad at all.
-    _adManager.showInterstitialIfAllowed(
-      onContinue: () => _push(navigator, repository, tool),
+    InterstitialManager.instance.showIfEligible(
+      onDone: () => _push(navigator, repository, tool),
     );
   }
 

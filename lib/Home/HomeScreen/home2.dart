@@ -11,9 +11,7 @@ import '../../Utils/scale_in.dart';
 import '../../RecentlyVideos/RecentlyPlayedScreen/recently_played_screen.dart';
 import '../../VideoPLayer/4kPlayer/4k_player.dart';
 import '../../VideoPLayer/VideoList/video_list.dart';
-import '../../ads/BannerAdsList/banner_ad_list.dart';
-import '../../ads/app_open_ad_manager.dart';
-import '../../main.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import 'BannerSlider/banner_slider.dart';
 import 'BottomsheetHomeScreen/bottomsheet_menu_button.dart';
 import 'HorizontalGridList/horizontal_gridlist.dart';
@@ -107,6 +105,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
   bool _isListView = true;
   bool _isGridView = false;
   bool _isCompactView = false;
+  final FeedAdController _feedAds = FeedAdController();
 
   @override
   void initState() {
@@ -187,6 +186,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _controller.dispose();
+    _feedAds.dispose();
     super.dispose();
   }
 
@@ -235,6 +235,7 @@ class _HomeScreenState extends State<DemoHomeScreen>
                 SizedBox(height: 16.sp),
                 ElevatedButton(
                   onPressed: () async {
+                    AdsManager.skipNextAppOpen();
                     await PhotoManager.openSetting();
                   },
                   style: ElevatedButton.styleFrom(
@@ -440,16 +441,27 @@ class _HomeScreenState extends State<DemoHomeScreen>
                                   switchOutCurve: Curves.easeIn,
                                   child:
                                   _isListView
-                                      ? InlineBannerList(
+                                      ? ListView.builder(
                                     key: const ValueKey('listView'),
-                                    items: _albums,
-                                    adUnitId: AdUnits.banner,
-                                    itemsPerAd: 9, // ✅ 6 items ke baad ad
                                     physics: const NeverScrollableScrollPhysics(),
                                     shrinkWrap: true,
-                                    itemBuilder: (context, index, album) {
+                                    padding: EdgeInsets.zero,
+                                    itemCount: FeedAds.itemCount(_albums.length),
+                                    itemBuilder: (context, i) {
+                                      if (FeedAds.isAd(i)) {
+                                        return HybridAdSlot(
+                                          controller: _feedAds,
+                                          slotKey: i,
+                                          templateType: TemplateType.small,
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 12,
+                                            vertical: 12,
+                                          ),
+                                        );
+                                      }
+                                      final index = FeedAds.contentIndex(i);
                                       return AlbumTile(
-                                        album: album,
+                                        album: _albums[index],
                                         index: index,
                                       );
                                     },
@@ -607,8 +619,8 @@ class AlbumTile extends StatelessWidget {
 
         return GestureDetector(
           onTap: () {
-            appOpenManager.showInterstitialIfAllowed(
-              onContinue: () {
+            InterstitialManager.instance.showIfEligible(
+              onDone: () {
                 Navigator.push(
                   context,
                   MaterialPageRoute(

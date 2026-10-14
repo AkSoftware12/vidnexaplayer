@@ -6,7 +6,7 @@ import 'package:provider/provider.dart';
 import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/color.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../domain/entities/photo_entity.dart';
 import '../../domain/repositories/gallery_repository.dart';
 import '../controllers/gallery_controller.dart';
@@ -32,7 +32,6 @@ class _PhotoGridState extends State<PhotoGrid> {
   static const _loadMoreThreshold = 800.0;
 
   final ScrollController _scrollController = ScrollController();
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   /// Day sections to clear before the first in-feed ad, and the gap between
   /// ads after that.
@@ -140,7 +139,7 @@ class _PhotoGridState extends State<PhotoGrid> {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: EdgeInsets.fromLTRB(10.sp, 14.sp, 10.sp, 6.sp),
-                    child: _adManager.nativeCompactWidget(),
+                    child: const HybridAdSlot(templateType: TemplateType.small, padding: EdgeInsets.zero),
                   ),
                 ),
             ],

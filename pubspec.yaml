@@ -2,7 +2,7 @@ name: videoplayer
 description: "A new Flutter project."
 publish_to: 'none'
 
-version: 1.0.31+31
+version: 1.0.35+35
 
 environment:
   sdk: ^3.13.0
@@ -74,6 +74,9 @@ dependencies:
   device_info_plus: ^12.4.0
   share_plus: ^12.0.2
   flutter_local_notifications: ^22.3.1
+  # ✅ Daily "new photos & videos today" reminder (Notification/new_media_digest.dart).
+  #    Android WorkManager: no exact-alarm permission, battery-friendly.
+  workmanager: ^0.10.10
   # ✅ Salted SHA-256 hashing for the vault PIN (was stored in plaintext).
   crypto: ^3.0.3
   # ✅ Fingerprint / face unlock for the vault (official flutter.dev plugin).
@@ -105,10 +108,18 @@ dependencies:
   volume_controller: ^3.4.0
 #  disk_space_plus: ^0.2.6
   disk_space_plus: ^0.2.5
-  rxdart: ^0.27.7
+  # 0.28 (from 0.27) for flutter_chrome_cast; the app only uses
+  # Rx.combineLatest2 and ValueStream, both unchanged in 0.28.
+  rxdart: ^0.28.0
 #  google_mobile_ads: ^7.0.0
   google_mobile_ads: ^9.1.0
   android_intent_plus: ^6.0.0
+
+  # ✅ Chromecast: sends the video itself to a Chromecast / Google TV, which
+  #    plays it natively — replacing screen mirroring, whose lag came from
+  #    Android re-encoding the whole screen. Wraps Google's official Cast SDK.
+  #    1.4.8 is the newest that accepts permission_handler ^12 (1.5.0 needs 13).
+  flutter_chrome_cast: ^1.4.8
 
   # ✅ Google Play Billing (Play Billing Library 8.x via the official plugin).
   #    `in_app_purchase_android` is pinned explicitly because the paywall
@@ -125,7 +136,11 @@ dependencies:
 
 
   # whatsapp
-  photo_view: ^0.14.0
+  # 0.15 (from 0.14) for pdfx; 0.15.0 only added options, nothing removed.
+  photo_view: ^0.15.0
+  # ✅ In-app PDF viewer for the file manager. Renders with Android's own
+  #    PdfRenderer, so no PDF engine is bundled into the APK.
+  pdfx: ^2.11.0
 
   docman: ^1.2.0
   gal: ^1.9.1

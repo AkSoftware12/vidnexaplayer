@@ -9,7 +9,7 @@ import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/app_palette.dart';
 import '../../../../Utils/color.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../data/repositories/gallery_repository_impl.dart';
 import '../../domain/entities/gallery_permission.dart';
 import '../../domain/entities/photo_album.dart';
@@ -72,7 +72,6 @@ class _GalleryHomeView extends StatefulWidget {
 }
 
 class _GalleryHomeViewState extends State<_GalleryHomeView> {
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   @override
   Widget build(BuildContext context) {
@@ -115,7 +114,7 @@ class _GalleryHomeViewState extends State<_GalleryHomeView> {
                       ),
                     ],
                   ),
-        bottomNavigationBar: widget.embedded ? null : _adManager.bannerWidget(),
+        bottomNavigationBar: widget.embedded ? null : const BottomBannerBar(),
       ),
     );
   }
@@ -408,7 +407,6 @@ class _AlbumsTab extends StatefulWidget {
 }
 
 class _AlbumsTabState extends State<_AlbumsTab> {
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   /// Albums shown before the in-feed ad — one full row at two columns.
   ///
@@ -447,7 +445,7 @@ class _AlbumsTabState extends State<_AlbumsTab> {
           SliverToBoxAdapter(
             child: Padding(
               padding: EdgeInsets.fromLTRB(10.sp, 4.sp, 10.sp, 14.sp),
-              child: _adManager.nativeWidget(),
+              child: const HybridAdSlot(templateType: TemplateType.small, padding: EdgeInsets.zero),
             ),
           ),
         _albumGrid(trailing),

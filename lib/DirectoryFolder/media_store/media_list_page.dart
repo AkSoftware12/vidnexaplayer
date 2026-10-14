@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 import 'package:on_audio_query_forked/on_audio_query.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../../Utils/asset_file.dart';
 import 'package:provider/provider.dart';
 
 import '../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
@@ -12,10 +13,10 @@ import '../directory_folder.dart' show FullScreenImageViewer;
 import '../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../Utils/app_palette.dart';
-import '../../ads/app_open_ad_manager.dart';
-import '../../ads/list_native_ad.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../file_browser/file_kind.dart';
 import '../file_browser/file_ops.dart';
+import '../file_browser/pdf_viewer_page.dart';
 import 'media_store.dart';
 import 'media_thumb.dart';
 
@@ -68,6 +69,7 @@ class _MediaListPageState extends State<MediaListPage> {
   String _query = '';
   bool _searchOpen = false;
   final TextEditingController _searchCtrl = TextEditingController();
+  final FeedAdController _feedAds = FeedAdController();
 
   String get _lang => context.read<LocaleProvider>().locale.languageCode;
   String _t(String key) => HomeStrings.t(_lang, key);
@@ -97,6 +99,7 @@ class _MediaListPageState extends State<MediaListPage> {
   @override
   void dispose() {
     _searchCtrl.dispose();
+    _feedAds.dispose();
     super.dispose();
   }
 
@@ -167,10 +170,10 @@ class _MediaListPageState extends State<MediaListPage> {
   /// other kinds (and anything the in-app path cannot resolve) go to the
   /// system "Open with".
   /// Gives the interstitial its chance first. It is frequency-capped inside
-  /// [AppOpenAdManager], so most taps open the file straight away.
+  /// [InterstitialManager], so most taps open the file straight away.
   void _open(MediaFile file) {
-    AppOpenAdManager().showInterstitialIfAllowed(
-      onContinue: () {
+    InterstitialManager.instance.showIfEligible(
+      onDone: () {
         if (mounted) _openNow(file);
       },
     );
@@ -182,6 +185,7 @@ class _MediaListPageState extends State<MediaListPage> {
           FileKind.video => await _openVideo(file, rows),
           FileKind.image => await _openImage(file),
           FileKind.audio => await _openAudio(file, rows),
+          FileKind.pdf => _openPdf(file),
           _ => false,
         } ||
         await _openOutside(file);
@@ -235,7 +239,7 @@ class _MediaListPageState extends State<MediaListPage> {
   /// photo_manager resolves it from the same id.
   Future<bool> _openImage(MediaFile file) async {
     final asset = await AssetEntity.fromId(file.id.toString());
-    final real = await asset?.file;
+    final real = await asset?.fileOrNull;
     if (real == null || !mounted) return false;
 
     Navigator.push(
@@ -288,6 +292,19 @@ class _MediaListPageState extends State<MediaListPage> {
     });
   }
 
+  /// PDFs open in the app's own viewer, which keeps "open with another app"
+  /// in its toolbar — so this never needs the external fallback below.
+  bool _openPdf(MediaFile file) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        settings: const RouteSettings(name: 'PdfViewerScreen'),
+        builder: (_) => PdfViewerPage(file: file),
+      ),
+    );
+    return true;
+  }
+
   Future<bool> _openOutside(MediaFile file) =>
       MediaStoreRepo.instance.openExternally(file);
 
@@ -332,10 +349,6 @@ class _MediaListPageState extends State<MediaListPage> {
       ),
     );
   }
-
-  /// Rows shown before the native ad in list view: far enough down that the
-  /// first thing seen is the files, close enough that the ad is seen at all.
-  static const int _adAfterRows = 4;
 
   /// Grid cells before the ad — three full rows of three.
   static const int _adAfterCells = 9;
@@ -436,6 +449,7 @@ class _MediaListPageState extends State<MediaListPage> {
         _t('fb_media_permission'),
         action: _t('fb_grant'),
         onAction: () async {
+          AdsManager.skipNextAppOpen();
           await openAppSettings();
           if (mounted) _load(refresh: true);
         },
@@ -452,16 +466,21 @@ class _MediaListPageState extends State<MediaListPage> {
     return _grid ? _gridView(rows) : _listView(rows);
   }
 
-  /// One native ad sits among the rows, after [_adAfterRows] of them (or at
-  /// the end of a shorter list).
+  /// Native ads sit among the rows at the [FeedAds] positions.
   Widget _listView(List<MediaFile> rows) {
-    final adAt = rows.length < _adAfterRows ? rows.length : _adAfterRows;
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-      itemCount: rows.length + 1,
+      itemCount: FeedAds.itemCount(rows.length),
       itemBuilder: (context, i) {
-        if (i == adAt) return const ListNativeAd();
-        final file = rows[i > adAt ? i - 1 : i];
+        if (FeedAds.isAd(i)) {
+          return HybridAdSlot(
+            controller: _feedAds,
+            slotKey: i,
+            templateType: TemplateType.small,
+            padding: const EdgeInsets.symmetric(vertical: 12),
+          );
+        }
+        final file = rows[FeedAds.contentIndex(i)];
         return _Tile(
           file: file,
           accent: widget.accent,
@@ -501,8 +520,13 @@ class _MediaListPageState extends State<MediaListPage> {
           padding: const EdgeInsets.fromLTRB(10, 8, 10, 0),
           sliver: grid(0, split),
         ),
-        const SliverToBoxAdapter(
-          child: ListNativeAd(padding: EdgeInsets.fromLTRB(10, 8, 10, 2)),
+        SliverToBoxAdapter(
+          child: HybridAdSlot(
+            controller: _feedAds,
+            slotKey: 'grid',
+            templateType: TemplateType.small,
+            padding: const EdgeInsets.fromLTRB(10, 12, 10, 12),
+          ),
         ),
         SliverPadding(
           padding: const EdgeInsets.fromLTRB(10, 6, 10, 24),

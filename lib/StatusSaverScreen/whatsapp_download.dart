@@ -14,7 +14,7 @@ import 'package:videoplayer/Utils/color.dart';
 
 import '../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
-import '../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../Utils/animated_progress_indicator.dart';
 import '../Utils/app_palette.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
@@ -1124,9 +1124,10 @@ class _StatusSaverHomePageState extends State<StatusSaverHomePage>
         // Native ad above the grid, not inside it: a grid cell is a tap target
         // for saving a status, and an ad sitting among them would collect
         // mis-taps that AdMob counts as clicks. It disappears on its own for
-        // premium users — NativeAdCard gates itself.
-        AppOpenAdManager().nativeCompactWidget(
-          margin: const EdgeInsets.fromLTRB(8, 4, 8, 0),
+        // premium users — HybridAdSlot gates itself.
+        const HybridAdSlot(
+          templateType: TemplateType.small,
+          padding: EdgeInsets.fromLTRB(8, 4, 8, 0),
         ),
 
         Expanded(

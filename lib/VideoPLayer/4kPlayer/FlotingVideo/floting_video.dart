@@ -4,6 +4,8 @@ import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:media_kit_video/media_kit_video.dart';
 import 'package:photo_manager/photo_manager.dart';
+import '../../../features/equalizer/audio_effects_service.dart';
+import '../../../features/equalizer/domain/eq_models.dart';
 import '../../../features/playback/playback_coordinator.dart';
 import '../4k_player.dart';
 import '../../safe_player_dispose.dart';
@@ -77,17 +79,20 @@ class FloatingVideoManager {
   }
 
   /// Shows the floating player. No-op if one is already visible.
-  static void show(
+  ///
+  /// Returns whether the window took the player. On false the caller still
+  /// owns it and must dispose it as usual — otherwise it leaks.
+  static bool show(
     BuildContext context,
     Player player,
     VideoController controller,
     List<AssetEntity> videos,
     int currentIndex,
   ) {
-    if (_entry != null) return;
+    if (_entry != null) return false;
 
     final overlay = Overlay.maybeOf(context);
-    if (overlay == null) return;
+    if (overlay == null) return false;
 
     _player = player;
     _controller = controller;
@@ -275,6 +280,7 @@ class FloatingVideoManager {
     overlay.insert(_entry!);
     _showControlsTemporarily();
     _armSystemPip(player);
+    return true;
   }
 
   static StreamSubscription<bool>? _completedSub;
@@ -401,20 +407,31 @@ class FloatingVideoManager {
   /// Removes the overlay and disposes the player.
   static Future<void> close() async {
     final player = _player;
+    final token = _coordinatorToken;
 
-    // The ✕: the video is really gone, so music the video interrupted comes
-    // back here.
-    await PlaybackCoordinator.instance
-        .detachVideo(token: _coordinatorToken, resumeMusic: true);
+    // Clear everything synchronously, BEFORE the await below. Previously the
+    // fields were cleared after it, so a tap on "fullscreen" during that await
+    // let detach() hand this same player to a new full-screen page — which
+    // this method then disposed underneath it (Crashlytics:
+    // `[Player] has been disposed` from that page's first play()).
     _coordinatorToken = null;
-
     _teardownOverlay();
-
     _player = null;
     _controller = null;
     _videos = const [];
 
+    // The ✕: the video is really gone, so music the video interrupted comes
+    // back here.
+    await PlaybackCoordinator.instance
+        .detachVideo(token: token, resumeMusic: true);
+
     if (player == null) return;
+
+    // Detach the equalizer while the player is still alive, as the full-screen
+    // page does in its dispose(). Without this the video EQ stayed bound to
+    // the released player, and the next video's first filter write landed on
+    // it (`[eq] af write failed: [Player] has been disposed`).
+    unawaited(AudioEffectsService.instance.unbind(MediaType.video));
 
     // Deferred for the same reason as the full-screen player: the
     // `_teardownOverlay()` above removes the OverlayEntry, which destroys the

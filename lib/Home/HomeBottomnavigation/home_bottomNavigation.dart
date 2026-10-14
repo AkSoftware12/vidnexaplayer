@@ -5,7 +5,6 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:flutter_svg/svg.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:new_version_plus/new_version_plus.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:provider/provider.dart';
@@ -38,7 +37,7 @@ import '../../NotifyListeners/UserData/user_data.dart';
 import '../../SplashScreen/splash_screen.dart';
 import '../../StatusSaverScreen/whatsapp_download.dart';
 import '../../Utils/textSize.dart';
-import '../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../app_store/app_store.dart';
 import '../../features/equalizer/audio_effects_service.dart';
 import '../../features/equalizer/domain/eq_models.dart';
@@ -46,6 +45,7 @@ import '../../features/equalizer/presentation/equalizer_sheet.dart';
 import '../HomeScreen/home2.dart';
 import '../Me/me.dart';
 import '../OfflineMusic/offline_music_tab.dart';
+import '../../Notification/new_media_digest.dart';
 
 class HomeBottomNavigation extends StatefulWidget {
   final int bottomIndex;
@@ -74,7 +74,6 @@ class HomeBottomNavigation extends StatefulWidget {
 class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   final GlobalKey<CustomBottomBarState> bottomNavigationKey =
   GlobalKey<CustomBottomBarState>();
-  final appOpenManager = AppOpenAdManager();
 
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
   int currentPage = 0;
@@ -89,80 +88,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   String? userName;
   String userImage = "";
 
-  // ================= EXIT DIALOG AD =================
-  /// Banner shown inside the exit confirmation dialog. Loaded up front so the
-  /// dialog never opens with an empty 250px hole where the ad will land.
-  ///
-  /// Ownership is **transferred** to the dialog when it opens (see
-  /// [_takeExitAd]): the field is cleared, `_ExitDialogAd` disposes the ad
-  /// when that route goes away, and a fresh one is loaded for next time.
-  ///
-  /// Handing one BannerAd to a second AdWidget is what produced
-  ///   "The Android view returned from PlatformView#getView() was already
-  ///    added to a parent view"
-  /// out of `SurfaceAndroidViewController._sendCreateMessage`. Closing the
-  /// dialog tears its platform view down asynchronously, so a quick
-  /// back / cancel / back sequence asked for a second Android view backed by
-  /// the same native ad View while it was still parented to the first route.
-  /// One BannerAd is now used by exactly one AdWidget, ever.
-  BannerAd? _exitBannerAd;
-  bool _isExitAdLoaded = false;
-
-  void _loadExitAd() {
-    // Another ad request a subscriber must never make. This one is easy to
-    // miss because it fires from initState rather than from a widget: the exit
-    // dialog preloads its 300x250 banner long before the dialog is opened.
-    if (BillingService.instance.isPremium) return;
-
-    final ad = BannerAd(
-      adUnitId: AdUnits.banner,
-      size: AdSize.mediumRectangle, // 300x250 -- dialog ke liye best fit
-      request: const AdRequest(),
-      listener: BannerAdListener(
-        onAdLoaded: (ad) {
-          if (!mounted) {
-            // Screen went away mid-flight; nothing will ever render this.
-            ad.dispose();
-            _exitBannerAd = null;
-            return;
-          }
-          setState(() => _isExitAdLoaded = true);
-        },
-        onAdFailedToLoad: (ad, error) {
-          debugPrint('Exit banner failed: $error');
-          ad.dispose();
-          _exitBannerAd = null;
-          _isExitAdLoaded = false;
-        },
-      ),
-    );
-    _exitBannerAd = ad;
-    ad.load();
-  }
-
-  /// Hands the loaded ad (if there is one) to the caller and gives up the
-  /// field's claim on it. Returns null while a load is still in flight or has
-  /// failed, in which case the dialog simply shows no ad.
-  BannerAd? _takeExitAd() {
-    // Gating only [_loadExitAd] is not enough. A user who opened the app as a
-    // free user already has this banner in hand; buying premium afterwards
-    // cannot un-load it, so without this check the very next back press would
-    // still show them an ad. Drop it instead of handing it to the dialog.
-    if (BillingService.instance.isPremium) {
-      _exitBannerAd?.dispose();
-      _exitBannerAd = null;
-      _isExitAdLoaded = false;
-      return null;
-    }
-
-    if (!_isExitAdLoaded) return null;
-    final ad = _exitBannerAd;
-    _exitBannerAd = null;
-    _isExitAdLoaded = false;
-    return ad;
-  }
-  // ==================================================
-
   // NOTE: the old `_toggleTheme()` here was dead code that only wrote a
   // SharedPreferences flag and called `markNeedsBuild()` — it never told
   // ThemeProvider anything, so nothing on screen changed. The working toggle
@@ -176,7 +101,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
 
     _getUsername();
 
-    _loadExitAd(); // exit dialog ka ad pehle se load
     currentPage = widget.bottomIndex;
 
     final newVersion = NewVersionPlus(
@@ -209,13 +133,56 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
     // the background. Never blocks the first frame, never throws — see
     // VideoIndexService.ensureIndexed for the throttling/diffing logic.
     unawaited(VideoIndexService.instance.ensureIndexed());
+
+    // A tap on the evening "new photos & videos" reminder lands on Gallery —
+    // whether it launched the app (taken here) or arrived while it was open.
+    NewMediaDigest.openGalleryRequests.addListener(_openGalleryFromReminder);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openGalleryFromReminder();
+    });
+
+    // Same for a tapped push, which lands on the notification list.
+    NotificationStore.instance.openListRequests
+        .addListener(_openNotificationsFromPush);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _openNotificationsFromPush();
+    });
+  }
+
+  void _openNotificationsFromPush() {
+    if (!mounted || !NotificationStore.instance.takeOpenListRequest()) return;
+    // Back to the shell first, as for the reminder above; that also closes
+    // an already-open list, so the one pushed below loads the new entry.
+    final shellRoute = ModalRoute.of(context);
+    if (shellRoute != null && !shellRoute.isCurrent) {
+      Navigator.of(context).popUntil((route) => route == shellRoute);
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        settings: const RouteSettings(name: 'NotificationScreen'),
+        builder: (context) => const NotificationScreen(),
+      ),
+    );
+  }
+
+  void _openGalleryFromReminder() {
+    if (!mounted || !NewMediaDigest.takeGalleryRequest()) return;
+    // Pop anything pushed over the shell (a player, a settings page) so the
+    // tab switch is actually visible — back to this shell's own route, never
+    // past it.
+    final shellRoute = ModalRoute.of(context);
+    if (shellRoute != null && !shellRoute.isCurrent) {
+      Navigator.of(context).popUntil((route) => route == shellRoute);
+    }
+    _selectTab(HomeBottomNavigation.galleryTab);
   }
 
   @override
   void dispose() {
-    // Only ever the *unclaimed* preload: once a dialog takes it, _ExitDialogAd
-    // owns it and the field is null.
-    _exitBannerAd?.dispose();
+    NewMediaDigest.openGalleryRequests.removeListener(_openGalleryFromReminder);
+    NotificationStore.instance.openListRequests
+        .removeListener(_openNotificationsFromPush);
     super.dispose();
   }
 
@@ -260,53 +227,44 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
   }
 
   /// Shows the "exit app?" confirmation with a bounce-in animation,
-  /// blurred backdrop and a banner ad inside the dialog.
+  /// blurred backdrop. No ad: AdMob policy rules out ads inside dialogs and
+  /// on app exit.
   ///
   /// Called from [PopScope.onPopInvokedWithResult]; `WillPopScope` is never
   /// invoked with `android:enableOnBackInvokedCallback="true"` (Android 13+),
   /// which is why the dialog stopped appearing.
   Future<bool> _confirmExit() async {
-    // Taken once, before the route is built: the transitionBuilder below runs
-    // on every animation frame, and the dialog must see the same BannerAd
-    // instance each time or its AdWidget would be re-created mid-transition.
-    final exitAd = _takeExitAd();
-    try {
-      return (await showGeneralDialog<bool>(
-        context: context,
-        barrierDismissible: true,
-        barrierLabel: 'Exit',
-        barrierColor: Colors.black54,
-        transitionDuration: const Duration(milliseconds: 450),
-        pageBuilder: (context, anim1, anim2) => const SizedBox.shrink(),
-        transitionBuilder: (context, animation, secondaryAnimation, child) {
-          // Elastic bounce + fade + background blur
-          final curvedValue = Curves.easeOutBack.transform(animation.value);
-          return BackdropFilter(
-            filter: ImageFilter.blur(
-              sigmaX: 5 * animation.value,
-              sigmaY: 5 * animation.value,
+    return (await showGeneralDialog<bool>(
+      context: context,
+      barrierDismissible: true,
+      barrierLabel: 'Exit',
+      barrierColor: Colors.black54,
+      transitionDuration: const Duration(milliseconds: 450),
+      pageBuilder: (context, anim1, anim2) => const SizedBox.shrink(),
+      transitionBuilder: (context, animation, secondaryAnimation, child) {
+        // Elastic bounce + fade + background blur
+        final curvedValue = Curves.easeOutBack.transform(animation.value);
+        return BackdropFilter(
+          filter: ImageFilter.blur(
+            sigmaX: 5 * animation.value,
+            sigmaY: 5 * animation.value,
+          ),
+          child: Transform.scale(
+            scale: curvedValue,
+            child: Opacity(
+              opacity: animation.value.clamp(0.0, 1.0),
+              child: _buildExitDialog(context),
             ),
-            child: Transform.scale(
-              scale: curvedValue,
-              child: Opacity(
-                opacity: animation.value.clamp(0.0, 1.0),
-                child: _buildExitDialog(context, exitAd),
-              ),
-            ),
-          );
-        },
-      )) ??
-          false;
-    } finally {
-      // Prime the next dialog. The one just shown (if any) now belongs to
-      // _ExitDialogAd; only start a load when no other is already in flight.
-      if (mounted && _exitBannerAd == null) _loadExitAd();
-    }
+          ),
+        );
+      },
+    )) ??
+        false;
   }
 
   /// Clean white exit dialog — white background, black text,
   /// subtle border, red Exit button. Sirf ye method replace karo.
-  Widget _buildExitDialog(BuildContext context, BannerAd? exitAd) {
+  Widget _buildExitDialog(BuildContext context) {
     return Dialog(
       backgroundColor: Colors.transparent,
       insetPadding: EdgeInsets.symmetric(horizontal: 24.sp),
@@ -378,14 +336,6 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
                 height: 1,
               ),
             ),
-
-            // ============ AD SECTION ============
-            // Nothing at all when no ad was ready -- better than a 250px hole.
-            if (exitAd != null) ...[
-              _ExitDialogAd(ad: exitAd),
-              SizedBox(height: 16.sp),
-            ],
-            // ====================================
 
             Row(
               children: [
@@ -762,7 +712,8 @@ class _HomeBottomNavigationState extends State<HomeBottomNavigation> {
         bottomNavigationBar: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            appOpenManager.bannerWidgetBottomScreen(),
+            // Gap keeps the ad's button off the tab bar (accidental clicks).
+            const BottomBannerBar(padding: EdgeInsets.only(bottom: 8)),
 
             const MiniPlayer(),   // 👈 YAHI ADD KARNA HAI
 
@@ -1263,6 +1214,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       final Uri url = Uri.parse(
                         'https://vidnexaplayer.com/privacy-policy.html',
                       );
+                      AdsManager.skipNextAppOpen();
                       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
                         throw 'Could not launch $url';
                       }
@@ -1279,6 +1231,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                       final Uri url = Uri.parse(
                         'https://play.google.com/store/apps/details?id=com.vidnexa.videoplayer',
                       );
+                      AdsManager.skipNextAppOpen();
                       if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
                         throw 'Could not launch $url';
                       }
@@ -1297,6 +1250,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         path: 'vidnexaplayer@gmail.com',
                         query: 'subject=${Uri.encodeComponent('Help & Support')}',
                       );
+                      AdsManager.skipNextAppOpen();
                       await launchUrl(emailLaunchUri);
                     },
                   ),
@@ -1313,6 +1267,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         path: 'vidnexaplayer@gmail.com',
                         query: 'subject=App Feedback',
                       );
+                      AdsManager.skipNextAppOpen();
                       await launchUrl(emailLaunchUri);
                     },
                   ),
@@ -1324,6 +1279,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     title: t('drawer_share_app'),
                     subtitle: t('drawer_share_app_sub'),
                     onTap: () {
+                      AdsManager.skipNextAppOpen();
                       SharePlus.instance.share(
                         ShareParams(
                           text:
@@ -1697,48 +1653,4 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
 
-}
-
-/// Renders the exit dialog's banner and **owns** it: the ad is disposed when
-/// this route is torn down.
-///
-/// The ad is created by `_HomeBottomNavigationState._loadExitAd` and handed
-/// over by `_takeExitAd`, so exactly one `AdWidget` ever points at a given
-/// `BannerAd`. That is the invariant that keeps
-/// "The Android view returned from PlatformView#getView() was already added to
-/// a parent view" from firing when the dialog is opened, cancelled and opened
-/// again before the previous platform view has finished detaching.
-class _ExitDialogAd extends StatefulWidget {
-  const _ExitDialogAd({required this.ad});
-
-  final BannerAd ad;
-
-  @override
-  State<_ExitDialogAd> createState() => _ExitDialogAdState();
-}
-
-class _ExitDialogAdState extends State<_ExitDialogAd> {
-  @override
-  void dispose() {
-    widget.ad.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: Colors.black.withValues(alpha: 0.1),
-          width: 1,
-        ),
-      ),
-      clipBehavior: Clip.antiAlias,
-      width: widget.ad.size.width.toDouble(),
-      height: widget.ad.size.height.toDouble(),
-      child: AdWidget(ad: widget.ad),
-    );
-  }
 }

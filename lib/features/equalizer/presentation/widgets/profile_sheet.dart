@@ -8,6 +8,7 @@ import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../audio_effects_service.dart';
 import '../../domain/eq_models.dart';
 import '../../domain/eq_profile.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 /// Localised lookup for this sheet. Watches the locale so the whole sheet
 /// re-renders when the app language changes.
@@ -359,6 +360,7 @@ class _ProfileTile extends StatelessWidget {
       case 'device':
         if (context.mounted) await _pickDevice(context, service);
       case 'export':
+        AdsManager.skipNextAppOpen();
         await SharePlus.instance.share(
           ShareParams(
             text: service.exportProfile(profile),

@@ -7,6 +7,8 @@ import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/color.dart';
 import '../controllers/gallery_controller.dart';
+import 'gallery_button.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 /// Shown instead of the tabs when photo access has been refused.
 ///
@@ -51,29 +53,16 @@ class GalleryPermissionView extends StatelessWidget {
               ),
             ),
             SizedBox(height: 20.sp),
-            ElevatedButton(
+            GalleryButton.compact(
+              label: DeviceStrings.t(lang, 'gallery_permission_grant'),
               onPressed: controller.retryPermission,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ColorSelect.maineColor,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(
-                  horizontal: 24.sp,
-                  vertical: 10.sp,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8.sp),
-                ),
-              ),
-              child: Text(
-                DeviceStrings.t(lang, 'gallery_permission_grant'),
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
             ),
             SizedBox(height: 6.sp),
             TextButton(
-              onPressed: openAppSettings,
+              onPressed: () {
+                AdsManager.skipNextAppOpen();
+                openAppSettings();
+              },
               child: Text(
                 DeviceStrings.t(lang, 'gallery_permission_settings'),
                 style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp,
@@ -101,7 +90,10 @@ class LimitedAccessBanner extends StatelessWidget {
     return Material(
       color: ColorSelect.maineColor.withValues(alpha: 0.10),
       child: InkWell(
-        onTap: openAppSettings,
+        onTap: () {
+          AdsManager.skipNextAppOpen();
+          openAppSettings();
+        },
         child: Padding(
           padding: EdgeInsets.symmetric(horizontal: 12.sp, vertical: 8.sp),
           child: Row(

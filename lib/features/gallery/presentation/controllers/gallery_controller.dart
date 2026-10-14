@@ -11,6 +11,7 @@ import '../../domain/entities/photo_album.dart';
 import '../../domain/entities/photo_entity.dart';
 import '../../domain/entities/photo_section.dart';
 import '../../domain/repositories/gallery_repository.dart';
+import '../services/photo_signature_service.dart';
 
 /// Drives one browsing surface — either the whole library ([albumId] null) or
 /// a single album.
@@ -89,7 +90,13 @@ class GalleryController extends ChangeNotifier with WidgetsBindingObserver {
     WidgetsBinding.instance.addObserver(this);
     await _restoreDensity();
 
+    // Every await below can outlive the page (the permission dialog alone can
+    // sit open indefinitely). Bail out once disposed — above all before
+    // watchLibrary(): dispose() has already run stopWatchingLibrary(), so a
+    // listener registered after it would never be removed.
+    if (_disposed) return;
     _permission = await _repository.ensurePermission();
+    if (_disposed) return;
     if (!_permission.canRead) {
       _ready = true;
       notifyListeners();
@@ -97,7 +104,9 @@ class GalleryController extends ChangeNotifier with WidgetsBindingObserver {
     }
 
     await _loadFirstPage();
+    if (_disposed) return;
     if (albumId == null) await _loadAlbums();
+    if (_disposed) return;
 
     // React to the library changing underneath us — this app saving an
     // enhance or a filter, the camera taking a shot, another app deleting a
@@ -107,6 +116,36 @@ class GalleryController extends ChangeNotifier with WidgetsBindingObserver {
 
     _ready = true;
     notifyListeners();
+
+    _scheduleBackgroundIndex(_indexStartDelay);
+  }
+
+  /// Background indexing.
+  ///
+  /// The signature index behind duplicates, junk and colour search used to be
+  /// built only when one of those tools was opened, so the user always sat
+  /// through the whole pass. Now the Photos tab starts it quietly a few
+  /// seconds after opening (once the grid has painted), and again a while
+  /// after the library changes, so a tool usually finds the index ready.
+  ///
+  /// The pass is incremental (a no-op once caught up) and runs at reduced
+  /// speed so the grid stays smooth; a tool that needs it raises it to full
+  /// speed. Only on the library-wide controller — an album page sits on top of
+  /// it and would only schedule the same work twice — and only with read
+  /// permission already granted, so it can never cause a prompt.
+  static const _indexStartDelay = Duration(seconds: 4);
+  static const _indexAfterChangeDelay = Duration(seconds: 20);
+  Timer? _indexTimer;
+
+  void _scheduleBackgroundIndex(Duration delay) {
+    if (albumId != null || !_permission.canRead) return;
+    _indexTimer?.cancel();
+    _indexTimer = Timer(delay, () {
+      if (_disposed) return;
+      unawaited(
+        PhotoSignatureService.instance.ensureSignatures(background: true),
+      );
+    });
   }
 
   void _onLibraryChanged() {
@@ -115,14 +154,21 @@ class GalleryController extends ChangeNotifier with WidgetsBindingObserver {
       if (_disposed) return;
       refresh();
     });
+    // Longer than the reload: a burst of camera shots or a WhatsApp download
+    // batch should end in one pass, not one per photo.
+    _scheduleBackgroundIndex(_indexAfterChangeDelay);
   }
 
   /// Re-runs the permission request. Used by the denied state's retry button,
   /// which is the only place the module asks a second time.
   Future<void> retryPermission() async {
     _permission = await _repository.ensurePermission();
+    if (_disposed) return;
     notifyListeners();
-    if (_permission.canRead) await refresh();
+    if (_permission.canRead) {
+      await refresh();
+      _scheduleBackgroundIndex(_indexStartDelay);
+    }
   }
 
   Future<void> refresh() async {
@@ -267,10 +313,19 @@ class GalleryController extends ChangeNotifier with WidgetsBindingObserver {
     super.didHaveMemoryPressure();
   }
 
+  /// Safety net for every async path here (paging, refresh, delete): a late
+  /// completion after the route closed must not notify a disposed notifier.
+  @override
+  void notifyListeners() {
+    if (_disposed) return;
+    super.notifyListeners();
+  }
+
   @override
   void dispose() {
     _disposed = true;
     _reloadTimer?.cancel();
+    _indexTimer?.cancel();
     _repository.stopWatchingLibrary(_onLibraryChanged);
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();

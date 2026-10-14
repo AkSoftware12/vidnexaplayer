@@ -4,6 +4,7 @@ import 'dart:typed_data';
 import 'package:gal/gal.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 /// The single owner of destructive and outward-facing photo operations in the
 /// gallery module. No page or controller calls `PhotoManager.editor` directly.
@@ -16,6 +17,7 @@ import 'package:share_plus/share_plus.dart';
 class MediaWriteDatasource {
   Future<List<String>> deletePhotos(List<String> ids) async {
     if (ids.isEmpty) return const [];
+    AdsManager.skipNextAppOpen();
     return PhotoManager.editor.deleteWithIds(ids);
   }
 
@@ -88,6 +90,7 @@ class MediaWriteDatasource {
 
   Future<void> shareFiles(List<File> files) async {
     if (files.isEmpty) return;
+    AdsManager.skipNextAppOpen();
     await SharePlus.instance.share(
       ShareParams(files: files.map((file) => XFile(file.path)).toList()),
     );

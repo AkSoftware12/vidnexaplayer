@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/color.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../domain/entities/photo_entity.dart';
 import '../../domain/repositories/gallery_repository.dart';
 import '../widgets/photo_thumbnail.dart';
@@ -34,7 +34,6 @@ class PhotoPickerPage extends StatefulWidget {
 }
 
 class _PhotoPickerPageState extends State<PhotoPickerPage> {
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   List<PhotoEntity> _photos = const [];
   bool _loading = true;
@@ -132,7 +131,7 @@ class _PhotoPickerPageState extends State<PhotoPickerPage> {
             ),
           ],
         ),
-        bottomNavigationBar: _adManager.bannerWidget(),
+        bottomNavigationBar: const BottomBannerBar(),
         body: _loading
             ? Center(
                 child: CircularProgressIndicator(color: ColorSelect.maineColor),

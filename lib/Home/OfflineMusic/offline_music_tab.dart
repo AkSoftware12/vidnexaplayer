@@ -16,6 +16,7 @@ import 'OfflineSongs/presentation/pages/home/views/albums_view.dart';
 import 'OfflineSongs/presentation/pages/home/views/artists_view.dart';
 import 'OfflineSongs/presentation/pages/home/views/genres_view.dart';
 import 'OfflineSongs/presentation/pages/home/views/songs_view.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 class OfflineMusicTabScreen extends StatefulWidget {
   const OfflineMusicTabScreen({super.key});
@@ -292,7 +293,10 @@ class _OfflineMusicTabScreenState extends State<OfflineMusicTabScreen>
               SizedBox(height: 16.sp),
               if (_isPermanentlyDenied)
                 ElevatedButton(
-                  onPressed: () => openAppSettings(),
+                  onPressed: () {
+                    AdsManager.skipNextAppOpen();
+                    openAppSettings();
+                  },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: ColorSelect.maineColor,
                     foregroundColor: Colors.white,

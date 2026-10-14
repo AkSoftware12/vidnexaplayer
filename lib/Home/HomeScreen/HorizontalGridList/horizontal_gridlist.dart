@@ -2,12 +2,11 @@ import 'package:material_ui/material_ui.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:provider/provider.dart';
-import '../../../DeviceSpace/device_space.dart';
 import '../../../NetWork Stream/stream_video.dart';
 import '../../../NotifyListeners/LanguageProvider/home_strings.dart';
 import '../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../Utils/app_palette.dart';
-import '../../../features/gallery/presentation/pages/gallery_home_page.dart';
+import '../../../LockScreen/LockScreen/lock_screen.dart';
 import '../../../StatusSaverScreen/whatsapp_download.dart';
 import '../../../VideoPLayer/VideoList/video_list.dart';
 import '../../HomeBottomnavigation/home_bottomNavigation.dart'; // for AssetPathEntity
@@ -37,8 +36,12 @@ class PropertyTypeModel {
   /// blue-violet gradient it read as a hole.
   final bool tintWhite;
 
+  /// Drawn instead of [imageUrl] when set — for a tile with no artwork of its
+  /// own (Private Vault).
+  final IconData? icon;
+
   PropertyTypeModel({
-    required this.imageUrl,
+    this.imageUrl = '',
     required this.text,
     required this.color,
     required this.color2,
@@ -46,6 +49,7 @@ class PropertyTypeModel {
     required this.count,
     required this.open,
     this.tintWhite = false,
+    this.icon,
   });
 }
 
@@ -98,38 +102,21 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
             ),
           ),
         ),
+        // Gallery and Files are tabs of the bottom bar, so they no longer
+        // take spots here; the Private Vault, otherwise only reachable from
+        // the Profile tab, gets one instead.
         PropertyTypeModel(
-          imageUrl: 'assets/image.png',
-          text: 'home_cat_images',
-          color: Colors.pinkAccent,
-          color2: Colors.redAccent,
-          mb: '5.6 GB',
-          count: 1032,
-          open: (context) => Navigator.push(
-            context,
-            MaterialPageRoute(
-              settings: const RouteSettings(name: 'GalleryHomeScreen'),
-              builder: (context) => const GalleryHomePage(),
-            ),
-          ),
-        ),
-        // Moved here off the home app bar, where it was a bare purple folder
-        // square sitting next to the drawer button with nothing naming it.
-        // It is a media category like the rest, so it belongs in the row that
-        // says so — and here it gets a label.
-        PropertyTypeModel(
-          imageUrl: 'assets/files.png',
-          text: 'home_cat_files',
-          tintWhite: true,
-          color: const Color(0xFF3B82F6),
-          color2: const Color(0xFF9333EA),
-          mb: '0 GB',
+          icon: Icons.lock_rounded,
+          text: 'home_cat_vault',
+          color: const Color(0xFF0F766E),
+          color2: const Color(0xFF14B8A6),
+          mb: '',
           count: 0,
           open: (context) => Navigator.push(
             context,
             MaterialPageRoute(
-              settings: const RouteSettings(name: 'DeviceSpaceScreen'),
-              builder: (context) => const DeviceSpaceScreen(),
+              settings: const RouteSettings(name: 'VaultScreen'),
+              builder: (context) => const VaultScreen(),
             ),
           ),
         ),
@@ -329,11 +316,20 @@ class _HorizontalGridListState extends State<HorizontalGridList> {
                                 ),
                                 child: Padding(
                                   padding: EdgeInsets.all(6.sp),
-                                  child: Image.asset(
-                                    item.imageUrl,
-                                    color: item.tintWhite ? Colors.white : null,
-                                    fit: BoxFit.contain,
-                                  ),
+                                  child: item.icon != null
+                                      ? FittedBox(
+                                          child: Icon(
+                                            item.icon,
+                                            color: Colors.white,
+                                          ),
+                                        )
+                                      : Image.asset(
+                                          item.imageUrl,
+                                          color: item.tintWhite
+                                              ? Colors.white
+                                              : null,
+                                          fit: BoxFit.contain,
+                                        ),
                                 ),
                               ),
                             ),

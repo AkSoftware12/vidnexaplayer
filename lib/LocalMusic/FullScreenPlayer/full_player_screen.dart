@@ -15,7 +15,7 @@ import '../../NotifyListeners/LanguageProvider/music_strings.dart';
 import '../../TextScroll/text_scroll.dart';
 import '../../Utils/color.dart';
 import '../../Utils/common.dart';
-import '../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../features/equalizer/audio_effects_service.dart';
 import '../../features/equalizer/domain/eq_models.dart';
 import '../../features/equalizer/presentation/equalizer_sheet.dart';
@@ -36,7 +36,6 @@ class FullPlayerScreen extends StatefulWidget {
 
 class _FullPlayerScreenState extends State<FullPlayerScreen> {
   late final PageController _pageCtrl;
-  final appOpenManager = AppOpenAdManager();
 
   Duration? selectedTimer;
   bool _isDragging = false;
@@ -73,11 +72,13 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
 
   Future<void> _launchYoutubeSearch(String query) async {
     final url = Uri.parse('https://www.youtube.com/search?q=$query');
+    AdsManager.skipNextAppOpen();
     if (await canLaunchUrl(url)) await launchUrl(url);
   }
 
   Future<void> _launchGoogleSearch(String query) async {
     final url = Uri.parse('https://www.google.com/search?q=$query');
+    AdsManager.skipNextAppOpen();
     if (await canLaunchUrl(url)) await launchUrl(url);
   }
 
@@ -141,6 +142,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           }, Icons.color_lens),
                           const SizedBox(width: 10,),
                           _iconBtn(() {
+                            AdsManager.skipNextAppOpen();
                             SharePlus.instance.share(
                               ShareParams(
                                 text:
@@ -487,10 +489,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
               ],
             ),
           ),
-          bottomNavigationBar: SizedBox(
-            height: 50,
-            child: appOpenManager.bannerWidgetBottomScreen(),
-          ),
+          bottomNavigationBar: const BottomBannerBar(),
 
         );
       },
@@ -949,6 +948,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           song.extras?['path']?.toString() ?? song.id;
 
                       if (filePath.isEmpty) {
+                        AdsManager.skipNextAppOpen();
                         await SharePlus.instance.share(
                           ShareParams(
                             text: '${song.title}\n${song.artist ?? ""}',
@@ -956,6 +956,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                           ),
                         );
                       } else {
+                        AdsManager.skipNextAppOpen();
                         await SharePlus.instance.share(
                           ShareParams(
                             files: [XFile(filePath)],
@@ -965,6 +966,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
                         );
                       }
                     } catch (_) {
+                      AdsManager.skipNextAppOpen();
                       await SharePlus.instance.share(
                         ShareParams(
                           text: '${song.title}\n${song.artist ?? ""}',
@@ -1115,6 +1117,7 @@ class _FullPlayerScreenState extends State<FullPlayerScreen> {
       // An "Open with" file has a uri as its id and is not ours to delete.
       if (int.tryParse(song.id) == null) throw StateError('Not a library song');
 
+      AdsManager.skipNextAppOpen();
       final deleted = await PhotoManager.editor.deleteWithIds([song.id]);
       // Empty when the user declined the system dialog — not an error.
       if (!deleted.contains(song.id)) return;

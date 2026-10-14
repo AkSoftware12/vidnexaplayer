@@ -6,7 +6,7 @@ import 'package:videoplayer/Utils/color.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../NotifyListeners/LanguageProvider/video_strings.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
-import '../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../WhatsNew/whats_new.dart';
 
 class VideoPlayerStream extends StatefulWidget {
@@ -17,7 +17,6 @@ class VideoPlayerStream extends StatefulWidget {
 }
 
 class _VideoPlayerStreamState extends State<VideoPlayerStream> {
-  final appOpenManager = AppOpenAdManager();
 
   final TextEditingController _urlController = TextEditingController();
   bool _isLoading = false;
@@ -198,7 +197,7 @@ class _VideoPlayerStreamState extends State<VideoPlayerStream> {
           ),
         ),
       ),
-      bottomNavigationBar:appOpenManager.bannerWidget(),
+      bottomNavigationBar:const BottomBannerBar(),
 
     );
   }

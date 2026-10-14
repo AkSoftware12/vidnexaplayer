@@ -6,6 +6,7 @@ import 'package:permission_handler/permission_handler.dart';
 import '../../LocalMusic/AUDIOCONTROLLER/global_audio_controller.dart';
 import '../../Utils/app_palette.dart';
 import 'file_kind.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 /// Music grouped by the folder each track actually sits in.
 ///
@@ -121,6 +122,7 @@ class _AudioFoldersViewState extends State<AudioFoldersView> {
         widget.permissionLabel,
         actionLabel: widget.grantLabel,
         onAction: () async {
+          AdsManager.skipNextAppOpen();
           await openAppSettings();
           await _load();
         },

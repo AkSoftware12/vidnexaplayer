@@ -46,6 +46,18 @@ class GalleryQueryParser {
     'pink': PhotoColor.pink,
     'गुलाबी': PhotoColor.pink,
     'gulabi': PhotoColor.pink,
+    // Black-and-white. The comment above promised "black and white" could not
+    // be half-consumed by "black" — but neither was in the table, so the words
+    // fell through to a filename search and matched nothing.
+    'black and white': PhotoColor.mono,
+    'black & white': PhotoColor.mono,
+    'black white': PhotoColor.mono,
+    'b&w': PhotoColor.mono,
+    'monochrome': PhotoColor.mono,
+    'grayscale': PhotoColor.mono,
+    'greyscale': PhotoColor.mono,
+    'ब्लैक एंड व्हाइट': PhotoColor.mono,
+    'श्वेत-श्याम': PhotoColor.mono,
   };
 
   static const Map<String, PhotoOrientation> _orientations = {
@@ -86,7 +98,19 @@ class GalleryQueryParser {
   };
 
   GalleryQuery parse(String rawText) {
-    var remaining = ' ${rawText.toLowerCase().trim()} ';
+    // Punctuation off first. Keywords are matched as whole words between
+    // spaces, so "red," or a recogniser's trailing "screenshots." used to slip
+    // past every table here — and the delegated parser, which strips
+    // punctuation itself, then claimed the bare word as a filename search.
+    // A decimal point between digits ("2.5 mb") is kept, as are `&` and `-`,
+    // which keywords above contain.
+    final normalised = rawText
+        .toLowerCase()
+        .replaceAll(RegExp(r'(?<!\d)\.|\.(?!\d)'), ' ')
+        .replaceAll(RegExp(r'[,!?;:"“”‘’()\[\]{}…।]'), ' ')
+        .replaceAll(RegExp(r'\s+'), ' ')
+        .trim();
+    var remaining = ' $normalised ';
     if (remaining.trim().isEmpty) return GalleryQuery.empty;
 
     PhotoColor? color;

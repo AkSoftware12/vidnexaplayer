@@ -5,7 +5,7 @@ import 'package:provider/provider.dart';
 import 'package:videoplayer/Utils/app_palette.dart';
 import 'package:videoplayer/Utils/color.dart';
 
-import '../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../NotifyListeners/LanguageProvider/misc_strings.dart';
 import 'notification_model.dart';
@@ -25,7 +25,6 @@ class NotificationDetailPage extends StatelessWidget {
   Widget build(BuildContext context) {
     AppPalette.sync(context);
     final lang = context.watch<LocaleProvider>().locale.languageCode;
-    final adManager = AppOpenAdManager();
 
     return Scaffold(
       backgroundColor: AppPalette.surface,
@@ -115,7 +114,7 @@ class NotificationDetailPage extends StatelessWidget {
           SizedBox(height: 24.sp),
         ],
       ),
-      bottomNavigationBar: adManager.bannerWidget(),
+      bottomNavigationBar: const BottomBannerBar(),
     );
   }
 }

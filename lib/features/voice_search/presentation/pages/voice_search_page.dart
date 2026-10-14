@@ -11,6 +11,7 @@ import '../services/video_index_service.dart';
 import '../widgets/mic_button.dart';
 import '../widgets/voice_search_result_tile.dart';
 import '../widgets/voice_search_state_view.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 
 /// Entry point pushed from the mic icon in `home_bottomNavigation.dart`'s
 /// app bar. Wraps a route-scoped [VoiceSearchController] — this feature
@@ -143,6 +144,7 @@ class _VoiceSearchViewState extends State<_VoiceSearchView> {
                       mediaKind: controller.lastQuery?.mediaKind,
                       onRetry: () => _startListening(controller),
                       onOpenSettings: () {
+                        AdsManager.skipNextAppOpen();
                         openAppSettings();
                       },
                       onExampleTap: controller.runTextQuery,

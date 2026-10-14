@@ -102,7 +102,12 @@ class MpvFilterBackend implements EqBackend {
       await _trySetProperty(
         native,
         'audio-channels',
-        s.dialogueDownmix ? 'stereo' : 'auto-safe',
+        // Stereo either way. 'auto-safe' let mpv open a 5.1/7.1 AudioTrack for
+        // AC3/E-AC3 tracks, which many phones accept and then play as silence
+        // — the "Dolby movie has no sound" report. A phone's speaker and
+        // headphones are stereo anyway; see `_configureAudioOutput` in the
+        // video player, which sets the same value before the first file.
+        'stereo',
       );
     }
 

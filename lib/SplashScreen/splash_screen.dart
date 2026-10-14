@@ -16,7 +16,9 @@ import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../NotifyListeners/LanguageProvider/profile_strings.dart';
 import '../OnboardScreen/onboarding_screen.dart';
 import '../VideoPLayer/4kPlayer/4k_player.dart';
-import '../ads/app_open_ad_manager.dart';
+import '../Billing/billing_service.dart';
+import '../ads/ad_units.dart';
+import '../ads/ads_manager.dart';
 import '../video_intent_service.dart';
 
 
@@ -28,31 +30,30 @@ class SplashScreen extends StatefulWidget {
 }
 
 class _SplashScreenState extends State<SplashScreen> {
-  // Singleton — owned and initialised by main.dart, never disposed here.
-  final AppOpenAdManager _adManager = AppOpenAdManager();
-
-  Timer? _startTimer;
-
   @override
   void initState() {
     super.initState();
-
-    _startTimer = Timer(const Duration(seconds: 3), () {
-      if (!mounted) return;
-      _adManager.showAdIfAvailable(() async {
-        // Rating prompt moved to the home screen (shown there as a bottom
-        // sheet). Splash now just continues into the app.
-        await Future.delayed(const Duration(milliseconds: 300));
-        if (!mounted) return;
-        await checkLoginStatus();
-      });
-    });
+    unawaited(_startAdsThenContinue());
   }
 
-  @override
-  void dispose() {
-    _startTimer?.cancel();
-    super.dispose();
+  /// Consent + SDK + preload, then the App Open ad (or straight on after
+  /// ~1.5s if none is ready). Every launch — "Open with", notification taps —
+  /// comes through this screen, so this is the only init site.
+  Future<void> _startAdsThenContinue() async {
+    // Cached entitlement, loaded in main() before runApp.
+    configureAds(isPremium: BillingService.instance.isPremium);
+    try {
+      await AdsManager.init();
+    } catch (e) {
+      Ads.log('Splash', 'init failed: $e');
+    }
+    if (!mounted) return;
+    AppOpenManager.instance.show(
+      fromSplash: true,
+      onDone: () {
+        if (mounted) checkLoginStatus();
+      },
+    );
   }
 
   Future<void> checkLoginStatus() async {
@@ -200,6 +201,7 @@ class CustomUpgradeDialog extends StatelessWidget {
 
     bool opened = false;
     try {
+      AdsManager.skipNextAppOpen();
       opened = await launchUrl(uri, mode: LaunchMode.externalApplication);
     } catch (_) {
       opened = false;

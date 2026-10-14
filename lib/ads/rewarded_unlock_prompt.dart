@@ -7,33 +7,27 @@ import '../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../NotifyListeners/LanguageProvider/misc_strings.dart';
 import '../Utils/app_palette.dart';
 import '../Utils/color.dart';
-import 'app_open_ad_manager.dart';
+import 'ads_manager.dart';
 import 'rewarded_unlock.dart';
 
 /// Asks whether the user wants to watch a rewarded ad to unlock [feature], and
 /// returns whether they may now proceed.
 ///
-/// This is the opt-in screen AdMob requires in front of a rewarded ad — and
-/// requires explicitly in front of a rewarded *interstitial*. It names the
-/// reward, says plainly that it is a video ad, and the decline button is a
-/// real one: saying no closes the sheet and nothing else happens.
+/// This is the opt-in screen AdMob requires in front of a rewarded ad. It
+/// names the reward, says plainly that it is a video ad, and the decline
+/// button is a real one: saying no closes the sheet and nothing else happens.
 ///
-/// Three cases return true without an ad being shown:
-///
-/// * the window from an earlier ad is still open — one ad, thirty minutes,
-///   not one ad per tap;
-/// * no ad could be loaded — a user must never lose a feature because our
-///   inventory was empty, so the unlock is granted anyway;
-/// * the user watched to the end and earned it.
-///
-/// Returns false only when the user declined, or closed the ad early. Closing
-/// early earns nothing — that is how rewarded ads work — so the caller should
-/// say so rather than silently doing nothing.
+/// Returns true when the user is premium, the window from an earlier ad is
+/// still open (one ad, one window: thirty minutes, two for HDR), or the user
+/// watched to the end. The "Watch ad" button is only enabled while
+/// [RewardedManager.isReady]; with no ad, or an ad closed early, the user is
+/// told so and this returns false.
 Future<bool> ensureRewardedUnlock(
   BuildContext context, {
   required String feature,
   required String titleKey,
   required String bodyKey,
+  Widget? preview,
 }) async {
   // Premium owns these outright — no ad, no 30-minute window, no prompt.
   // Checked before the stored unlock so a paying user never writes an
@@ -45,14 +39,9 @@ Future<bool> ensureRewardedUnlock(
   if (await unlocks.isUnlocked(feature)) return true;
   if (!context.mounted) return false;
 
-  final manager = AppOpenAdManager();
-
-  // Nothing to offer. Grant it rather than dangling a prompt that cannot pay
-  // out — and rather than gating the feature on our own fill rate.
-  if (!manager.hasRewardedAd) {
-    await unlocks.unlock(feature);
-    return true;
-  }
+  final manager = RewardedManager.instance;
+  final ready = await manager.isReady();
+  if (!context.mounted) return false;
 
   final lang = context.read<LocaleProvider>().locale.languageCode;
   final messenger = ScaffoldMessenger.of(context);
@@ -65,6 +54,9 @@ Future<bool> ensureRewardedUnlock(
       lang: lang,
       titleKey: titleKey,
       bodyKey: bodyKey,
+      preview: preview,
+      minutes: RewardedUnlock.windowFor(feature).inMinutes,
+      adReady: ready,
       onDecline: () => Navigator.pop(sheetContext, false),
       onAccept: () => Navigator.pop(sheetContext, true),
     ),
@@ -72,23 +64,21 @@ Future<bool> ensureRewardedUnlock(
 
   if (accepted != true) return false;
 
-  final earned = await manager.showRewarded();
+  final adShown = await manager.isReady();
+  final earned = await manager.show();
 
   if (!earned) {
-    // Either they closed it early, or the ad failed on the way up. The first
-    // is their choice; the second is ours to absorb, so only a genuine
-    // dismissal leaves the feature locked.
-    if (manager.hasRewardedAd) {
-      messenger.showSnackBar(
-        SnackBar(
-          duration: const Duration(seconds: 3),
-          content: Text(MiscStrings.t(lang, 'rewarded_incomplete')),
-        ),
-      );
-      return false;
-    }
-    await unlocks.unlock(feature);
-    return true;
+    // No ad to show, or the user closed it before the reward.
+    messenger.showSnackBar(
+      SnackBar(
+        duration: const Duration(seconds: 3),
+        content: Text(MiscStrings.t(
+          lang,
+          adShown ? 'rewarded_incomplete' : 'rewarded_unavailable',
+        )),
+      ),
+    );
+    return false;
   }
 
   await unlocks.unlock(feature);
@@ -97,7 +87,7 @@ Future<bool> ensureRewardedUnlock(
       duration: const Duration(seconds: 2),
       content: Text(
         MiscStrings.t(lang, 'rewarded_unlocked')
-            .replaceAll('{minutes}', '${RewardedUnlock.window.inMinutes}'),
+            .replaceAll('{minutes}', '${RewardedUnlock.windowFor(feature).inMinutes}'),
       ),
     ),
   );
@@ -111,11 +101,25 @@ class _RewardedSheet extends StatelessWidget {
     required this.bodyKey,
     required this.onAccept,
     required this.onDecline,
+    this.preview,
+    required this.minutes,
+    required this.adReady,
   });
 
   final String lang;
   final String titleKey;
   final String bodyKey;
+
+  /// Optional picture of what the reward does, shown under the title — the
+  /// HDR before/after, for one.
+  final Widget? preview;
+
+  /// Length of the unlock window this ad buys, for the body text.
+  final int minutes;
+
+  /// Whether a rewarded ad is loaded. The "Watch ad" button is disabled
+  /// without one, rather than promising an ad we can't show.
+  final bool adReady;
   final VoidCallback onAccept;
   final VoidCallback onDecline;
 
@@ -133,7 +137,10 @@ class _RewardedSheet extends StatelessWidget {
           color: AppPalette.card,
           borderRadius: BorderRadius.circular(18.sp),
         ),
-        child: Column(
+        // Scrolls rather than overflows: with a preview, the sheet can be
+        // taller than a landscape video player's screen.
+        child: SingleChildScrollView(
+          child: Column(
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -164,15 +171,29 @@ class _RewardedSheet extends StatelessWidget {
                 ),
               ],
             ),
+            if (preview != null) ...[
+              SizedBox(height: 12.sp),
+              preview!,
+            ],
             SizedBox(height: 10.sp),
             Text(
               MiscStrings.t(lang, bodyKey)
-                  .replaceAll('{minutes}', '${RewardedUnlock.window.inMinutes}'),
+                  .replaceAll('{minutes}', '$minutes'),
               style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5.sp,
                 height: 1.45,
                 color: AppPalette.textB,
               ),
             ),
+            if (!adReady) ...[
+              SizedBox(height: 8.sp),
+              Text(
+                MiscStrings.t(lang, 'rewarded_unavailable'),
+                style: TextStyle(fontFamily: 'Poppins', fontSize: 11.sp,
+                  fontWeight: FontWeight.w600,
+                  color: AppPalette.textS,
+                ),
+              ),
+            ],
             SizedBox(height: 16.sp),
             Row(
               mainAxisAlignment: MainAxisAlignment.end,
@@ -189,7 +210,7 @@ class _RewardedSheet extends StatelessWidget {
                 ),
                 SizedBox(width: 6.sp),
                 ElevatedButton.icon(
-                  onPressed: onAccept,
+                  onPressed: adReady ? onAccept : null,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: accent,
                     foregroundColor: Colors.white,
@@ -213,6 +234,7 @@ class _RewardedSheet extends StatelessWidget {
               ],
             ),
           ],
+        ),
         ),
       ),
     );

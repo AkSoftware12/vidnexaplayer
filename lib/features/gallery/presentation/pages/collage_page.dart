@@ -7,13 +7,14 @@ import 'package:provider/provider.dart';
 import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/color.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../data/repositories/gallery_repository_impl.dart';
 import '../../domain/entities/collage_template.dart';
 import '../../domain/entities/photo_entity.dart';
 import '../../domain/repositories/gallery_repository.dart';
 import 'collage_cell_editor_page.dart';
 import 'photo_picker_page.dart';
+import '../widgets/gallery_button.dart';
 
 /// Builds a collage, choosing the layout automatically.
 ///
@@ -31,7 +32,6 @@ class CollagePage extends StatefulWidget {
 }
 
 class _CollagePageState extends State<CollagePage> {
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   /// Preview renders small and fast; the saved file renders large. Same code
   /// path, so what you see is what gets written.
@@ -49,6 +49,11 @@ class _CollagePageState extends State<CollagePage> {
   bool _rendering = false;
   bool _saving = false;
   String? _status;
+
+  /// True once the collage on screen has been written to the gallery. Every
+  /// change re-renders, which clears it — so Save cannot write the same
+  /// collage twice.
+  bool _savedCurrent = false;
 
   /// Manual crops, keyed by cell index. Cells absent from this map keep the
   /// automatic crop. Cleared whenever the photos or the template change,
@@ -98,7 +103,10 @@ class _CollagePageState extends State<CollagePage> {
     final template = _template;
     if (template == null || _photos.isEmpty) return;
 
-    setState(() => _rendering = true);
+    setState(() {
+      _rendering = true;
+      _savedCurrent = false;
+    });
 
     // Shape-matched order, so each photo lands in the cell it fits best.
     final ordered = GalleryRepositoryImpl.assignToCells(_photos, template);
@@ -191,6 +199,7 @@ class _CollagePageState extends State<CollagePage> {
     if (!mounted) return;
     setState(() {
       _saving = false;
+      _savedCurrent = report.saved;
       _status = DeviceStrings.t(
         lang,
         report.saved ? 'gallery_collage_saved' : 'gallery_collage_failed',
@@ -226,7 +235,7 @@ class _CollagePageState extends State<CollagePage> {
               ),
           ],
         ),
-        bottomNavigationBar: _adManager.bannerWidget(),
+        bottomNavigationBar: const BottomBannerBar(),
         body: _photos.isEmpty
             ? _EmptyState(lang: lang, onPick: _pick)
             : Column(
@@ -292,38 +301,20 @@ class _CollagePageState extends State<CollagePage> {
                       ),
                     ),
                   Padding(
-                    padding: EdgeInsets.all(14.sp),
-                    child: SizedBox(
-                      width: double.infinity,
-                      child: ElevatedButton(
-                        onPressed:
-                            _rendering || _saving || _preview == null
-                                ? null
-                                : _save,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: ColorSelect.maineColor,
-                          foregroundColor: Colors.white,
-                          padding: EdgeInsets.symmetric(vertical: 13.sp),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(10.sp),
-                          ),
-                        ),
-                        child: _saving
-                            ? SizedBox(
-                                width: 18.sp,
-                                height: 18.sp,
-                                child: const CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                  color: Colors.white,
-                                ),
-                              )
-                            : Text(
-                                DeviceStrings.t(lang, 'gallery_collage_save'),
-                                style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
+                    padding: EdgeInsets.all(12.sp),
+                    child: GalleryButton(
+                      label: DeviceStrings.t(
+                        lang,
+                        _savedCurrent
+                            ? 'gallery_tool_saved'
+                            : 'gallery_collage_save',
                       ),
+                      busy: _saving,
+                      onPressed: _rendering ||
+                              _savedCurrent ||
+                              _preview == null
+                          ? null
+                          : _save,
                     ),
                   ),
                 ],
@@ -361,25 +352,9 @@ class _EmptyState extends StatelessWidget {
               ),
             ),
             SizedBox(height: 16.sp),
-            ElevatedButton(
+            GalleryButton.compact(
+              label: DeviceStrings.t(lang, 'gallery_pick_photos'),
               onPressed: onPick,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: ColorSelect.maineColor,
-                foregroundColor: Colors.white,
-                padding: EdgeInsets.symmetric(
-                  horizontal: 22.sp,
-                  vertical: 11.sp,
-                ),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(9.sp),
-                ),
-              ),
-              child: Text(
-                DeviceStrings.t(lang, 'gallery_pick_photos'),
-                style: TextStyle(fontFamily: 'Poppins', fontSize: 12.sp,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
             ),
           ],
         ),

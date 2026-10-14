@@ -2,6 +2,9 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
+import 'new_media_digest.dart';
+import 'notification_store.dart';
+
 /// Shows a push as a real system notification while the app is in the
 /// foreground.
 ///
@@ -31,14 +34,35 @@ class LocalNotifications {
 
   static bool _ready = false;
 
-  static Future<void> init() async {
-    if (_ready) return;
+  /// The in-flight init, shared. main.dart starts init() from two places at
+  /// once (FCM setup and the new-media digest); without this both could get
+  /// past `_ready` and route the launching tap twice.
+  static Future<void>? _initializing;
+
+  static Future<void> init() {
+    if (_ready) return Future.value();
+    return _initializing ??= _init().whenComplete(() => _initializing = null);
+  }
+
+  static Future<void> _init() async {
     try {
       await _plugin.initialize(
         settings: const InitializationSettings(
-          android: AndroidInitializationSettings('@mipmap/ic_launcher'),
+          // Monochrome status-bar icon. The launcher mipmap is opaque, and
+          // Android draws only a small icon's alpha, so it showed as a blank
+          // white square.
+          android: AndroidInitializationSettings('@drawable/ic_stat_notification'),
         ),
+        // Tapped while the app is running (foreground or in the background).
+        onDidReceiveNotificationResponse: _onTap,
       );
+
+      // Tapped while the app was closed: the tap is what launched it.
+      final launch = await _plugin.getNotificationAppLaunchDetails();
+      if (launch?.didNotificationLaunchApp ?? false) {
+        final response = launch!.notificationResponse;
+        if (response != null) _onTap(response);
+      }
 
       await _plugin
           .resolvePlatformSpecificImplementation<
@@ -49,6 +73,21 @@ class LocalNotifications {
       _ready = true;
     } catch (error) {
       debugPrint('LocalNotifications.init failed: $error');
+    }
+  }
+
+  /// Payload on a push drawn by [show], so its tap can be told apart from the
+  /// new-media reminder's.
+  static const _pushPayload = 'push';
+
+  /// Routes a tapped local notification: the new-media reminder to Gallery, a
+  /// foreground push to the notification list.
+  static void _onTap(NotificationResponse response) {
+    switch (response.payload) {
+      case NewMediaDigest.payload:
+        NewMediaDigest.requestOpenGallery();
+      case _pushPayload:
+        NotificationStore.instance.requestOpenList();
     }
   }
 
@@ -69,6 +108,7 @@ class LocalNotifications {
         id: message.messageId.hashCode,
         title: title,
         body: body,
+        payload: _pushPayload,
         notificationDetails: NotificationDetails(
           android: AndroidNotificationDetails(
             _channel.id,

@@ -6,6 +6,7 @@ import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../controllers/review_controller.dart';
 import 'byte_format.dart';
+import 'gallery_button.dart';
 import 'gallery_dialog.dart';
 
 /// The confirm-and-delete bar shared by the duplicate finder and the junk
@@ -71,22 +72,11 @@ class DeleteActionBar extends StatelessWidget {
                 ),
               ),
               SizedBox(width: 4.sp),
-              ElevatedButton.icon(
+              GalleryButton.compact(
+                label: DeviceStrings.t(lang, 'gallery_delete'),
+                icon: Icons.delete_outline,
+                destructive: true,
                 onPressed: () => _confirm(context, lang),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.red.shade600,
-                  foregroundColor: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8.sp),
-                  ),
-                ),
-                icon: Icon(Icons.delete_outline, size: 16.sp),
-                label: Text(
-                  DeviceStrings.t(lang, 'gallery_delete'),
-                  style: TextStyle(fontFamily: 'Poppins', fontSize: 11.5.sp,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
               ),
             ],
           ),

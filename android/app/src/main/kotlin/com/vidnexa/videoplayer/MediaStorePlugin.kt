@@ -96,6 +96,23 @@ class MediaStorePlugin(
                         ),
                     )
 
+                    // Off the main thread: a large PDF takes long enough to copy
+                    // that doing it inline would freeze the UI.
+                    "copyToCache" -> {
+                        val uri = call.argument<String>("uri")
+                        val name = call.argument<String>("name")
+                        val main = android.os.Handler(android.os.Looper.getMainLooper())
+                        Thread {
+                            val path = try {
+                                copyToCache(uri, name)
+                            } catch (t: Throwable) {
+                                Log.w(TAG, "copyToCache failed", t)
+                                null
+                            }
+                            main.post { result.success(path) }
+                        }.start()
+                    }
+
                     else -> result.notImplemented()
                 }
             } catch (t: Throwable) {
@@ -269,6 +286,32 @@ class MediaStorePlugin(
      * the device can open the type, which is a normal outcome for, say, a `.db`
      * backup.
      */
+    /**
+     * Copies a `content://` file into the app's cache and returns its path,
+     * for the in-app PDF viewer — Android's PdfRenderer needs a seekable file
+     * descriptor, and MediaStore only hands out uris.
+     *
+     * One fixed folder that is emptied first, so at most one copy is ever kept
+     * and the cache cannot grow with every document opened.
+     */
+    private fun copyToCache(uri: String?, name: String?): String? {
+        if (uri.isNullOrEmpty()) return null
+        val dir = java.io.File(context.cacheDir, "doc_view")
+        dir.listFiles()?.forEach { it.delete() }
+        dir.mkdirs()
+
+        val safeName = (name ?: "document")
+            .replace(Regex("[^A-Za-z0-9._-]"), "_")
+            .ifEmpty { "document" }
+        val target = java.io.File(dir, safeName)
+        val input = context.contentResolver.openInputStream(android.net.Uri.parse(uri))
+            ?: return null
+        input.use { source ->
+            target.outputStream().use { sink -> source.copyTo(sink) }
+        }
+        return target.absolutePath
+    }
+
     private fun openExternally(uri: String?, mime: String?): Boolean {
         if (uri.isNullOrEmpty()) return false
 

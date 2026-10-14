@@ -310,6 +310,20 @@ class MediaStoreRepo {
     }
   }
 
+  /// A readable local copy of [file], for viewers that need a real path (the
+  /// in-app PDF viewer). Only the most recent copy is kept. Null on failure.
+  Future<String?> copyToCache(MediaFile file) async {
+    try {
+      return await _channel.invokeMethod<String>('copyToCache', {
+        'uri': file.uri,
+        'name': file.name,
+      });
+    } on PlatformException catch (e) {
+      debugPrint('MediaStoreRepo.copyToCache failed: $e');
+      return null;
+    }
+  }
+
   /// Drops every cache, so the next read hits MediaStore.
   void invalidate() {
     _files.clear();

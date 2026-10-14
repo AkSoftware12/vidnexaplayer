@@ -5,13 +5,14 @@ import 'package:provider/provider.dart';
 import '../../../../NotifyListeners/LanguageProvider/device_strings.dart';
 import '../../../../NotifyListeners/LanguageProvider/language_provider.dart';
 import '../../../../Utils/color.dart';
-import '../../../../ads/app_open_ad_manager.dart';
+import 'package:videoplayer/ads/ads_manager.dart';
 import '../../../../ads/rewarded_unlock.dart';
 import '../../../../ads/rewarded_unlock_prompt.dart';
 import '../../domain/entities/photo_entity.dart';
 import '../../domain/repositories/gallery_repository.dart';
 import '../widgets/photo_thumbnail.dart';
 import 'photo_picker_page.dart';
+import '../widgets/gallery_button.dart';
 
 /// Enlarges a photo toward 4K and sharpens it.
 ///
@@ -30,11 +31,12 @@ class EnhancePage extends StatefulWidget {
 class _EnhancePageState extends State<EnhancePage> {
   static const _targetLongEdge = 3840;
 
-  final AppOpenAdManager _adManager = AppOpenAdManager();
 
   PhotoEntity? _photo;
   bool _working = false;
   UpscaleReport? _report;
+
+  bool get _isSaved => _report?.saved ?? false;
 
   Future<void> _pick() async {
     final lang = context.read<LocaleProvider>().locale.languageCode;
@@ -160,31 +162,16 @@ class _EnhancePageState extends State<EnhancePage> {
                 ),
                 SizedBox(height: 14.sp),
               ],
-              ElevatedButton(
-                onPressed: photo == null || _working ? null : _enhance,
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: ColorSelect.maineColor,
-                  foregroundColor: Colors.white,
-                  padding: EdgeInsets.symmetric(vertical: 13.sp),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10.sp),
-                  ),
+              GalleryButton(
+                label: DeviceStrings.t(
+                  lang,
+                  _isSaved ? 'gallery_tool_saved' : 'gallery_enhance_action',
                 ),
-                child: _working
-                    ? SizedBox(
-                        width: 18.sp,
-                        height: 18.sp,
-                        child: const CircularProgressIndicator(
-                          strokeWidth: 2,
-                          color: Colors.white,
-                        ),
-                      )
-                    : Text(
-                        DeviceStrings.t(lang, 'gallery_enhance_action'),
-                        style: TextStyle(fontFamily: 'Poppins', fontSize: 13.sp,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
+                busy: _working,
+                // A successful report means this photo is already in the
+                // gallery at 4K; enhancing it again would only write a copy.
+                // Picking another photo clears the report.
+                onPressed: photo == null || _isSaved ? null : _enhance,
               ),
               if (_working) ...[
                 SizedBox(height: 10.sp),
@@ -213,7 +200,7 @@ class _EnhancePageState extends State<EnhancePage> {
               // clear of it. It is also the only ad on this screen — no
               // banner competes with it.
               SizedBox(height: 18.sp),
-              _adManager.nativeWidget(),
+              const HybridAdSlot(templateType: TemplateType.small, padding: EdgeInsets.zero),
             ],
           ),
         ),
